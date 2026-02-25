@@ -1,11 +1,10 @@
-
-
 "use client";
 
 import { useState, ChangeEvent, DragEvent, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-//  Types 
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ModalType = "quiz" | "flashcards" | "recording" | "youtube" | null;
 
@@ -13,11 +12,11 @@ interface UploadedFile {
   id: number;
   name: string;
   ext: string;
-  progress: number;   // 0-100
+  progress: number;
   done: boolean;
 }
 
-// Helpers
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getExt(name: string) {
   return name.split(".").pop()?.toUpperCase() ?? "FILE";
@@ -42,18 +41,14 @@ function simulateUpload(
     if (current >= 100) {
       current = 100;
       clearInterval(interval);
-      setter((prev) =>
-        prev.map((f) => (f.id === id ? { ...f, progress: 100, done: true } : f))
-      );
+      setter((prev) => prev.map((f) => (f.id === id ? { ...f, progress: 100, done: true } : f)));
     } else {
-      setter((prev) =>
-        prev.map((f) => (f.id === id ? { ...f, progress: current } : f))
-      );
+      setter((prev) => prev.map((f) => (f.id === id ? { ...f, progress: current } : f)));
     }
   }, 280);
 }
 
-//  Top-right Progress Panel 
+// ─── Progress Panel ───────────────────────────────────────────────────────────
 
 function ProgressPanel({
   files,
@@ -66,60 +61,46 @@ function ProgressPanel({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const uploading = files.filter((f) => !f.done);
-  const done = files.filter((f) => f.done);
 
   if (files.length === 0) return null;
 
   return (
-    <div className="fixed top-5 right-5 z-200 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-      {/* Header */}
+    <div className="fixed top-5 right-5 z-[200] w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-gray-700">
             {uploading.length > 0 ? "Uploading files" : "Upload complete"}
           </span>
           {uploading.length > 0 && (
-            <svg className="w-4 h-4 cursor-pointer animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
           )}
         </div>
-        <button onClick={() => setCollapsed((c) => !c)} className="text-gray-400 hover:text-gray-600 transition">
+        <button onClick={() => setCollapsed((c) => !c)} className="text-gray-400 hover:text-gray-600 transition cursor-pointer">
           <svg className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
           </svg>
         </button>
       </div>
-
-      {/* File rows */}
       {!collapsed && (
         <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
           {files.map((file) => {
             const { bg, text } = extColor(file.ext);
             return (
               <div key={file.id} className="flex items-center gap-3 px-4 py-3">
-                {/* Ext badge */}
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${bg} ${text} shrink-0`}>
-                  {file.ext}
-                </span>
-
-                {/* Name + bar */}
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${bg} ${text} shrink-0`}>{file.ext}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-700 truncate">{file.name}</p>
                   <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{ width: `${file.progress}%`, backgroundColor: accentColor }}
-                    />
+                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${file.progress}%`, backgroundColor: accentColor }} />
                   </div>
                 </div>
-
-                {/* Right side */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   {file.done ? (
-                    <button onClick={() => onRemove(file.id)} className="text-gray-300 hover:text-red-400 transition">
-                      <svg className="w-4 h-4 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <button onClick={() => onRemove(file.id)} className="text-gray-300 hover:text-red-400 transition cursor-pointer">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
@@ -136,16 +117,10 @@ function ProgressPanel({
   );
 }
 
-//  Modal Shell 
+// ─── Modal Shell ──────────────────────────────────────────────────────────────
 
 function ModalShell({
-  title,
-  subtitle,
-  onClose,
-  onSave,
-  saveLabel,
-  saveDisabled,
-  children,
+  title, subtitle, onClose, onSave, saveLabel, saveDisabled, children,
 }: {
   title: string;
   subtitle: string;
@@ -181,18 +156,10 @@ function ModalShell({
   );
 }
 
-// File Upload Area (shared) 
+// ─── File Upload Area ─────────────────────────────────────────────────────────
 
 function FileUploadArea({
-  files,
-  onAdd,
-  onRemove,
-  accept,
-  borderHover,
-  accentColor,
-  icon,
-  label,
-  sublabel,
+  files, onAdd, onRemove, accept, borderHover, accentColor, icon, label, sublabel,
 }: {
   files: UploadedFile[];
   onAdd: (newFiles: File[]) => void;
@@ -206,13 +173,11 @@ function FileUploadArea({
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const inputId = useRef(`fi-${Math.random().toString(36).slice(2)}`).current;
-
   const donFiles = files.filter((f) => f.done);
   const uploadingFiles = files.filter((f) => !f.done);
 
   return (
     <div className="space-y-3">
-      {/* Drop zone */}
       <label
         htmlFor={inputId}
         onDragOver={(e: DragEvent<HTMLLabelElement>) => { e.preventDefault(); setIsDragging(true); }}
@@ -225,8 +190,6 @@ function FileUploadArea({
           ${isDragging ? `${borderHover} bg-gray-50` : `border-gray-300 ${borderHover.replace("border-", "hover:border-")}`}`}
       >
         <div className="opacity-70">{icon}</div>
-
-        {/* Show completed files inside the drop zone */}
         {donFiles.length > 0 && (
           <div className="w-full space-y-1.5">
             {donFiles.map((f) => {
@@ -235,11 +198,7 @@ function FileUploadArea({
                 <div key={f.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${bg} ${text} shrink-0`}>{f.ext}</span>
                   <span className="text-xs text-gray-700 truncate flex-1">{f.name}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); onRemove(f.id); }}
-                    className="text-gray-300 cursor-pointer hover:text-red-400 transition shrink-0"
-                  >
+                  <button type="button" onClick={(e) => { e.preventDefault(); onRemove(f.id); }} className="text-gray-300 cursor-pointer hover:text-red-400 transition shrink-0">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -249,7 +208,6 @@ function FileUploadArea({
             })}
           </div>
         )}
-
         <p className="text-gray-500 text-sm">{label}</p>
         <p className="text-gray-400 text-xs text-center">{sublabel}</p>
         <input id={inputId} type="file" multiple accept={accept} className="hidden"
@@ -258,8 +216,6 @@ function FileUploadArea({
             e.target.value = "";
           }} />
       </label>
-
-      {/* Uploading pills (below dropzone) */}
       {uploadingFiles.length > 0 && (
         <div className="space-y-2">
           {uploadingFiles.map((f) => {
@@ -270,17 +226,12 @@ function FileUploadArea({
                 <span className="text-xs text-gray-700 truncate flex-1">{f.name}</span>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-gray-400">Uploading</span>
-                  {/* Spinner */}
                   <svg className="w-3.5 h-3.5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onRemove(f.id)}
-                  className="text-gray-300 hover:text-red-400 transition shrink-0"
-                >
+                <button type="button" onClick={() => onRemove(f.id)} className="text-gray-300 cursor-pointer hover:text-red-400 transition shrink-0">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -294,7 +245,7 @@ function FileUploadArea({
   );
 }
 
-// useFileUpload hook 
+// ─── useFileUpload ─────────────────────────────────────────────────────────────
 
 function useFileUpload(accentColor: string) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -320,15 +271,9 @@ function useFileUpload(accentColor: string) {
   return { files, addFiles, removeFile, reset };
 }
 
-//  Quiz Modal 
+// ─── Quiz Modal ───────────────────────────────────────────────────────────────
 
-function QuizModal({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void;
-  onSave: (files: UploadedFile[]) => void;
-}) {
+function QuizModal({ onClose, onSave }: { onClose: () => void; onSave: (files: UploadedFile[]) => void }) {
   const { files, addFiles, removeFile } = useFileUpload("#EAB308");
   const doneCount = files.filter((f) => f.done).length;
 
@@ -344,12 +289,9 @@ function QuizModal({
         saveDisabled={doneCount === 0}
       >
         <FileUploadArea
-          files={files}
-          onAdd={addFiles}
-          onRemove={removeFile}
+          files={files} onAdd={addFiles} onRemove={removeFile}
           accept=".pdf,.doc,.docx,.txt,.ppt,.pptx"
-          borderHover="border-yellow-400"
-          accentColor="#EAB308"
+          borderHover="border-yellow-400" accentColor="#EAB308"
           label="Drag your reading material here"
           sublabel="PDF, Word, PowerPoint, or plain text — we'll handle the rest"
           icon={
@@ -363,15 +305,9 @@ function QuizModal({
   );
 }
 
-//  Flashcard Modal 
+// ─── Flashcard Modal ──────────────────────────────────────────────────────────
 
-function FlashcardModal({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void;
-  onSave: (files: UploadedFile[]) => void;
-}) {
+function FlashcardModal({ onClose, onSave }: { onClose: () => void; onSave: (files: UploadedFile[]) => void }) {
   const { files, addFiles, removeFile } = useFileUpload("#22C55E");
   const doneCount = files.filter((f) => f.done).length;
 
@@ -387,12 +323,9 @@ function FlashcardModal({
         saveDisabled={doneCount === 0}
       >
         <FileUploadArea
-          files={files}
-          onAdd={addFiles}
-          onRemove={removeFile}
+          files={files} onAdd={addFiles} onRemove={removeFile}
           accept=".pdf,.doc,.docx,.txt,.ppt,.pptx"
-          borderHover="border-green-400"
-          accentColor="#22C55E"
+          borderHover="border-green-400" accentColor="#22C55E"
           label="Drag your reading material here"
           sublabel="PDF, Word, PowerPoint, or plain text — we'll handle the rest"
           icon={
@@ -406,7 +339,7 @@ function FlashcardModal({
   );
 }
 
-// YouTube Modal 
+// ─── YouTube Modal ────────────────────────────────────────────────────────────
 
 interface YoutubeUpload {
   id: number;
@@ -415,13 +348,7 @@ interface YoutubeUpload {
   done: boolean;
 }
 
-function YoutubeModal({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void;
-  onSave: (url: string) => void;
-}) {
+function YoutubeModal({ onClose, onSave }: { onClose: () => void; onSave: (url: string) => void }) {
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const [uploads, setUploads] = useState<YoutubeUpload[]>([]);
@@ -438,6 +365,7 @@ function YoutubeModal({
   const validInput = isValid(input.trim());
   const thumbnail = validInput ? getThumbnail(input.trim()) : "";
   const anyDone = uploads.some((u) => u.done);
+  const firstDoneUrl = uploads.find((u) => u.done)?.url ?? "";
 
   const handleProcess = () => {
     if (!validInput) { setError("Please enter a valid YouTube URL."); return; }
@@ -461,9 +389,8 @@ function YoutubeModal({
 
   return (
     <>
-      {/* YouTube progress panel */}
       {uploads.length > 0 && (
-        <div className="fixed top-5 right-5 z-200 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div className="fixed top-5 right-5 z-[200] w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-700">
@@ -491,7 +418,7 @@ function YoutubeModal({
                 </div>
                 <div className="shrink-0">
                   {u.done ? (
-                    <button onClick={() => setUploads((p) => p.filter((x) => x.id !== u.id))} className="text-gray-300 hover:text-red-400 transition">
+                    <button onClick={() => setUploads((p) => p.filter((x) => x.id !== u.id))} className="text-gray-300 cursor-pointer hover:text-red-400 transition">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -510,7 +437,7 @@ function YoutubeModal({
         title="Paste a YouTube Link"
         subtitle="Turn any video into study material"
         onClose={onClose}
-        onSave={() => { onSave(input); onClose(); }}
+        onSave={() => { onSave(firstDoneUrl); onClose(); }}
         saveLabel={!anyDone ? "Process a Video First" : "Continue"}
         saveDisabled={!anyDone}
       >
@@ -520,14 +447,13 @@ function YoutubeModal({
               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
             </svg>
 
-            {/* Done uploads shown inside drop zone */}
             {uploads.filter((u) => u.done).map((u) => (
               <div key={u.id} className="flex items-center gap-2 w-full bg-white border border-red-100 rounded-lg px-3 py-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="#EF4444">
                   <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                 </svg>
                 <span className="text-xs text-gray-700 truncate flex-1">{u.url.replace("https://", "").replace("www.", "")}</span>
-                <button onClick={() => setUploads((p) => p.filter((x) => x.id !== u.id))} className="text-gray-300 hover:text-red-400 transition">
+                <button onClick={() => setUploads((p) => p.filter((x) => x.id !== u.id))} className="text-gray-300 cursor-pointer hover:text-red-400 transition">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -535,7 +461,6 @@ function YoutubeModal({
               </div>
             ))}
 
-            {/* Uploading pills */}
             {uploads.filter((u) => !u.done).map((u) => (
               <div key={u.id} className="flex items-center gap-3 w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="#EF4444">
@@ -550,7 +475,6 @@ function YoutubeModal({
               </div>
             ))}
 
-            {/* Thumbnail preview */}
             {thumbnail && uploads.length === 0 && (
               <div className="flex items-center gap-3 w-full bg-red-50 border border-red-100 rounded-lg px-3 py-2">
                 <img src={thumbnail} alt="thumb" className="w-14 h-10 object-cover rounded shrink-0" />
@@ -574,7 +498,7 @@ function YoutubeModal({
               type="button"
               onClick={handleProcess}
               disabled={!validInput}
-              className={`w-full py-2 rounded-lg text-sm font-medium transition-all active:scale-95 ${validInput ? "bg-red-500 hover:bg-red-600 text-white" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+              className={`w-full py-2 rounded-lg text-sm font-medium transition-all active:scale-95 ${validInput ? "bg-red-500 hover:bg-red-600 text-white cursor-pointer" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
             >
               Process Video
             </button>
@@ -587,68 +511,67 @@ function YoutubeModal({
   );
 }
 
-// Recording Modal 
+// ─── Recording Modal ──────────────────────────────────────────────────────────
+// Exactly like the reference image: "Record Lecture" with Microphone + Browser Tab options
 
 function RecordingModal({
   onClose,
-  onSave,
+  onMicrophone,
+  onBrowserTab,
 }: {
   onClose: () => void;
-  onSave: (files: UploadedFile[]) => void;
+  onMicrophone: () => void;
+  onBrowserTab: () => void;
 }) {
-  const { files, addFiles, removeFile } = useFileUpload("#38BDF8");
-  const doneCount = files.filter((f) => f.done).length;
-
   return (
-    <>
-      <ProgressPanel files={files} accentColor="#38BDF8" onRemove={removeFile} />
-      <ModalShell
-        title="Record a Lecture"
-        subtitle="Upload an audio file or start a live recording"
-        onClose={onClose}
-        onSave={() => { if (doneCount > 0) { onSave(files); onClose(); } }}
-        saveLabel={doneCount === 0 ? "Add Audio First" : `Process ${doneCount} Audio File${doneCount > 1 ? "s" : ""}`}
-        saveDisabled={doneCount === 0}
-      >
-        <div className="space-y-3">
-          <FileUploadArea
-            files={files}
-            onAdd={addFiles}
-            onRemove={removeFile}
-            accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm"
-            borderHover="border-sky-400"
-            accentColor="#38BDF8"
-            label="Drag your audio file here to upload"
-            sublabel="MP3, WAV, M4A, OGG supported"
-            icon={
-              <svg width="34" height="34" fill="none" viewBox="0 0 24 24" stroke="#38BDF8" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-              </svg>
-            }
-          />
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="flex items-center justify-between px-6 pt-6 pb-2">
+          <h2 className="text-xl font-semibold text-gray-800">Record Lecture</h2>
+          <button onClick={onClose} className="text-gray-400 cursor-pointer hover:text-gray-600 transition text-xl leading-none">✕</button>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-xs text-gray-400">or</span>
-            <div className="flex-1 h-px bg-gray-100" />
-          </div>
-
+        <div className="px-6 pb-6 pt-4 space-y-3">
+          {/* Microphone */}
           <button
-            type="button"
-            onClick={onClose}
-            className="w-full flex items-center justify-center gap-3 py-4 border-2 border-dotted border-sky-300 hover:border-sky-500 hover:bg-sky-50 rounded-xl transition text-sky-500 font-medium text-sm"
+            onClick={onMicrophone}
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
           >
-            <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse shrink-0" />
-            Start Live Recording
-            <span className="text-xs text-sky-400 font-normal">→ opens recording page</span>
+            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 group-hover:bg-gray-200 transition-colors">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">Microphone</p>
+              <p className="text-xs text-gray-400 mt-0.5">Record your voice or class</p>
+            </div>
+          </button>
+
+          {/* Browser Tab */}
+          <button
+            onClick={onBrowserTab}
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
+          >
+            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 group-hover:bg-gray-200 transition-colors">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">Browser Tab</p>
+              <p className="text-xs text-gray-400 mt-0.5">Capture audio playing in a browser tab</p>
+            </div>
           </button>
         </div>
-      </ModalShell>
-    </>
+      </div>
+    </div>
   );
 }
 
-// Page
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const [youtubeLink, setYoutubeLink] = useState("");
@@ -774,11 +697,58 @@ export default function DashboardPage() {
         </button>
       </form>
 
+      {/* Recent */}
+      <div className="flex items-center justify-between w-full max-w-2xl mb-4 mt-10">
+        <div className="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <h1>Recent</h1>
+        </div>
+        <div>
+          <Link href="/history" className="flex items-center gap-2 hover:text-gray-700 transition-colors duration-200">
+            <h1>View all</h1>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </Link>
+        </div>
+      </div>
+
       {/* Modals */}
       {activeModal === "quiz" && <QuizModal onClose={closeModal} onSave={() => {}} />}
       {activeModal === "flashcards" && <FlashcardModal onClose={closeModal} onSave={() => {}} />}
-      {activeModal === "youtube" && <YoutubeModal onClose={closeModal} onSave={() => {}} />}
-      {activeModal === "recording" && <RecordingModal onClose={closeModal} onSave={() => {}} />}
+
+      {activeModal === "youtube" && (
+        <YoutubeModal
+          onClose={closeModal}
+          onSave={(url) => {
+            const id = Math.random().toString(36).slice(2, 18);
+            router.push(`/content/${id}?url=${encodeURIComponent(url)}`);
+          }}
+        />
+      )}
+
+      {activeModal === "recording" && (
+        <RecordingModal
+          onClose={closeModal}
+          onMicrophone={() => {
+            // Microphone: goes to content page, recording starts immediately on arrival
+            closeModal();
+            const id = Math.random().toString(36).slice(2, 18);
+            router.push(`/content/${id}?mode=microphone`);
+          }}
+          onBrowserTab={() => {
+            // Browser Tab: triggers screen/tab share picker, records only audio
+            closeModal();
+            const id = Math.random().toString(36).slice(2, 18);
+            router.push(`/content/${id}?mode=browsertab`);
+          }}
+        />
+      )}
     </main>
   );
 }

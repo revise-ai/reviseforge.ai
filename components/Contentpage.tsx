@@ -9,24 +9,7 @@ type Mode = "youtube" | "microphone" | "browsertab";
 // ─── Sidebar panel data (same for both YouTube and Recording) ──────────────────
 
 const panels = [
-  // {
-  //   label: "Podcast",
-  //   icon: (
-  //     <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#9B6FE0" strokeWidth={1.8}>
-  //       <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-  //     </svg>
-  //   ),
-  // },
-  // {
-  //   label: "Video",
-  //   badge: "Beta",
-  //   icon: (
-  //     <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#4B9CF5" strokeWidth={1.8}>
-  //       <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-  //       <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  //     </svg>
-  //   ),
-  // },
+ 
   {
     label: "Summary",
     icon: (
@@ -51,14 +34,16 @@ const panels = [
       </svg>
     ),
   },
-  // {
-  //   label: "Notes",
-  //   icon: (
-  //     <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#E0B83A" strokeWidth={1.8}>
-  //       <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-  //     </svg>
-  //   ),
-  // },
+ {
+  label: "Exams Mode",
+  icon: (
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#E0B83A" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 9.5v5" />
+    </svg>
+  ),
+},
 ];
 
 // ─── Right Sidebar ─────────────────────────────────────────────────────────────
@@ -67,10 +52,12 @@ function RightSidebar({
   open,
   onToggle,
   mode,
+  isChat,
 }: {
   open: boolean;
   onToggle: () => void;
   mode: Mode;
+  isChat: boolean;
 }) {
   const isRecording = mode === "microphone" || mode === "browsertab";
 
@@ -88,9 +75,9 @@ function RightSidebar({
         </button>
       )}
 
-      {/* Sidebar panel  the w for the right sidebar-[500px]*/}
+      {/* Sidebar panel */}
       <div
-        className={`relative flex flex-col border-l border-gray-200 bg-white transition-all duration-300 ease-in-out shrink-0 ${open ? "w-125" : "w-0 overflow-hidden"}`}
+        className={`relative flex flex-col border-l border-gray-200 bg-white transition-all duration-300 ease-in-out shrink-0 ${open ? "w-130" : "w-0 overflow-hidden"}`}
       >
         {/* Toggle button when open */}
         {open && (
@@ -109,17 +96,8 @@ function RightSidebar({
             {/* Header — "Learn Tab" with green dot */}
             <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-gray-100">
               <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-              <span className="text-sm font-medium text-gray-700">Learn Tab</span>
-              <button className="ml-auto text-gray-400 hover:text-gray-600 cursor-pointer transition">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <button className="text-gray-400 hover:text-gray-600 cursor-pointer transition ml-1">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
+              <span className="text-sm font-medium text-gray-700">StudyForge</span>
+             
             </div>
 
             {/* Generate label */}
@@ -140,9 +118,7 @@ function RightSidebar({
                       <span className="shrink-0">{p.icon}</span>
                       <span className="text-sm text-gray-700 font-medium leading-tight">
                         {p.label}
-                        {/* {p.badge && (
-                          <span className="ml-1 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-normal">{p.badge}</span>
-                        )} */}
+                       
                       </span>
                       <span className="ml-auto text-gray-300 group-hover:text-gray-400 shrink-0">
                         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -164,9 +140,7 @@ function RightSidebar({
                         <span className="shrink-0">{p.icon}</span>
                         <span className="text-sm text-gray-500 font-medium leading-tight">
                           {p.label}
-                          {/* {p.badge && (
-                            <span className="ml-1 text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-normal">{p.badge}</span>
-                          )} */}
+                          
                         </span>
                       </div>
                     ))}
@@ -176,7 +150,8 @@ function RightSidebar({
               )}
             </div>
 
-            {/* Bottom input */}
+            {/* Bottom input — only for YouTube and Recording, not chat */}
+            {!isChat && (
             <div className="px-4 py-4 border-t border-gray-100">
               <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3 border border-gray-200 focus-within:border-gray-300 transition-colors">
                 <input
@@ -191,6 +166,7 @@ function RightSidebar({
                 </button>
               </div>
             </div>
+            )}
           </div>
         )}
       </div>
@@ -221,22 +197,24 @@ function YoutubeView({ url }: { url: string }) {
   ];
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Video */}
-      <div className="bg-black w-full shrink-0" style={{ aspectRatio: "16/9", maxHeight: "300px" }}>
-        {videoId ? (
-          <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${videoId}`} allowFullScreen />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="#EF4444">
-              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-            </svg>
-          </div>
-        )}
+    <div className="flex flex-col h-full overflow-hidden bg-white">
+      {/* Video — padded and rounded */}
+      <div className="px-4 pt-4 shrink-0">
+        <div className="rounded-2xl overflow-hidden bg-black shadow-md" style={{ aspectRatio: "16/9", maxHeight: "420px" }}>
+          {videoId ? (
+            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} allowFullScreen />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="#EF4444">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+              </svg>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tabs + controls */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-white shrink-0 mt-1">
         <div className="flex items-center gap-1">
           <button
             onClick={() => setActiveTab("chapters")}
@@ -453,19 +431,151 @@ function RecordingView({ mode }: { mode: "microphone" | "browsertab" }) {
   );
 }
 
+
+// ─── Chat View ─────────────────────────────────────────────────────────────────
+
+function ChatView({ initialQuery, uploadedFile }: { initialQuery: string; uploadedFile: string }) {
+  const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>(() => {
+    const msgs: { role: "user" | "ai"; text: string }[] = [];
+    if (uploadedFile) {
+      msgs.push({ role: "user", text: `Uploaded: ${uploadedFile}` });
+      msgs.push({ role: "ai", text: `I've received your file **${uploadedFile}**. I can summarize it, generate flashcards, create a quiz, or answer questions about it. What would you like to do?` });
+    } else if (initialQuery) {
+      msgs.push({ role: "user", text: initialQuery });
+      msgs.push({ role: "ai", text: `Hi! I'm your AI study assistant. You said: "${initialQuery}". How can I help you study this topic? I can create flashcards, generate a quiz, summarize content, or just chat about it.` });
+    } else {
+      msgs.push({ role: "ai", text: "Hi! I'm your AI study assistant. Paste a YouTube link, upload a document, or ask me anything to get started." });
+    }
+    return msgs;
+  });
+  const [input, setInput] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendMessage = () => {
+    const text = input.trim();
+    if (!text) return;
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text },
+      { role: "ai", text: `Got it! Working on: "${text}". This is where the AI response will appear once connected to your backend.` },
+    ]);
+    setInput("");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text: `Uploaded: ${file.name}` },
+      { role: "ai", text: `I've received **${file.name}**. I can summarize it, generate flashcards, create a quiz, or answer questions about it. What would you like to do?` },
+    ]);
+    e.target.value = "";
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden bg-white">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} gap-3`}>
+            {msg.role === "ai" && (
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+            )}
+            <div
+              className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                msg.role === "user"
+                  ? "bg-gray-900 text-white rounded-tr-sm"
+                  : "bg-gray-50 border border-gray-100 text-gray-700 rounded-tl-sm"
+              }`}
+            >
+              {msg.text}
+            </div>
+            {msg.role === "user" && (
+              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mt-0.5">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#6B7280" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+            )}
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input bar */}
+      <div className="px-6 py-4 border-t border-gray-100 bg-white shrink-0">
+        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-blue-300 transition-colors">
+          {/* Upload */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            title="Upload file"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.mp3,.wav,.m4a"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            placeholder="Ask anything, or paste a YouTube link..."
+            className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none"
+          />
+          <button
+            type="button"
+            onClick={sendMessage}
+            disabled={!input.trim()}
+            className="w-8 h-8 shrink-0 rounded-xl bg-blue-600 disabled:bg-gray-200 flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ContentPage ──────────────────────────────────────────────────────────
 
-export default function Contentpage() {
+export default function Contentpages() {
   const params = useSearchParams();
   const mode = (params.get("mode") as Mode) ?? "youtube";
   const url = params.get("url") ?? "";
+  const initialQuery = params.get("q") ?? "";
+  const uploadedFile = params.get("file") ?? "";
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const isRecording = mode === "microphone" || mode === "browsertab";
+  const isChat = mode === "chat";
 
   const title = isRecording
     ? `Recording at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+    : isChat
+    ? (initialQuery || uploadedFile || "Chat")
     : url
     ? url.replace("https://", "").replace("www.", "").slice(0, 70)
     : "Content";
@@ -497,8 +607,9 @@ export default function Contentpage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Main */}
         <div className="flex-1 overflow-hidden min-w-0">
-          {!isRecording && <YoutubeView url={url} />}
+          {!isRecording && !isChat && <YoutubeView url={url} />}
           {isRecording && <RecordingView mode={mode as "microphone" | "browsertab"} />}
+          {isChat && <ChatView initialQuery={initialQuery} uploadedFile={uploadedFile} />}
         </div>
 
         {/* Right sidebar */}
@@ -506,6 +617,7 @@ export default function Contentpage() {
           open={sidebarOpen}
           onToggle={() => setSidebarOpen((o) => !o)}
           mode={mode}
+          isChat={isChat}
         />
       </div>
     </div>

@@ -353,13 +353,19 @@ function YoutubeModal({ onClose, onSave }: { onClose: () => void; onSave: (url: 
   const [error, setError] = useState("");
   const [uploads, setUploads] = useState<YoutubeUpload[]>([]);
 
-  function isValid(url: string) {
-    return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)[\w-]{11}/.test(url);
+  function extractVideoId(url: string): string | null {
+    const m = url.match(/(?:v=|youtu\.be\/|\/shorts\/|\/live\/|\/embed\/)([\w-]{11})/);
+    return m ? m[1] : null;
   }
 
-  function getThumbnail(url: string) {
-    const m = url.match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/);
-    return m ? `https://img.youtube.com/vi/${m[1]}/default.jpg` : "";
+  function isValid(url: string): boolean {
+    if (!url.includes("youtube.com") && !url.includes("youtu.be")) return false;
+    return extractVideoId(url) !== null;
+  }
+
+  function getThumbnail(url: string): string {
+    const id = extractVideoId(url);
+    return id ? `https://img.youtube.com/vi/${id}/default.jpg` : "";
   }
 
   const validInput = isValid(input.trim());
@@ -577,12 +583,29 @@ export default function DashboardPage() {
   const [youtubeLink, setYoutubeLink] = useState("");
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const closeModal = () => setActiveModal(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (youtubeLink.trim()) console.log("Processing link:", youtubeLink);
+    const text = youtubeLink.trim();
+    if (!text) return;
+    const id = Math.random().toString(36).slice(2, 18);
+    if (text.includes("youtube.com") || text.includes("youtu.be")) {
+      router.push(`/content/${id}?url=${encodeURIComponent(text)}`);
+    } else {
+      router.push(`/content/${id}?mode=chat&q=${encodeURIComponent(text)}`);
+    }
+    setYoutubeLink("");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const id = Math.random().toString(36).slice(2, 18);
+    router.push(`/content/${id}?mode=chat&file=${encodeURIComponent(file.name)}`);
+    e.target.value = "";
   };
 
   const tools = [
@@ -682,11 +705,27 @@ export default function DashboardPage() {
       {/* Input Bar */}
       <form onSubmit={handleSubmit}
         className="w-full max-w-2xl flex items-center gap-2 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
-        <svg className="w-5 h-5 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-        </svg>
+        {/* Upload icon */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+          title="Upload file"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+          </svg>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.webm"
+          className="hidden"
+          onChange={handleFileUpload}
+        />
         <input type="text" value={youtubeLink} onChange={(e) => setYoutubeLink(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit(e as any)}
           placeholder="Ask anything, or paste a YouTube link..."
           className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-300 outline-none" />
         <button type="submit" disabled={!youtubeLink.trim()}

@@ -13,7 +13,7 @@ const Footer = () => {
         <footer className="bg-[#131314] w-full max-w-337.5 mx-auto text-white pt-8 lg:pt-12 px-4 sm:px-8 md:px-16 lg:px-28 rounded-tl-3xl rounded-tr-3xl overflow-hidden">
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-6 gap-8 md:gap-12">
             <div className="lg:col-span-3 space-y-6">
-              <a href="https://prebuiltui.com" className="block">
+              <a href="" className="block">
                 <svg
                   width="157"
                   height="40"
@@ -219,7 +219,7 @@ const Footer = () => {
           <div className="relative">
             <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl h-full max-h-64 bg-blue-500 rounded-full blur-[170px] pointer-events-none" />
             <h3 className="text-center font-extrabold leading-[0.7] text-transparent text-[clamp(3rem,14vw,15rem)] [-webkit-text-stroke:1px_#0D3B54] mt-6">
-              StudyForge
+              ReviseForge
             </h3>
           </div>
         </footer>

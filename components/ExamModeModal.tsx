@@ -1,11 +1,13 @@
+// File path: components/ExamModeModal.tsx
 "use client";
 
 import { useState, ChangeEvent, DragEvent, useRef, useCallback } from "react";
 
-// Types 
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface UploadedFile {
   id: number;
+  file: File;        // real File stored here — passed to page on Start
   name: string;
   ext: string;
   progress: number;
@@ -15,17 +17,17 @@ interface UploadedFile {
 interface ExamModeModalProps {
   show: boolean;
   onClose: () => void;
-  onReady: () => void; // called when files are uploaded and user clicks Start Exam
+  onReady: (file: File) => void; // ← now passes the real File to the page
 }
 
-// Helpers 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getExt(name: string) {
   return name.split(".").pop()?.toUpperCase() ?? "FILE";
 }
 
 function extColor(ext: string) {
-  if (["PDF"].includes(ext)) return { bg: "bg-red-100", text: "text-red-500" };
+  if (ext === "PDF") return { bg: "bg-red-100", text: "text-red-500" };
   if (["DOC", "DOCX"].includes(ext)) return { bg: "bg-blue-100", text: "text-blue-500" };
   if (["PPT", "PPTX"].includes(ext)) return { bg: "bg-orange-100", text: "text-orange-500" };
   return { bg: "bg-gray-100", text: "text-gray-500" };
@@ -52,7 +54,7 @@ function simulateUpload(
   }, 280);
 }
 
-// Progress Panel (top-right) 
+// ─── Progress Panel (top-right) ───────────────────────────────────────────────
 
 function ProgressPanel({
   files,
@@ -67,7 +69,7 @@ function ProgressPanel({
   if (files.length === 0) return null;
 
   return (
-    <div className="fixed top-5 right-5 z-200 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+    <div className="fixed top-5 right-5 z-[200] w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-gray-700">
@@ -80,8 +82,14 @@ function ProgressPanel({
             </svg>
           )}
         </div>
-        <button onClick={() => setCollapsed((c) => !c)} className="text-gray-400 hover:text-gray-600 transition">
-          <svg className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="text-gray-400 hover:text-gray-600 transition cursor-pointer"
+        >
+          <svg
+            className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
           </svg>
         </button>
@@ -107,7 +115,10 @@ function ProgressPanel({
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {file.done ? (
-                    <button onClick={() => onRemove(file.id)} className="text-gray-300 hover:text-red-400 transition cursor-pointer">
+                    <button
+                      onClick={() => onRemove(file.id)}
+                      className="text-gray-300 hover:text-red-400 transition cursor-pointer"
+                    >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -125,7 +136,7 @@ function ProgressPanel({
   );
 }
 
-// Modal 
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
 export default function ExamModeModal({ show, onClose, onReady }: ExamModeModalProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -139,6 +150,7 @@ export default function ExamModeModal({ show, onClose, onReady }: ExamModeModalP
   const addFiles = useCallback((incoming: File[]) => {
     const newEntries: UploadedFile[] = incoming.map((f) => ({
       id: Date.now() + Math.random(),
+      file: f,
       name: f.name,
       ext: getExt(f.name),
       progress: 0,
@@ -164,8 +176,10 @@ export default function ExamModeModal({ show, onClose, onReady }: ExamModeModalP
   };
 
   const handleStartExam = () => {
-    onReady(); // tell the page: files are ready, proceed
+    if (doneCount === 0) return;
+    const firstDone = doneFiles[0];
     setFiles([]);
+    onReady(firstDone.file); // pass real File to page
   };
 
   const handleClose = () => {
@@ -209,12 +223,11 @@ export default function ExamModeModal({ show, onClose, onReady }: ExamModeModalP
             {/* Info pills */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               {[
-                { icon: "⏱️", label: "Timed sessions" },
-                { icon: "🎯", label: "Auto-generated questions" },
-                { icon: "📊", label: "Instant score & feedback" },
+                { label: "Timed sessions" },
+                { label: "Auto-generated questions" },
+                { label: "Instant score & feedback" },
               ].map((pill) => (
                 <span key={pill.label} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-blue-700 rounded-full text-xs font-medium">
-                  {/* <span>{pill.icon}</span> */}
                   {pill.label}
                 </span>
               ))}

@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import ExamModeModal from "@/components/ExamModeModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,7 +42,6 @@ interface ExamData {
 type Section = "mcq" | "fill" | "written";
 type Phase = "modal" | "loading" | "ready" | "active" | "done";
 
-// 45 minutes: MCQ ~30s × 20 = 10min, Fill ~60s × 15 = 15min, Written ~2.5min × 15 = 37min → compressed to 45min for exam pressure
 const TOTAL_SECONDS = 45 * 60;
 
 function fmt(s: number) {
@@ -109,10 +109,7 @@ function LoadingScreen({ fileName }: { fileName: string }) {
         <p className="text-xs text-gray-400">Generating 20 MCQ · 15 Fill-in · 15 Written questions</p>
       </div>
       <div className="w-64 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-blue-600 rounded-full"
-          style={{ animation: "loadbar 2s ease-in-out infinite" }}
-        />
+        <div className="h-full bg-blue-600 rounded-full" style={{ animation: "loadbar 2s ease-in-out infinite" }} />
       </div>
       <style>{`
         @keyframes loadbar {
@@ -142,7 +139,6 @@ function ReadyScreen({ fileName, onStart }: { fileName: string; onStart: () => v
         <p className="text-gray-400 text-sm mb-1 font-medium truncate px-8">{fileName}</p>
         <p className="text-gray-400 text-sm mb-8">Take a deep breath. Once you start, the timer begins immediately.</p>
 
-        {/* Stats */}
         <div className="grid grid-cols-4 gap-3 mb-8">
           {[
             { value: "20", label: "MCQ" },
@@ -157,7 +153,6 @@ function ReadyScreen({ fileName, onStart }: { fileName: string; onStart: () => v
           ))}
         </div>
 
-        {/* Rules */}
         <div className="bg-gray-900 rounded-2xl p-5 mb-8 text-left">
           <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <WarnIcon />
@@ -172,9 +167,7 @@ function ReadyScreen({ fileName, onStart }: { fileName: string; onStart: () => v
               "No hints. No explanations. Results shown only after you finish",
             ].map((rule, i) => (
               <li key={i} className="flex items-start gap-2.5 text-xs text-gray-300">
-                <span className="text-gray-600 shrink-0 font-mono mt-0.5 text-[10px]">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
+                <span className="text-gray-600 shrink-0 font-mono mt-0.5 text-[10px]">{String(i + 1).padStart(2, "0")}</span>
                 {rule}
               </li>
             ))}
@@ -197,15 +190,7 @@ function ReadyScreen({ fileName, onStart }: { fileName: string; onStart: () => v
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
 
-function ResultsScreen({
-  exam,
-  mcqAnswers,
-  fillAnswers,
-  writtenAnswers,
-  timeUsed,
-  timedOut,
-  onRetake,
-}: {
+function ResultsScreen({ exam, mcqAnswers, fillAnswers, writtenAnswers, timeUsed, timedOut, onRetake, sourceUrl }: {
   exam: ExamData;
   mcqAnswers: Record<number, "A" | "B" | "C" | "D">;
   fillAnswers: Record<number, string>;
@@ -213,14 +198,13 @@ function ResultsScreen({
   timeUsed: number;
   timedOut: boolean;
   onRetake: () => void;
+  sourceUrl?: string;
 }) {
   const mcqCorrect = exam.mcq.filter((q) => mcqAnswers[q.id] === q.correctAnswer).length;
   const fillCorrect = exam.fillInBlank.filter((q) =>
     (fillAnswers[q.id] ?? "").trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()
   ).length;
-  const writtenAttempted = exam.written.filter(
-    (q) => (writtenAnswers[q.id] ?? "").trim().length > 10
-  ).length;
+  const writtenAttempted = exam.written.filter((q) => (writtenAnswers[q.id] ?? "").trim().length > 10).length;
 
   const objTotal = exam.mcq.length + exam.fillInBlank.length;
   const objScore = mcqCorrect + fillCorrect;
@@ -235,14 +219,11 @@ function ResultsScreen({
   const ringColor = pct >= 70 ? "#2563EB" : pct >= 55 ? "#EAB308" : "#EF4444";
   const radius = 42;
   const circ = 2 * Math.PI * radius;
-
   const [openWritten, setOpenWritten] = useState<number | null>(null);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-12">
       <div className="max-w-2xl mx-auto">
-
-        {/* Header */}
         <div className="text-center mb-8">
           {timedOut && (
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium mb-4">
@@ -275,28 +256,18 @@ function ResultsScreen({
           <h2 className={`text-2xl font-semibold ${grade.color} mb-1`}>{grade.label}</h2>
           <p className="text-gray-400 text-sm">Objective score: {objScore} / {objTotal}</p>
           <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100">
-            <div>
-              <p className="text-xl font-bold text-gray-900">{mcqCorrect}/{exam.mcq.length}</p>
-              <p className="text-xs text-gray-400">MCQ</p>
-            </div>
-            <div>
-              <p className="text-xl font-bold text-gray-900">{fillCorrect}/{exam.fillInBlank.length}</p>
-              <p className="text-xs text-gray-400">Fill-in</p>
-            </div>
-            <div>
-              <p className="text-xl font-bold text-gray-900">{writtenAttempted}/{exam.written.length}</p>
-              <p className="text-xs text-gray-400">Written</p>
-            </div>
+            <div><p className="text-xl font-bold text-gray-900">{mcqCorrect}/{exam.mcq.length}</p><p className="text-xs text-gray-400">MCQ</p></div>
+            <div><p className="text-xl font-bold text-gray-900">{fillCorrect}/{exam.fillInBlank.length}</p><p className="text-xs text-gray-400">Fill-in</p></div>
+            <div><p className="text-xl font-bold text-gray-900">{writtenAttempted}/{exam.written.length}</p><p className="text-xs text-gray-400">Written</p></div>
           </div>
         </div>
 
-        {/* ── MCQ Review ── */}
+        {/* MCQ Review */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-4">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
               <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
             <div>
@@ -311,20 +282,14 @@ function ResultsScreen({
               return (
                 <div key={q.id} className="px-5 py-4 flex items-start gap-3">
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${correct ? "bg-green-100" : "bg-red-100"}`}>
-                    {correct
-                      ? <CheckIcon cls="w-3 h-3 text-green-600" />
-                      : <XIcon cls="w-3 h-3 text-red-500" />}
+                    {correct ? <CheckIcon cls="w-3 h-3 text-green-600" /> : <XIcon cls="w-3 h-3 text-red-500" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-700 font-medium mb-1">{i + 1}. {q.question}</p>
                     {!correct && (
                       <div className="space-y-1">
-                        {userAns && (
-                          <p className="text-xs text-red-500">Your answer: <span className="font-medium">{userAns}. {q.options[userAns]}</span></p>
-                        )}
-                        <p className="text-xs text-green-600 font-medium">
-                          Correct: {q.correctAnswer}. {q.options[q.correctAnswer]}
-                        </p>
+                        {userAns && <p className="text-xs text-red-500">Your answer: <span className="font-medium">{userAns}. {q.options[userAns]}</span></p>}
+                        <p className="text-xs text-green-600 font-medium">Correct: {q.correctAnswer}. {q.options[q.correctAnswer]}</p>
                         <p className="text-xs text-gray-400 leading-relaxed">{q.explanation}</p>
                       </div>
                     )}
@@ -335,13 +300,12 @@ function ResultsScreen({
           </div>
         </div>
 
-        {/* ── Fill-in Review ── */}
+        {/* Fill-in Review */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-4">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
               <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </div>
             <div>
@@ -356,14 +320,10 @@ function ResultsScreen({
               return (
                 <div key={q.id} className="px-5 py-4 flex items-start gap-3">
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${correct ? "bg-green-100" : "bg-red-100"}`}>
-                    {correct
-                      ? <CheckIcon cls="w-3 h-3 text-green-600" />
-                      : <XIcon cls="w-3 h-3 text-red-500" />}
+                    {correct ? <CheckIcon cls="w-3 h-3 text-green-600" /> : <XIcon cls="w-3 h-3 text-red-500" />}
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-gray-700 font-medium mb-1">
-                      {i + 1}. {q.question.replace("[BLANK]", `[ ${userAns || "—"} ]`)}
-                    </p>
+                    <p className="text-xs text-gray-700 font-medium mb-1">{i + 1}. {q.question.replace("[BLANK]", `[ ${userAns || "—"} ]`)}</p>
                     {!correct && (
                       <div className="space-y-1">
                         {userAns && <p className="text-xs text-red-500">Your answer: "{userAns}"</p>}
@@ -378,13 +338,12 @@ function ResultsScreen({
           </div>
         </div>
 
-        {/* ── Written Review ── */}
+        {/* Written Review */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
               <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
             </div>
             <div>
@@ -399,9 +358,7 @@ function ResultsScreen({
               return (
                 <div key={q.id} className="px-5 py-4 flex items-start gap-3">
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${attempted ? "bg-blue-100" : "bg-gray-100"}`}>
-                    {attempted
-                      ? <CheckIcon cls="w-3 h-3 text-blue-600" />
-                      : <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
+                    {attempted ? <CheckIcon cls="w-3 h-3 text-blue-600" /> : <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-gray-700 font-medium mb-2">{i + 1}. {q.question}</p>
@@ -411,10 +368,8 @@ function ResultsScreen({
                         <p className="text-xs text-gray-600 leading-relaxed">{userAns}</p>
                       </div>
                     )}
-                    <button
-                      onClick={() => setOpenWritten(openWritten === q.id ? null : q.id)}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium transition cursor-pointer"
-                    >
+                    <button onClick={() => setOpenWritten(openWritten === q.id ? null : q.id)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium transition cursor-pointer">
                       {openWritten === q.id ? "Hide model answer ↑" : "View model answer ↓"}
                     </button>
                     {openWritten === q.id && (
@@ -425,8 +380,7 @@ function ResultsScreen({
                         <ul className="space-y-1">
                           {q.keyPoints.map((pt, pi) => (
                             <li key={pi} className="flex items-start gap-1.5 text-xs text-blue-600">
-                              <span className="text-blue-300 shrink-0 mt-0.5">•</span>
-                              {pt}
+                              <span className="text-blue-300 shrink-0 mt-0.5">•</span>{pt}
                             </li>
                           ))}
                         </ul>
@@ -441,17 +395,21 @@ function ResultsScreen({
 
         {/* Actions */}
         <div className="flex gap-3">
-          <button
-            onClick={onRetake}
-            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white font-semibold rounded-xl text-sm cursor-pointer"
-          >
+          <button onClick={onRetake}
+            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white font-semibold rounded-xl text-sm cursor-pointer">
             New Exam
           </button>
-          <Link href="/dashboard"
-            className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold rounded-xl text-sm text-center transition-all cursor-pointer"
-          >
-            Dashboard
-          </Link>
+          {sourceUrl ? (
+            <Link href={`/content?mode=youtube&url=${encodeURIComponent(sourceUrl)}`}
+              className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold rounded-xl text-sm text-center transition-all cursor-pointer">
+              Back to Video
+            </Link>
+          ) : (
+            <Link href="/dashboard"
+              className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold rounded-xl text-sm text-center transition-all cursor-pointer">
+              Dashboard
+            </Link>
+          )}
         </div>
       </div>
     </main>
@@ -461,36 +419,73 @@ function ResultsScreen({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ExamModePage() {
-  const [phase, setPhase] = useState<Phase>("modal");
+  const searchParams = useSearchParams();
+
+  // Detect if we came from a YouTube video in the content page
+  const youtubeUrl = searchParams.get("url") ?? "";
+  const source = searchParams.get("source") ?? "";
+  const isYoutubeSource = source === "youtube" && !!youtubeUrl;
+
+  const [phase, setPhase] = useState<Phase>(isYoutubeSource ? "loading" : "modal");
   const [exam, setExam] = useState<ExamData | null>(null);
-  const [fileName, setFileName] = useState("");
+  const [fileName, setFileName] = useState(isYoutubeSource ? youtubeUrl : "");
   const [error, setError] = useState("");
 
-  // answers
   const [mcqAnswers, setMcqAnswers] = useState<Record<number, "A" | "B" | "C" | "D">>({});
   const [fillAnswers, setFillAnswers] = useState<Record<number, string>>({});
   const [writtenAnswers, setWrittenAnswers] = useState<Record<number, string>>({});
 
-  // navigation
   const [section, setSection] = useState<Section>("mcq");
   const [qIndex, setQIndex] = useState(0);
   const [blocked, setBlocked] = useState(false);
 
-  // timer
   const [timeLeft, setTimeLeft] = useState(TOTAL_SECONDS);
   const [timeUsed, setTimeUsed] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeLeftRef = useRef(TOTAL_SECONDS);
 
-  // submit (stable ref so timer can call it)
   const submitExam = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     setTimeUsed(TOTAL_SECONDS - timeLeftRef.current);
     setPhase("done");
   }, []);
 
-  // Generate exam
+  // ── Auto-generate from YouTube URL on mount ──────────────────────────────
+  useEffect(() => {
+    if (!isYoutubeSource) return;
+
+    const generateFromYoutube = async () => {
+      setPhase("loading");
+      setError("");
+      // Display a friendly name instead of the full URL
+      const displayName = youtubeUrl.replace("https://", "").replace("www.", "").slice(0, 60);
+      setFileName(displayName);
+
+      try {
+        const res = await fetch("/api/generate-exam-youtube", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: youtubeUrl }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to generate exam from video");
+        }
+        const data = await res.json();
+        setExam(data.exam);
+        setPhase("ready");
+      } catch (err: any) {
+        setError(err.message || "Something went wrong. Please try again.");
+        setPhase("modal"); // Fall back to modal if generation fails
+      }
+    };
+
+    generateFromYoutube();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // only run once on mount
+
+  // ── Generate exam from uploaded file (modal path) ──────────────────────
   const generateExam = async (file: File) => {
     setFileName(file.name);
     setPhase("loading");
@@ -512,7 +507,6 @@ export default function ExamModePage() {
     }
   };
 
-  // Start exam
   const startExam = () => {
     setPhase("active");
     setSection("mcq");
@@ -523,9 +517,8 @@ export default function ExamModePage() {
     setBlocked(false);
     setTimedOut(false);
 
-    const start = TOTAL_SECONDS;
-    timeLeftRef.current = start;
-    setTimeLeft(start);
+    timeLeftRef.current = TOTAL_SECONDS;
+    setTimeLeft(TOTAL_SECONDS);
     setTimeUsed(0);
 
     timerRef.current = setInterval(() => {
@@ -539,15 +532,31 @@ export default function ExamModePage() {
     }, 1000);
   };
 
-  // Retake
   const retakeExam = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    setPhase("modal");
-    setExam(null);
-    setError("");
+    // If came from YouTube, re-generate; otherwise go back to modal
+    if (isYoutubeSource) {
+      setPhase("loading");
+      setExam(null);
+      setError("");
+      const displayName = youtubeUrl.replace("https://", "").replace("www.", "").slice(0, 60);
+      setFileName(displayName);
+
+      fetch("/api/generate-exam-youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: youtubeUrl }),
+      })
+        .then((r) => r.json())
+        .then((data) => { setExam(data.exam); setPhase("ready"); })
+        .catch(() => { setError("Failed to regenerate exam."); setPhase("modal"); });
+    } else {
+      setPhase("modal");
+      setExam(null);
+      setError("");
+    }
   };
 
-  // Is current question answered?
   const isAnswered = (): boolean => {
     if (!exam) return false;
     if (section === "mcq") return mcqAnswers[exam.mcq[qIndex]?.id] !== undefined;
@@ -556,7 +565,6 @@ export default function ExamModePage() {
     return false;
   };
 
-  // Next — enforced
   const handleNext = () => {
     if (!isAnswered()) {
       setBlocked(true);
@@ -577,7 +585,6 @@ export default function ExamModePage() {
     }
   };
 
-  // Prev
   const handlePrev = () => {
     setBlocked(false);
     if (!exam) return;
@@ -608,16 +615,13 @@ export default function ExamModePage() {
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
 
-  // Modal phase
   if (phase === "modal") return (
     <>
       {error && (
-        <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3 px-4">
-          <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
-            <XIcon cls="w-6 h-6 text-red-500" />
-          </div>
-          <p className="text-sm text-gray-500 text-center max-w-sm">{error}</p>
-        </main>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium shadow-lg">
+          <XIcon cls="w-4 h-4 text-red-500" />
+          {error}
+        </div>
       )}
       <ExamModeModal
         show={true}
@@ -628,7 +632,7 @@ export default function ExamModePage() {
   );
 
   if (phase === "loading") return <LoadingScreen fileName={fileName} />;
-  if (phase === "ready")   return <ReadyScreen fileName={fileName} onStart={startExam} />;
+  if (phase === "ready") return <ReadyScreen fileName={fileName} onStart={startExam} />;
   if (phase === "done" && exam) return (
     <ResultsScreen
       exam={exam}
@@ -638,6 +642,7 @@ export default function ExamModePage() {
       timeUsed={timeUsed}
       timedOut={timedOut}
       onRetake={retakeExam}
+      sourceUrl={isYoutubeSource ? youtubeUrl : undefined}
     />
   );
 
@@ -648,20 +653,16 @@ export default function ExamModePage() {
 
     return (
       <div className="min-h-screen bg-gray-50">
-
-        {/* ── Sticky top bar ── */}
+        {/* Sticky top bar */}
         <header className="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <span className={`px-3 py-1 text-xs font-semibold rounded-full shrink-0 ${sectionBadgeClass}`}>
-              {sectionLabel}
-            </span>
+            <span className={`px-3 py-1 text-xs font-semibold rounded-full shrink-0 ${sectionBadgeClass}`}>{sectionLabel}</span>
             <span className="text-sm text-gray-400 font-medium shrink-0">
               {overallIndex + 1}<span className="text-gray-300 mx-0.5">/</span>{totalQ}
             </span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-400 hidden sm:block">{answeredCount} answered</span>
-            {/* Timer */}
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono font-bold text-sm tabular-nums transition-colors ${
               timerDanger ? "bg-red-100 text-red-600 animate-pulse" :
               timerWarn   ? "bg-yellow-50 text-yellow-600" :
@@ -670,10 +671,8 @@ export default function ExamModePage() {
               <ClockIcon />
               {fmt(timeLeft)}
             </div>
-            <button
-              onClick={submitExam}
-              className="text-xs px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-500 rounded-lg transition cursor-pointer hidden sm:block"
-            >
+            <button onClick={submitExam}
+              className="text-xs px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-500 rounded-lg transition cursor-pointer hidden sm:block">
               Submit
             </button>
           </div>
@@ -681,10 +680,7 @@ export default function ExamModePage() {
 
         {/* Progress bar */}
         <div className="h-0.5 bg-gray-200">
-          <div
-            className="h-full bg-blue-500 transition-all duration-300"
-            style={{ width: `${((overallIndex + 1) / totalQ) * 100}%` }}
-          />
+          <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${((overallIndex + 1) / totalQ) * 100}%` }} />
         </div>
 
         {/* Blocked warning */}
@@ -699,8 +695,6 @@ export default function ExamModePage() {
 
         {/* Question area */}
         <div className="max-w-2xl mx-auto px-4 py-8">
-
-          {/* Section + category */}
           <div className="flex items-center gap-2 mb-4">
             <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${sectionBadgeClass}`}>{sectionLabel}</span>
             <span className="text-xs text-gray-400">
@@ -710,16 +704,14 @@ export default function ExamModePage() {
             </span>
           </div>
 
-          {/* ── MCQ ── */}
+          {/* MCQ */}
           {section === "mcq" && (() => {
             const q = exam.mcq[qIndex];
             const sel = mcqAnswers[q.id];
             return (
               <div className="bg-white rounded-3xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between px-6 pt-5 pb-2">
-                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">
-                    Question {qIndex + 1} of {exam.mcq.length}
-                  </span>
+                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Question {qIndex + 1} of {exam.mcq.length}</span>
                   <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-semibold uppercase tracking-wide">Hard</span>
                 </div>
                 <div className="px-6 pb-3">
@@ -727,15 +719,11 @@ export default function ExamModePage() {
                 </div>
                 <div className="px-6 pb-7 space-y-3">
                   {(["A", "B", "C", "D"] as const).map((key) => (
-                    <button
-                      key={key}
+                    <button key={key}
                       onClick={() => setMcqAnswers((p) => ({ ...p, [q.id]: key }))}
                       className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                        sel === key
-                          ? "border-blue-500 bg-blue-50 text-blue-800"
-                          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-700"
-                      }`}
-                    >
+                        sel === key ? "border-blue-500 bg-blue-50 text-blue-800" : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-700"
+                      }`}>
                       <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
                         sel === key ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500"
                       }`}>{key}</span>
@@ -747,7 +735,7 @@ export default function ExamModePage() {
             );
           })()}
 
-          {/* ── Fill in the Blank ── */}
+          {/* Fill in the Blank */}
           {section === "fill" && (() => {
             const q = exam.fillInBlank[qIndex];
             const val = fillAnswers[q.id] ?? "";
@@ -755,9 +743,7 @@ export default function ExamModePage() {
             return (
               <div className="bg-white rounded-3xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between px-6 pt-5 pb-2">
-                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">
-                    Question {exam.mcq.length + qIndex + 1} of {totalQ}
-                  </span>
+                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Question {exam.mcq.length + qIndex + 1} of {totalQ}</span>
                   <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-semibold uppercase tracking-wide">Hard</span>
                 </div>
                 <div className="px-6 pb-3">
@@ -771,22 +757,19 @@ export default function ExamModePage() {
                 </div>
                 <div className="px-6 pb-7">
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Your Answer</label>
-                  <input
-                    type="text"
-                    value={val}
+                  <input type="text" value={val}
                     onChange={(e) => setFillAnswers((p) => ({ ...p, [q.id]: e.target.value }))}
                     onKeyDown={(e) => e.key === "Enter" && handleNext()}
                     placeholder="Type the exact term or phrase..."
                     className="w-full px-4 py-3 border-2 border-gray-200 focus:border-blue-500 rounded-xl text-sm text-gray-900 outline-none transition placeholder-gray-300"
-                    autoFocus
-                  />
+                    autoFocus />
                   <p className="text-xs text-gray-400 mt-1.5">Press Enter to advance when ready</p>
                 </div>
               </div>
             );
           })()}
 
-          {/* ── Written ── */}
+          {/* Written */}
           {section === "written" && (() => {
             const q = exam.written[qIndex];
             const val = writtenAnswers[q.id] ?? "";
@@ -794,9 +777,7 @@ export default function ExamModePage() {
             return (
               <div className="bg-white rounded-3xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between px-6 pt-5 pb-2">
-                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">
-                    Question {exam.mcq.length + exam.fillInBlank.length + qIndex + 1} of {totalQ}
-                  </span>
+                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Question {exam.mcq.length + exam.fillInBlank.length + qIndex + 1} of {totalQ}</span>
                   <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-semibold uppercase tracking-wide">Written</span>
                 </div>
                 <div className="px-6 pb-3">
@@ -809,32 +790,28 @@ export default function ExamModePage() {
                       {words} {words === 1 ? "word" : "words"}
                     </span>
                   </div>
-                  <textarea
-                    value={val}
+                  <textarea value={val}
                     onChange={(e) => setWrittenAnswers((p) => ({ ...p, [q.id]: e.target.value }))}
                     rows={9}
                     placeholder="Write a thorough, detailed answer. Aim for at least 3–5 sentences..."
                     className="w-full px-4 py-3 border-2 border-gray-200 focus:border-blue-500 rounded-xl text-sm text-gray-900 outline-none transition resize-none placeholder-gray-300 leading-relaxed"
-                    autoFocus
-                  />
+                    autoFocus />
                   <p className="text-xs text-gray-400 mt-1.5">Minimum one sentence required to proceed</p>
                 </div>
               </div>
             );
           })()}
 
-          {/* ── Navigation ── */}
+          {/* Navigation */}
           <div className="flex items-center justify-between mt-6">
-            <button
-              onClick={handlePrev}
+            <button onClick={handlePrev}
               disabled={section === "mcq" && qIndex === 0}
-              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
-            >
+              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer">
               <ChevronL />
               Previous
             </button>
 
-            {/* Dots */}
+            {/* Progress dots */}
             <div className="flex gap-1 flex-wrap justify-center max-w-[180px]">
               {Array.from({ length: totalQ }).map((_, i) => {
                 const isCurrent = i === overallIndex;
@@ -851,19 +828,11 @@ export default function ExamModePage() {
               })}
             </div>
 
-            <button
-              onClick={handleNext}
+            <button onClick={handleNext}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer ${
-                isAnswered()
-                  ? "bg-blue-600 hover:bg-blue-700 active:scale-95 text-white"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-400"
-              }`}
-            >
-              {isLastQ ? (
-                <><CheckIcon cls="w-4 h-4" /> Submit Exam</>
-              ) : (
-                <>Next <ChevronR /></>
-              )}
+                isAnswered() ? "bg-blue-600 hover:bg-blue-700 active:scale-95 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-400"
+              }`}>
+              {isLastQ ? <><CheckIcon cls="w-4 h-4" /> Submit Exam</> : <>Next <ChevronR /></>}
             </button>
           </div>
         </div>

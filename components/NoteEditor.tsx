@@ -7,6 +7,9 @@ interface NoteEditorProps {
   initialName?: string;
 }
 
+// ── Polish mode type ──
+type PolishMode = "choose" | "polish-only" | "polish-resource" | "result";
+
 export default function NoteEditor({
   noteId,
   initialName = "Untitled Note",
@@ -15,9 +18,19 @@ export default function NoteEditor({
   const [isEditingName, setIsEditingName] = useState(false);
   const [savedStatus, setSavedStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const [secondsSaved, setSecondsSaved] = useState(0);
+
+  // ── AI Polish state ──
   const [showAIModal, setShowAIModal] = useState(false);
+  const [polishStep, setPolishStep] = useState<PolishMode>("choose");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState("");
+  const [aiError, setAiError] = useState("");
+
+  // ── Resource upload state ──
+  const [resourceFile, setResourceFile] = useState<File | null>(null);
+  const [resourceType, setResourceType] = useState<"file" | "youtube" | null>(null);
+  const [youtubeLink, setYoutubeLink] = useState("");
+  const resourceInputRef = useRef<HTMLInputElement>(null);
 
   // ── Voice state ──
   const [isListening, setIsListening] = useState(false);
@@ -29,14 +42,12 @@ export default function NoteEditor({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Check voice support on mount
   useEffect(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     setVoiceSupported(!!SpeechRecognition);
   }, []);
 
-  // Auto-save simulation
   const triggerSave = useCallback(() => {
     setSavedStatus("saving");
     setSecondsSaved(0);
@@ -47,19 +58,13 @@ export default function NoteEditor({
     }, 1200);
   }, []);
 
-  // Tick seconds since saved
   useEffect(() => {
     savedTickRef.current = setInterval(() => {
-      if (savedStatus === "saved") {
-        setSecondsSaved((s) => s + 1);
-      }
+      if (savedStatus === "saved") setSecondsSaved((s) => s + 1);
     }, 1000);
-    return () => {
-      if (savedTickRef.current) clearInterval(savedTickRef.current);
-    };
+    return () => { if (savedTickRef.current) clearInterval(savedTickRef.current); };
   }, [savedStatus]);
 
-  // Focus name input when editing
   useEffect(() => {
     if (isEditingName && nameInputRef.current) {
       nameInputRef.current.focus();
@@ -67,12 +72,7 @@ export default function NoteEditor({
     }
   }, [isEditingName]);
 
-  // Cleanup recognition on unmount
-  useEffect(() => {
-    return () => {
-      recognitionRef.current?.stop();
-    };
-  }, []);
+  useEffect(() => { return () => { recognitionRef.current?.stop(); }; }, []);
 
   const execCmd = (command: string, value?: string) => {
     document.execCommand(command, false, value);
@@ -85,7 +85,6 @@ export default function NoteEditor({
     if (url) execCmd("createLink", url);
   };
 
-  // ── Voice handler ──
   const handleVoice = () => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -106,20 +105,12 @@ export default function NoteEditor({
     let finalTranscript = "";
 
     recognition.onstart = () => setIsListening(true);
-
     recognition.onresult = (event: any) => {
-      let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript + " ";
-        } else {
-          interim = transcript;
-        }
+        if (event.results[i].isFinal) finalTranscript += transcript + " ";
       }
-      // Append final transcript to editor
       if (finalTranscript && editorRef.current) {
-        // Insert text at cursor position or append
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0 && editorRef.current.contains(selection.anchorNode)) {
           const range = selection.getRangeAt(0);
@@ -135,61 +126,127 @@ export default function NoteEditor({
         triggerSave();
       }
     };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
     recognition.start();
     editorRef.current?.focus();
   };
 
-  const handleAIPolish = async () => {
-    const content = editorRef.current?.innerText || "";
-    if (!content.trim()) return;
+  // ── Open the AI modal ──
+  const handleAIPolish = () => {
     setShowAIModal(true);
+    setPolishStep("choose");
+    setAiResult("");
+    setAiError("");
+    setResourceFile(null);
+    setResourceType(null);
+    setYoutubeLink("");
+  };
+
+  // ── POLISH ONLY — prompt lives in /api/gemini-polish ──
+  const runPolishOnly = async () => {
+    const noteContent = editorRef.current?.innerText || "";
+    if (!noteContent.trim()) {
+      setAiError("Your note is empty. Write something first.");
+      return;
+    }
+    setPolishStep("result");
     setAiLoading(true);
     setAiResult("");
+    setAiError("");
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/gemini-polish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [
-            {
-              role: "user",
-              content: `You are a study notes editor. Polish and improve the following note text. Fix grammar, improve clarity, enhance explanations, and make it more structured and readable. Keep the same information but make it better written and easier to understand as a study note. Return only the improved text, no preamble.\n\nNote:\n${content}`,
-            },
-          ],
+          mode: "polish-only",
+          noteContent,
         }),
       });
       const data = await response.json();
-      const text =
-        data.content
-          ?.map((b: { type: string; text?: string }) => b.text || "")
-          .join("") || "";
+      if (!response.ok) throw new Error(data.error || "Failed to polish");
+      const text = data.result || "";
+      if (!text) throw new Error("Empty response");
       setAiResult(text);
-    } catch {
-      setAiResult("Something went wrong. Please try again.");
+    } catch (err: any) {
+      setAiError(err.message || "Something went wrong. Please try again.");
     } finally {
       setAiLoading(false);
     }
   };
 
+  // ── POLISH WITH RESOURCE — prompt lives in /api/gemini-polish ──
+  const runPolishWithResource = async () => {
+    const noteContent = editorRef.current?.innerText || "";
+    if (!noteContent.trim()) {
+      setAiError("Your note is empty. Write something first.");
+      return;
+    }
+    if (!resourceFile && !youtubeLink.trim()) return;
+
+    setPolishStep("result");
+    setAiLoading(true);
+    setAiResult("");
+    setAiError("");
+
+    try {
+      let resourceParts: any[] = [];
+
+      if (resourceType === "youtube") {
+        resourceParts = [{ fileData: { fileUri: youtubeLink.trim() } }];
+      } else if (resourceFile) {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(resourceFile);
+        });
+        resourceParts = [{
+          inlineData: {
+            mimeType: resourceFile.type || "application/pdf",
+            data: base64,
+          },
+        }];
+      }
+
+      const response = await fetch("/api/gemini-polish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "polish-resource",
+          noteContent,
+          resourceParts,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to polish with resource");
+      setAiResult(data.result || "");
+    } catch (err: any) {
+      setAiError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // ── Apply result to editor ──
   const applyAIResult = () => {
     if (editorRef.current && aiResult) {
       editorRef.current.innerText = aiResult;
       triggerSave();
     }
+    closeModal();
+  };
+
+  const closeModal = () => {
+    if (aiLoading) return;
     setShowAIModal(false);
+    setPolishStep("choose");
     setAiResult("");
+    setAiError("");
+    setResourceFile(null);
+    setResourceType(null);
+    setYoutubeLink("");
   };
 
   const savedLabel =
@@ -246,9 +303,7 @@ export default function NoteEditor({
             </svg>
             Back
           </button>
-
           <div className="w-px h-5 bg-gray-200" />
-
           {isEditingName ? (
             <input
               ref={nameInputRef}
@@ -282,7 +337,6 @@ export default function NoteEditor({
             )}
             {savedLabel}
           </div>
-
           <button
             onClick={() => window.print()}
             className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all active:scale-95"
@@ -361,25 +415,20 @@ export default function NoteEditor({
 
         {/* ── Right side: Voice + AI Polish ── */}
         <div className="ml-auto flex items-center gap-2">
-
-          {/* Voice button */}
           {voiceSupported && (
             <button
               onClick={handleVoice}
               title={isListening ? "Stop voice input" : "Dictate with voice"}
               className={`cursor-pointer flex items-center gap-2 px-4 py-1.5 text-xs font-semibold rounded-xl transition-all active:scale-95 shadow-sm ${
-                isListening
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                isListening ? "bg-red-500 hover:bg-red-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-700"
               }`}
             >
               {isListening ? (
                 <>
-                  {/* Animated mic — pulsing dot */}
                   <span className="relative flex h-3.5 w-3.5 items-center justify-center">
                     <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-50 animate-ping" />
                     <svg className="w-3.5 h-3.5 relative" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 17.93V21H9v2h6v-2h-2v-2.07A8.001 8.001 0 0 0 20 11h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z"/>
+                      <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 17.93V21H9v2h6v-2h-2v-2.07A8.001 8.001 0 0 0 20 11h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z" />
                     </svg>
                   </span>
                   Stop
@@ -387,7 +436,7 @@ export default function NoteEditor({
               ) : (
                 <>
                   <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 17.93V21H9v2h6v-2h-2v-2.07A8.001 8.001 0 0 0 20 11h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z"/>
+                    <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 17.93V21H9v2h6v-2h-2v-2.07A8.001 8.001 0 0 0 20 11h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z" />
                   </svg>
                   Voice
                 </>
@@ -395,7 +444,6 @@ export default function NoteEditor({
             </button>
           )}
 
-          {/* AI Polish button */}
           <button
             onClick={handleAIPolish}
             className="cursor-pointer flex items-center gap-2 px-4 py-1.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold rounded-xl transition-all active:scale-95 shadow-sm"
@@ -411,7 +459,6 @@ export default function NoteEditor({
       {/* ── Editor Area ── */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
         <div className="max-w-3xl mx-auto">
-          {/* Live voice indicator banner */}
           {isListening && (
             <div className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
               <span className="relative flex h-2.5 w-2.5">
@@ -421,7 +468,6 @@ export default function NoteEditor({
               Listening… speak now and your words will appear in the note
             </div>
           )}
-
           <div
             ref={editorRef}
             contentEditable
@@ -434,26 +480,35 @@ export default function NoteEditor({
         </div>
       </div>
 
-      {/* ── AI Polish Modal ── */}
+      {/* ════════════════════════════════════════════
+          AI POLISH MODAL
+      ════════════════════════════════════════════ */}
       {showAIModal && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => { if (!aiLoading) setShowAIModal(false); }} />
-          <div className="fixed inset-0 flex items-center justify-center z-60 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={closeModal} />
+          <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+
+              {/* Modal Header */}
               <div className="px-7 pt-6 pb-4 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-linear-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Polish with AI</p>
-                    <p className="text-xs text-gray-400">Improves grammar, clarity and structure</p>
+                    <p className="text-xs text-gray-400">
+                      {polishStep === "choose" && "Choose how you want to polish your note"}
+                      {polishStep === "polish-only" && "Clean up your writing with AI"}
+                      {polishStep === "polish-resource" && "Enrich your note using a resource"}
+                      {polishStep === "result" && (aiLoading ? "Polishing your note..." : "Your polished note is ready")}
+                    </p>
                   </div>
                 </div>
                 {!aiLoading && (
-                  <button onClick={() => setShowAIModal(false)} className="cursor-pointer text-gray-400 hover:text-gray-600">
+                  <button onClick={closeModal} className="cursor-pointer text-gray-400 hover:text-gray-600 transition">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -461,29 +516,214 @@ export default function NoteEditor({
                 )}
               </div>
 
-              <div className="px-7 py-5">
-                {aiLoading ? (
-                  <div className="flex flex-col items-center justify-center py-10 gap-3">
-                    <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-sm text-gray-500">Polishing your notes...</p>
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 rounded-xl p-4 max-h-72 overflow-y-auto text-sm text-gray-700 leading-7 whitespace-pre-wrap" style={{ fontFamily: "Georgia, serif" }}>
-                    {aiResult}
-                  </div>
-                )}
-              </div>
-
-              {!aiLoading && aiResult && (
-                <div className="px-7 pb-6 flex gap-3">
-                  <button onClick={applyAIResult} className="cursor-pointer flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all active:scale-95">
-                    Replace my note with this
+              {/* ── STEP 1: Choose mode ── */}
+              {polishStep === "choose" && (
+                <div className="px-7 py-6 space-y-3">
+                  <button
+                    onClick={() => setPolishStep("polish-only")}
+                    className="cursor-pointer w-full text-left border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl px-5 py-4 transition-all group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center shrink-0 transition-colors">
+                        <svg className="w-4 h-4 text-gray-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Polish only</p>
+                        <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                          AI cleans and improves what you've already written — fixes spelling, grammar, clarity and flow. No resource needed.
+                        </p>
+                      </div>
+                    </div>
                   </button>
-                  <button onClick={() => setShowAIModal(false)} className="cursor-pointer px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-sm text-gray-600 rounded-xl transition-all">
-                    Keep original
+
+                  <button
+                    onClick={() => setPolishStep("polish-resource")}
+                    className="cursor-pointer w-full text-left border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl px-5 py-4 transition-all group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center shrink-0 transition-colors">
+                        <svg className="w-4 h-4 text-gray-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Polish with resource</p>
+                        <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                          Upload a PDF, audio file, or paste a YouTube link — AI enriches and expands your note using the resource without deleting anything you wrote.
+                        </p>
+                      </div>
+                    </div>
                   </button>
                 </div>
               )}
+
+              {/* ── STEP 2a: Polish Only confirm ── */}
+              {polishStep === "polish-only" && (
+                <div className="px-7 py-6">
+                  <div className="bg-gray-50 rounded-xl px-5 py-4 mb-5">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">What AI will do:</p>
+                    <ul className="space-y-1.5">
+                      {[
+                        "Fix all spelling and grammar mistakes",
+                        "Improve sentence clarity and flow",
+                        "Make the writing more structured and readable",
+                        "Keep all your original content — nothing gets deleted",
+                      ].map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-gray-500">
+                          <svg className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setPolishStep("choose")}
+                      className="cursor-pointer px-4 py-2.5 border border-gray-200 hover:bg-gray-50 text-sm text-gray-500 rounded-xl transition-all">
+                      ← Back
+                    </button>
+                    <button onClick={runPolishOnly}
+                      className="cursor-pointer flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all active:scale-95">
+                      Polish my note
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 2b: Polish with Resource ── */}
+              {polishStep === "polish-resource" && (
+                <div className="px-7 py-6">
+                  <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+                    Upload your study resource and AI will use it to expand and enrich your note — adding detail, definitions, and explanations from the resource without removing your existing content.
+                  </p>
+
+                  <div className="flex gap-2 mb-4">
+                    {[
+                      { type: "file" as const, label: "PDF / Audio", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
+                      { type: "youtube" as const, label: "YouTube", icon: "M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+                    ].map((opt) => (
+                      <button key={opt.type}
+                        onClick={() => { setResourceType(opt.type); setResourceFile(null); setYoutubeLink(""); }}
+                        className={`cursor-pointer flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                          resourceType === opt.type
+                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                            : "border-gray-200 text-gray-500 hover:border-gray-300"
+                        }`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={opt.icon} />
+                        </svg>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {resourceType === "file" && (
+                    <div
+                      onClick={() => resourceInputRef.current?.click()}
+                      className="cursor-pointer border-2 border-dashed border-gray-200 hover:border-blue-400 rounded-xl px-5 py-6 flex flex-col items-center gap-2 transition-all mb-4"
+                    >
+                      {resourceFile ? (
+                        <>
+                          <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <p className="text-xs font-semibold text-gray-700 text-center truncate max-w-xs">{resourceFile.name}</p>
+                          <p className="text-[10px] text-gray-400">Click to change file</p>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          <p className="text-xs text-gray-500 font-medium">Click to upload PDF or audio file</p>
+                          <p className="text-[10px] text-gray-400">.pdf, .mp3, .mp4, .wav, .m4a supported</p>
+                        </>
+                      )}
+                      <input
+                        ref={resourceInputRef}
+                        type="file"
+                        accept=".pdf,.mp3,.mp4,.wav,.m4a,.ogg,.webm"
+                        className="hidden"
+                        onChange={(e) => { if (e.target.files?.[0]) setResourceFile(e.target.files[0]); }}
+                      />
+                    </div>
+                  )}
+
+                  {resourceType === "youtube" && (
+                    <div className="mb-4">
+                      <input
+                        type="url"
+                        value={youtubeLink}
+                        onChange={(e) => setYoutubeLink(e.target.value)}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        className="w-full px-4 py-3 border border-gray-200 focus:border-blue-500 rounded-xl text-sm text-gray-800 outline-none transition placeholder-gray-300"
+                      />
+                    </div>
+                  )}
+
+                  {!resourceType && (
+                    <div className="mb-4 h-24 flex items-center justify-center border-2 border-dashed border-gray-100 rounded-xl">
+                      <p className="text-xs text-gray-300">Select a resource type above</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button onClick={() => setPolishStep("choose")}
+                      className="cursor-pointer px-4 py-2.5 border border-gray-200 hover:bg-gray-50 text-sm text-gray-500 rounded-xl transition-all">
+                      ← Back
+                    </button>
+                    <button
+                      onClick={runPolishWithResource}
+                      disabled={!resourceType || (resourceType === "file" && !resourceFile) || (resourceType === "youtube" && !youtubeLink.trim())}
+                      className="cursor-pointer flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all active:scale-95"
+                    >
+                      Polish with resource
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 3: Result ── */}
+              {polishStep === "result" && (
+                <>
+                  <div className="px-7 py-5">
+                    {aiLoading ? (
+                      <div className="flex flex-col items-center justify-center py-10 gap-3">
+                        <div className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-sm text-gray-500">Polishing your notes...</p>
+                      </div>
+                    ) : aiError ? (
+                      <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-4 text-sm text-red-500">
+                        {aiError}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-xl p-4 max-h-72 overflow-y-auto text-sm text-gray-700 leading-7 whitespace-pre-wrap" style={{ fontFamily: "Georgia, serif" }}>
+                        {aiResult}
+                      </div>
+                    )}
+                  </div>
+
+                  {!aiLoading && (aiResult || aiError) && (
+                    <div className="px-7 pb-6 flex gap-3">
+                      {aiResult && (
+                        <button onClick={applyAIResult}
+                          className="cursor-pointer flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all active:scale-95">
+                          Replace my note with this
+                        </button>
+                      )}
+                      <button onClick={closeModal}
+                        className="cursor-pointer px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-sm text-gray-600 rounded-xl transition-all">
+                        Keep original
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
             </div>
           </div>
         </>

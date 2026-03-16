@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import AddNotePanel from "./AddNotePanel";
 import CreateChannelModal from "./CreateChannelModal";
 
@@ -12,9 +13,18 @@ interface Channel {
   members: number;
 }
 
+interface Note {
+  id: string;
+  name: string;
+}
+
 interface SidebarProps {
   userName?: string;
   userEmail?: string;
+}
+
+function nameToSlug(name: string) {
+  return name.toLowerCase().replace(/\s+/g, "-");
 }
 
 export default function Sidebar({
@@ -29,16 +39,94 @@ export default function Sidebar({
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [loadingChannels, setLoadingChannels] = useState(false);
+  const [notes, setNotes] = useState<Note[]>([]);
 
   const getInitials = (name: string) =>
     name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
+  // ── Load user's channels from Supabase ────────────────────
+  useEffect(() => {
+    const fetchChannels = async () => {
+      setLoadingChannels(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoadingChannels(false); return; }
+
+      const { data, error } = await supabase
+        .from("channel_members")
+        .select(`channel_id, channels (id, name)`)
+        .eq("user_id", user.id);
+
+      if (!error && data) {
+        const list: Channel[] = data
+          .map((row: any) => ({ id: row.channels?.id ?? "", name: row.channels?.name ?? "", members: 1 }))
+          .filter((c) => c.id);
+        setChannels(list);
+      }
+      setLoadingChannels(false);
+    };
+    fetchChannels();
+  }, []);
+
+  // ── Load user's notes from Supabase ───────────────────────
+  useEffect(() => {
+    const fetchNotes = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("notes")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) setNotes(data as Note[]);
+    };
+    fetchNotes();
+  }, []);
+
   const handleChannelCreated = (channel: Channel) => {
     setChannels((prev) => [...prev, channel]);
+    router.push(`/dashboard/channel/${nameToSlug(channel.name)}`);
+    setShowChannelsPanel(false);
   };
 
-  const deleteChannel = (id: string) =>
+  const deleteChannel = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("channel_members").delete().eq("channel_id", id).eq("user_id", user.id);
     setChannels((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  // ── Note created — save to Supabase then navigate ─────────
+  const handleNoteCreated = async (name: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("notes")
+      .insert({ name, user_id: user.id, content: "" })
+      .select("id, name")
+      .single();
+
+    if (!error && data) {
+      setNotes((prev) => [data as Note, ...prev]);
+      setShowAddNote(false);
+      router.push(`/dashboard/note/${nameToSlug(data.name)}`);
+    }
+  };
+
+  // ── Note selected — navigate to /dashboard/note/[name] ────
+  const handleNoteSelected = (note: Note) => {
+    setShowAddNote(false);
+    router.push(`/dashboard/note/${nameToSlug(note.name)}`);
+  };
+
+  // ── Note deleted ──────────────────────────────────────────
+  const handleNoteDeleted = async (id: string) => {
+    await supabase.from("notes").delete().eq("id", id);
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+  };
 
   return (
     <>
@@ -70,19 +158,20 @@ export default function Sidebar({
 
           <div className="text-[10px] text-gray-400 font-medium mt-1 mb-0.5">Notes</div>
 
-          {/* Add Note — opens slide panel */}
-          <Link
-           href="/dashboard/note"
-            // onClick={() => { setShowChannelsPanel(false); setShowAddNote(true); }}
+          {/* Add Note — toggles slide panel */}
+          <button
+            onClick={() => { setShowChannelsPanel(false); setShowAddNote((v) => !v); }}
             className={`flex flex-col items-center justify-center w-full py-1.5 rounded-lg transition-colors gap-0.5 cursor-pointer ${
-              showAddNote ? "bg-gray-100 text-gray-700" : "hover:bg-gray-100 text-gray-400"
+              showAddNote || pathname.startsWith("/dashboard/note")
+                ? "bg-gray-100 text-gray-700"
+                : "hover:bg-gray-100 text-gray-400"
             }`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             <span className="text-[10px] font-medium leading-tight">Add Note</span>
-          </Link>
+          </button>
 
           <div className="w-8 h-px bg-gray-200 my-2" />
 
@@ -115,7 +204,7 @@ export default function Sidebar({
             <span className="text-[10px] font-medium leading-tight">Collections</span>
           </Link>
 
-          {/* Channels — opens slide panel */}
+          {/* Channels */}
           <button
             onClick={() => { setShowAddNote(false); setShowChannelsPanel((v) => !v); }}
             className={`flex flex-col items-center justify-center w-full py-1.5 rounded-lg transition-colors gap-0.5 cursor-pointer ${
@@ -199,18 +288,11 @@ export default function Sidebar({
         </div>
       </aside>
 
-      {/* ── Channels slide-out panel (same style as My Notes panel) ── */}
+      {/* ── Channels slide-out panel ── */}
       {showChannelsPanel && (
         <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-30 bg-black/20"
-            onClick={() => setShowChannelsPanel(false)}
-          />
-
-          {/* Panel */}
+          <div className="fixed inset-0 z-30 bg-black/20" onClick={() => setShowChannelsPanel(false)} />
           <div className="fixed left-22.5 top-0 bottom-0 w-90 bg-white border-r border-gray-200 shadow-lg z-40 flex flex-col">
-            {/* Panel header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center">
@@ -221,78 +303,57 @@ export default function Sidebar({
                   <span className="text-blue-600">Forge</span>
                 </span>
               </div>
-              <button
-                onClick={() => setShowChannelsPanel(false)}
-                className="cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors"
-              >
+              <button onClick={() => setShowChannelsPanel(false)} className="cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            {/* Channel list */}
             <div className="flex-1 overflow-y-auto px-4 py-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-2 mb-3">
-                My Channels
-              </p>
-
-              <div className="space-y-0.5">
-                {channels.map((channel) => (
-                  <div
-                    key={channel.id}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group cursor-pointer ${
-                      pathname === `/dashboard/channel/${channel.id}`
-                        ? "bg-blue-50 text-blue-700"
-                        : "hover:bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                    <Link
-                      href={`/dashboard/channel`}
-                      onClick={() => setShowChannelsPanel(false)}
-                      className="flex-1 text-sm font-medium truncate"
-                    >
-                      {channel.name}
-                    </Link>
-                    <span className="text-xs text-gray-400 shrink-0">{channel.members}</span>
-                    <button
-                      onClick={() => deleteChannel(channel.id)}
-                      className="cursor-pointer opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded-lg transition-all"
-                    >
-                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-2 mb-3">My Channels</p>
+              {loadingChannels ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {channels.map((channel) => {
+                    const slug = nameToSlug(channel.name);
+                    const isActive = pathname === `/dashboard/channel/${slug}`;
+                    return (
+                      <div key={channel.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group cursor-pointer ${isActive ? "bg-blue-50 text-blue-700" : "hover:bg-gray-100 text-gray-700"}`}>
+                        <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                        <Link href={`/dashboard/channel/${slug}`} onClick={() => setShowChannelsPanel(false)} className="flex-1 text-sm font-medium truncate">
+                          {channel.name}
+                        </Link>
+                        <span className="text-xs text-gray-400 shrink-0">{channel.members}</span>
+                        <button onClick={() => deleteChannel(channel.id)} className="cursor-pointer opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded-lg transition-all" title="Leave channel">
+                          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button onClick={() => setShowCreateChannelModal(true)} className="cursor-pointer w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-left group mt-1">
+                    <div className="w-6 h-6 rounded-lg bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition-colors shrink-0">
+                      <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
-                    </button>
-                  </div>
-                ))}
-
-                {/* Add Channel button */}
-                <button
-                  onClick={() => setShowCreateChannelModal(true)}
-                  className="cursor-pointer w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-left group mt-1"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition-colors shrink-0">
-                    <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                  <span className="text-sm text-gray-600 font-medium">Add Channel</span>
-                </button>
-              </div>
+                    </div>
+                    <span className="text-sm text-gray-600 font-medium">Add Channel</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Bottom — plan info */}
             <div className="border-t border-gray-100 p-4 shrink-0">
               <div className="flex items-center justify-between mb-1 px-2">
                 <span className="text-xs text-gray-500">Current Plan</span>
                 <span className="px-2 py-0.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-full">Free plan</span>
               </div>
-              <Link
-                href="/upgrade"
-                className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors"
-              >
+              <Link href="/upgrade" className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors">
                 <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
@@ -306,10 +367,17 @@ export default function Sidebar({
         </>
       )}
 
-      {/* Add Note Panel */}
-      <AddNotePanel show={showAddNote} onClose={() => setShowAddNote(false)} />
+      {/* ── Add Note slide-out panel ── */}
+      <AddNotePanel
+        show={showAddNote}
+        notes={notes}
+        onClose={() => setShowAddNote(false)}
+        onNoteSelected={handleNoteSelected}
+        onNoteCreated={handleNoteCreated}
+        onNoteDeleted={handleNoteDeleted}
+      />
 
-      {/* Create Channel Modal — triggered from inside the channels panel */}
+      {/* Create Channel Modal */}
       <CreateChannelModal
         show={showCreateChannelModal}
         onClose={() => setShowCreateChannelModal(false)}

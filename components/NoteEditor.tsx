@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface NoteEditorProps {
   noteId?: string;
@@ -42,21 +43,49 @@ export default function NoteEditor({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Load note content from Supabase on mount ─────────────
+  useEffect(() => {
+    if (!noteId) return;
+    const loadNote = async () => {
+      const { data, error } = await supabase
+        .from("notes")
+        .select("name, content")
+        .eq("id", noteId)
+        .single();
+
+      if (!error && data) {
+        setNoteName(data.name);
+        if (editorRef.current && data.content) {
+          editorRef.current.innerHTML = data.content;
+        }
+      }
+    };
+    loadNote();
+  }, [noteId]);
+
   useEffect(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     setVoiceSupported(!!SpeechRecognition);
   }, []);
 
+  // ── triggerSave now saves to Supabase ────────────────────
   const triggerSave = useCallback(() => {
     setSavedStatus("saving");
     setSecondsSaved(0);
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
+    saveTimerRef.current = setTimeout(async () => {
+      if (noteId) {
+        const content = editorRef.current?.innerHTML ?? "";
+        await supabase
+          .from("notes")
+          .update({ name: noteName, content, updated_at: new Date().toISOString() })
+          .eq("id", noteId);
+      }
       setSavedStatus("saved");
       setSecondsSaved(0);
     }, 1200);
-  }, []);
+  }, [noteId, noteName]);
 
   useEffect(() => {
     savedTickRef.current = setInterval(() => {

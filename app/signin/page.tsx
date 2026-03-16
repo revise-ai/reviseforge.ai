@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-// ── Toast ──────────────────────────────────────────────────────────────────────
 function Toast({ message, type, onClose }: { message: string; type: "error" | "success"; onClose: () => void }) {
   useEffect(() => {
     const t = setTimeout(onClose, 4000);
@@ -18,14 +15,8 @@ function Toast({ message, type, onClose }: { message: string; type: "error" | "s
     <div className="fixed top-5 right-5 z-[200] w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-in">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          {type === "error" ? (
-            <div className="w-2 h-2 rounded-full bg-red-500" />
-          ) : (
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-          )}
-          <span className="text-sm font-semibold text-gray-700">
-            {type === "error" ? "Error" : "Success"}
-          </span>
+          <div className={`w-2 h-2 rounded-full ${type === "error" ? "bg-red-500" : "bg-green-500"}`} />
+          <span className="text-sm font-semibold text-gray-700">{type === "error" ? "Error" : "Success"}</span>
         </div>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition cursor-pointer">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -36,12 +27,9 @@ function Toast({ message, type, onClose }: { message: string; type: "error" | "s
       <div className="px-4 py-3">
         <p className="text-sm text-gray-600">{message}</p>
       </div>
-      {/* Progress bar */}
       <div className="h-1 bg-gray-100">
-        <div
-          className={`h-full ${type === "error" ? "bg-red-400" : "bg-green-400"}`}
-          style={{ animation: "shrink 4s linear forwards" }}
-        />
+        <div className={`h-full ${type === "error" ? "bg-red-400" : "bg-green-400"}`}
+          style={{ animation: "shrink 4s linear forwards" }} />
       </div>
       <style>{`
         @keyframes shrink { from { width: 100%; } to { width: 0%; } }
@@ -52,7 +40,6 @@ function Toast({ message, type, onClose }: { message: string; type: "error" | "s
   );
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────────
 export default function SigninPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -81,7 +68,14 @@ export default function SigninPage() {
           showToast(error.message, "error");
         }
       } else {
-        router.push("/dashboard");
+        // ── Check for pending invite ──────────────────────────
+        const pendingInvite = sessionStorage.getItem("pending_invite");
+        if (pendingInvite) {
+          sessionStorage.removeItem("pending_invite");
+          router.push(`/join/${pendingInvite}`);
+        } else {
+          router.push("/dashboard");
+        }
       }
     } catch {
       showToast("Something went wrong. Please try again.", "error");
@@ -107,10 +101,8 @@ export default function SigninPage() {
 
   return (
     <main className="min-h-screen bg-white flex flex-col">
-      {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
 
-      {/* Nav logo */}
       <div className="px-6 py-5 flex items-center gap-2">
         <button className="text-gray-500 hover:text-gray-800 transition-colors">
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -124,7 +116,6 @@ export default function SigninPage() {
         </div>
       </div>
 
-      {/* Form */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 pb-16">
         <div className="w-full max-w-[420px] flex flex-col items-center">
           <div className="flex items-end gap-0.5 mb-8">
@@ -136,7 +127,6 @@ export default function SigninPage() {
           <h1 className="text-3xl font-semibold text-gray-900 mb-2">Welcome back</h1>
           <p className="text-gray-400 text-sm mb-8">Let's continue your learning journey.</p>
 
-          {/* Google */}
           <button
             onClick={handleGoogleSignin}
             disabled={googleLoading}
@@ -158,14 +148,12 @@ export default function SigninPage() {
             Continue with Google
           </button>
 
-          {/* Divider */}
           <div className="w-full flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-gray-200" />
             <span className="text-xs text-gray-400">or continue with</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 
-          {/* Email */}
           <input
             type="email"
             placeholder="Enter your email"
@@ -174,7 +162,6 @@ export default function SigninPage() {
             className="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition mb-3"
           />
 
-          {/* Password */}
           <div className="relative w-full mb-2">
             <input
               type={showPassword ? "text" : "password"}
@@ -199,14 +186,12 @@ export default function SigninPage() {
             </button>
           </div>
 
-          {/* Forgot password */}
           <div className="w-full flex justify-end mb-5">
             <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-blue-600 transition">
               Forgot password?
             </Link>
           </div>
 
-          {/* Sign in button */}
           <button
             onClick={handleEmailSignin}
             disabled={loading || !email || !password}

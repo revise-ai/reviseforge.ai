@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface CreateChannelModalProps {
   show: boolean;
@@ -18,19 +19,75 @@ export default function CreateChannelModal({
   onChannelCreated,
 }: CreateChannelModalProps) {
   const [channelName, setChannelName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!show) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!channelName.trim()) return;
-    onChannelCreated({
-      id: Date.now().toString(),
-      name: channelName.trim(),
-      members: 1,
-    });
-    setChannelName("");
-    onClose();
+    const trimmedName = channelName.trim();
+    if (!trimmedName) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Get current user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setError("You must be logged in to create a channel.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Insert channel into Supabase
+      const { data: channel, error: channelError } = await supabase
+        .from("channels")
+        .insert({
+          name: trimmedName,
+          created_by: user.id,
+        })
+        .select("id, name")
+        .single();
+
+      if (channelError || !channel) {
+        setError(channelError?.message ?? "Failed to create channel.");
+        setLoading(false);
+        return;
+      }
+
+      // 3. Add creator as admin member
+      const { error: memberError } = await supabase
+        .from("channel_members")
+        .insert({
+          channel_id: channel.id,
+          user_id: user.id,
+          role: "admin",
+        });
+
+      if (memberError) {
+        setError(memberError.message);
+        setLoading(false);
+        return;
+      }
+
+      // 4. Notify parent
+      onChannelCreated({
+        id: channel.id,
+        name: channel.name,
+        members: 1,
+      });
+
+      setChannelName("");
+      onClose();
+    } catch (err: any) {
+      setError(err.message ?? "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,7 +133,7 @@ export default function CreateChannelModal({
             </button>
           </div>
 
-          {/* Info box — matches "About notes" style */}
+          {/* Info box */}
           <div className="mx-6 mb-5 border border-gray-200 rounded-xl p-4 flex gap-3">
             <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
               <svg
@@ -104,6 +161,13 @@ export default function CreateChannelModal({
             </div>
           </div>
 
+          {/* Error */}
+          {error && (
+            <div className="mx-6 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="px-6 pb-6">
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -116,23 +180,32 @@ export default function CreateChannelModal({
               placeholder="e.g. Biology 101, Calculus Study..."
               autoFocus
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 transition-all"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 transition-all disabled:opacity-50"
             />
 
             <div className="flex gap-3 mt-5">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 cursor-pointer px-4 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                disabled={loading}
+                className="flex-1 cursor-pointer px-4 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={!channelName.trim()}
-                className="flex-1 cursor-pointer px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={!channelName.trim() || loading}
+                className="flex-1 cursor-pointer px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Create Channel
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Creating…
+                  </>
+                ) : (
+                  "Create Channel"
+                )}
               </button>
             </div>
           </form>

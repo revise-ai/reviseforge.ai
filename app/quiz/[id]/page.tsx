@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+// app/quiz/[id]/page.tsx
+
+import { useState, useEffect, useRef } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface QuizQuestion {
   id: number;
+  dbId?: string;
   question: string;
   options: { A: string; B: string; C: string; D: string };
   correctAnswer: "A" | "B" | "C" | "D";
@@ -51,7 +56,9 @@ function LoadingScreen({ fileName }: { fileName: string }) {
         <h2 className="text-xl font-semibold text-gray-800 mb-1">
           Generating quiz{".".repeat(dots)}
         </h2>
-        <p className="text-sm text-gray-400">Analyzing <span className="font-medium text-gray-600">{fileName}</span></p>
+        <p className="text-sm text-gray-400">
+          Analyzing <span className="font-medium text-gray-600">{fileName}</span>
+        </p>
         <p className="text-xs text-gray-400 mt-1">Building 30 difficult MCQs from your document</p>
       </div>
       <div className="w-64 h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -59,9 +66,9 @@ function LoadingScreen({ fileName }: { fileName: string }) {
       </div>
       <style>{`
         @keyframes loading {
-          0% { width: 0%; margin-left: 0; }
-          50% { width: 70%; margin-left: 15%; }
-          100% { width: 0%; margin-left: 100%; }
+          0%   { width: 0%;  margin-left: 0;    }
+          50%  { width: 70%; margin-left: 15%;  }
+          100% { width: 0%;  margin-left: 100%; }
         }
       `}</style>
     </div>
@@ -83,7 +90,6 @@ function ExplanationPopup({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        {/* Header */}
         <div className={`px-6 py-4 flex items-center justify-between ${isCorrect ? "bg-green-50 border-b border-green-100" : "bg-red-50 border-b border-red-100"}`}>
           <div className="flex items-center gap-3">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isCorrect ? "bg-green-500" : "bg-red-500"}`}>
@@ -108,12 +114,11 @@ function ExplanationPopup({
               )}
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition cursor-pointer p-1 rounded-lg hover:bg-white/60">
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 transition cursor-pointer p-1 rounded-lg hover:bg-white/60">
             <CloseIcon />
           </button>
         </div>
 
-        {/* Explanation */}
         <div className="px-6 py-5">
           <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,6 +132,7 @@ function ExplanationPopup({
 
         <div className="px-6 pb-5">
           <button
+            type="button"
             onClick={onClose}
             className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition cursor-pointer active:scale-95"
           >
@@ -142,36 +148,31 @@ function ExplanationPopup({
 function ResultsScreen({
   questions,
   answers,
-  fileName,
   onRetry,
 }: {
   questions: QuizQuestion[];
   answers: Record<number, "A" | "B" | "C" | "D">;
-  fileName: string;
   onRetry: () => void;
 }) {
   const correct = questions.filter((q) => answers[q.id] === q.correctAnswer).length;
-  const total = questions.length;
-  const pct = Math.round((correct / total) * 100);
+  const total   = questions.length;
+  const pct     = Math.round((correct / total) * 100);
 
   const grade =
-    pct >= 90 ? { label: "Excellent", color: "text-green-600", bg: "bg-green-50", border: "border-green-200" } :
-    pct >= 75 ? { label: "Good", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" } :
+    pct >= 90 ? { label: "Excellent",  color: "text-green-600",  bg: "bg-green-50",  border: "border-green-200"  } :
+    pct >= 75 ? { label: "Good",       color: "text-blue-600",   bg: "bg-blue-50",   border: "border-blue-200"   } :
     pct >= 60 ? { label: "Needs Work", color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200" } :
-    { label: "Try Again", color: "text-red-600", bg: "bg-red-50", border: "border-red-200" };
+               { label: "Try Again",  color: "text-red-600",    bg: "bg-red-50",    border: "border-red-200"    };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
-        {/* Score card */}
         <div className={`bg-white rounded-3xl border ${grade.border} shadow-sm p-8 text-center mb-6`}>
           <div className={`w-20 h-20 rounded-full ${grade.bg} flex items-center justify-center mx-auto mb-4`}>
             <span className={`text-2xl font-bold ${grade.color}`}>{pct}%</span>
           </div>
           <h2 className="text-2xl font-semibold text-gray-800 mb-1">{grade.label}</h2>
           <p className="text-gray-400 text-sm">{correct} out of {total} questions correct</p>
-
-          {/* Progress bar */}
           <div className="mt-6 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-1000 ${
@@ -182,20 +183,19 @@ function ResultsScreen({
           </div>
         </div>
 
-        {/* Quick review */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-6">
           <div className="px-5 py-3 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-700">Question Review</h3>
           </div>
           <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
             {questions.map((q, i) => {
-              const correct = answers[q.id] === q.correctAnswer;
+              const isCorrect = answers[q.id] === q.correctAnswer;
               return (
                 <div key={q.id} className="flex items-center gap-3 px-5 py-3">
                   <span className="text-xs text-gray-400 shrink-0 w-5">{i + 1}</span>
                   <p className="text-xs text-gray-600 truncate flex-1">{q.question}</p>
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${correct ? "bg-green-100" : "bg-red-100"}`}>
-                    {correct ? (
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isCorrect ? "bg-green-100" : "bg-red-100"}`}>
+                    {isCorrect ? (
                       <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
@@ -212,12 +212,14 @@ function ResultsScreen({
         </div>
 
         <div className="flex gap-3">
-          <button onClick={onRetry}
-            className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl text-sm font-semibold transition cursor-pointer active:scale-95">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl text-sm font-semibold transition cursor-pointer active:scale-95"
+          >
             Try Again
           </button>
-          <Link href="/dashboard"
-            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition text-center active:scale-95">
+          <Link href="/dashboard" className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition text-center active:scale-95">
             Dashboard
           </Link>
         </div>
@@ -228,16 +230,8 @@ function ResultsScreen({
 
 // ── Question Card ──────────────────────────────────────────────────────────────
 function QuestionCard({
-  question,
-  current,
-  total,
-  selectedAnswer,
-  answered,
-  onSelect,
-  onShowExplanation,
-  onPrev,
-  onNext,
-  onFinish,
+  question, current, total, selectedAnswer, answered,
+  onSelect, onShowExplanation, onPrev, onNext, onFinish,
 }: {
   question: QuizQuestion;
   current: number;
@@ -254,26 +248,19 @@ function QuestionCard({
   const isLast = current === total - 1;
 
   const getOptionStyle = (key: "A" | "B" | "C" | "D") => {
-    if (!answered || selectedAnswer !== key) {
-      // Not yet answered or not this option
-      if (selectedAnswer === key && !answered) {
-        return "border-blue-400 bg-blue-50 text-gray-800";
-      }
-      return "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-700 cursor-pointer";
+    if (!answered) {
+      return selectedAnswer === key
+        ? "border-blue-400 bg-blue-50 text-gray-800"
+        : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-700 cursor-pointer";
     }
-    // Answered
-    if (key === question.correctAnswer) {
-      return "border-green-500 bg-green-50 text-green-800 ring-2 ring-green-200";
-    }
-    if (key === selectedAnswer) {
-      return "border-red-500 bg-red-50 text-red-800 ring-2 ring-red-200";
-    }
+    if (key === question.correctAnswer) return "border-green-500 bg-green-50 text-green-800 ring-2 ring-green-200";
+    if (key === selectedAnswer)         return "border-red-500 bg-red-50 text-red-800 ring-2 ring-red-200";
     return "border-gray-200 bg-white text-gray-400";
   };
 
   const getOptionIcon = (key: "A" | "B" | "C" | "D") => {
     if (!answered) return null;
-    if (key === question.correctAnswer) {
+    if (key === question.correctAnswer)
       return (
         <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shrink-0">
           <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -281,8 +268,7 @@ function QuestionCard({
           </svg>
         </div>
       );
-    }
-    if (key === selectedAnswer) {
+    if (key === selectedAnswer)
       return (
         <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center shrink-0">
           <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,50 +276,39 @@ function QuestionCard({
           </svg>
         </div>
       );
-    }
     return null;
   };
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-50 px-4 py-10">
-      {/* Category badge */}
       <div className="mb-4">
         <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
           {question.category}
         </span>
       </div>
 
-      {/* Question card */}
       <div className="w-full max-w-2xl bg-white rounded-3xl border border-gray-200 shadow-sm">
-        {/* Question number + difficulty */}
         <div className="flex items-center justify-between px-6 pt-5 pb-0">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Question {current + 1}
-          </span>
-          <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-medium uppercase tracking-wide">
-            Hard
-          </span>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Question {current + 1}</span>
+          <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-medium uppercase tracking-wide">Hard</span>
         </div>
 
-        {/* Question text */}
         <div className="px-6 pt-4 pb-5">
-          <p className="text-lg font-medium text-gray-900 leading-relaxed">
-            {question.question}
-          </p>
+          <p className="text-lg font-medium text-gray-900 leading-relaxed">{question.question}</p>
         </div>
 
-        {/* Options */}
         <div className="px-6 pb-6 space-y-3">
           {optionKeys.map((key) => (
             <button
               key={key}
+              type="button"
               onClick={() => !answered && onSelect(key)}
               disabled={answered}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 text-left transition-all duration-150 ${getOptionStyle(key)}`}
             >
               <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
-                answered && key === question.correctAnswer ? "bg-green-500 text-white" :
-                answered && key === selectedAnswer && key !== question.correctAnswer ? "bg-red-500 text-white" :
+                answered && key === question.correctAnswer                               ? "bg-green-500 text-white" :
+                answered && key === selectedAnswer && key !== question.correctAnswer     ? "bg-red-500 text-white"   :
                 "bg-gray-100 text-gray-500"
               }`}>
                 {key}
@@ -344,10 +319,10 @@ function QuestionCard({
           ))}
         </div>
 
-        {/* Explain button — only shows after answering */}
         {answered && (
           <div className="px-6 pb-6">
             <button
+              type="button"
               onClick={onShowExplanation}
               className="w-full py-2.5 border-2 border-blue-200 hover:border-blue-400 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-semibold transition cursor-pointer flex items-center justify-center gap-2"
             >
@@ -361,9 +336,9 @@ function QuestionCard({
         )}
       </div>
 
-      {/* Navigation */}
       <div className="flex items-center gap-6 mt-8">
         <button
+          type="button"
           onClick={onPrev}
           disabled={current === 0}
           className="w-12 h-12 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shadow-sm"
@@ -371,12 +346,13 @@ function QuestionCard({
           <ChevronLeft />
         </button>
 
-        <span className="text-sm text-gray-500 font-medium min-w-[60px] text-center">
+        <span className="text-sm text-gray-500 font-medium min-w-15 text-center">
           {current + 1} / {total}
         </span>
 
         {isLast ? (
           <button
+            type="button"
             onClick={onFinish}
             disabled={!answered}
             className="w-12 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 flex items-center justify-center text-white transition cursor-pointer shadow-sm disabled:cursor-not-allowed"
@@ -387,6 +363,7 @@ function QuestionCard({
           </button>
         ) : (
           <button
+            type="button"
             onClick={onNext}
             disabled={current === total - 1}
             className="w-12 h-12 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shadow-sm"
@@ -396,20 +373,14 @@ function QuestionCard({
         )}
       </div>
 
-      {/* Total count below navigation */}
-      <p className="mt-3 text-xs text-gray-400 font-medium">
-        {total} questions total
-      </p>
+      <p className="mt-3 text-xs text-gray-400 font-medium">{total} questions total</p>
 
-      {/* Progress dots */}
       <div className="flex gap-1.5 mt-4 flex-wrap justify-center max-w-xs">
         {Array.from({ length: total }).map((_, i) => (
           <div
             key={i}
             className={`w-1.5 h-1.5 rounded-full transition-colors ${
-              i === current ? "bg-blue-600" :
-              i < current ? "bg-gray-400" :
-              "bg-gray-200"
+              i === current ? "bg-blue-600" : i < current ? "bg-gray-400" : "bg-gray-200"
             }`}
           />
         ))}
@@ -420,58 +391,220 @@ function QuestionCard({
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function QuizPage() {
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [fileName, setFileName] = useState("");
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, "A" | "B" | "C" | "D">>({});
+  const params       = useParams();
+  const urlSessionId = params?.id as string;
+
+  // useRef to prevent Strict Mode double-firing the generate call
+  const hasRun = useRef(false);
+
+  const [questions,       setQuestions]       = useState<QuizQuestion[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [error,           setError]           = useState("");
+  const [fileName,        setFileName]        = useState("");
+  const [currentIndex,    setCurrentIndex]    = useState(0);
+  const [answers,         setAnswers]         = useState<Record<number, "A" | "B" | "C" | "D">>({});
   const [showExplanation, setShowExplanation] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+  const [showResults,     setShowResults]     = useState(false);
 
+  // ── On mount ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    const storedFile = sessionStorage.getItem("quiz_file");
-    const storedName = sessionStorage.getItem("quiz_filename");
-    if (storedFile && storedName) {
-      setFileName(storedName);
-      generateQuiz(storedFile, storedName);
-      sessionStorage.removeItem("quiz_file");
-      sessionStorage.removeItem("quiz_filename");
+    // ✅ Strict Mode guard — only run once even in dev double-invoke
+    if (hasRun.current) return;
+    hasRun.current = true;
+
+    if (!urlSessionId) {
+      setError("No quiz session found. Please start a new quiz from the dashboard.");
+      setLoading(false);
+      return;
     }
-  }, []);
 
-  const generateQuiz = async (base64File: string, name: string) => {
+    const b64File = sessionStorage.getItem("quiz_file");
+    const name    = sessionStorage.getItem("quiz_filename");
+
+    if (name) setFileName(name);
+
+    if (b64File && name) {
+      // Fresh quiz — file data is in sessionStorage
+      // Don't remove it yet; generateAndPersist will clear it on success
+      generateAndPersist(b64File, name, urlSessionId);
+    } else {
+      // Page refreshed or revisited — load from DB
+      loadQuestionsFromDB(urlSessionId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSessionId]);
+
+  // ── Load from DB ──────────────────────────────────────────────────────────
+  const loadQuestionsFromDB = async (sid: string) => {
     setLoading(true);
-    setError("");
     try {
-      const byteString = atob(base64File.split(",")[1] ?? base64File);
-      const mimeType = base64File.startsWith("data:") ? base64File.split(":")[1].split(";")[0] : "application/pdf";
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const blob = new Blob([ab], { type: mimeType });
-      const file = new File([blob], name, { type: mimeType });
-      const formData = new FormData();
-      formData.append("file", file);
+      const { data: session, error: sessionErr } = await supabase
+        .from("quiz_sessions")
+        .select("status, file_name")
+        .eq("id", sid)
+        .single();
 
-      const res = await fetch("/api/generate-quiz", { method: "POST", body: formData });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to generate quiz");
-      }
-      const data = await res.json();
-      setQuestions(data.questions);
+      if (sessionErr)                          throw new Error("Quiz session not found.");
+      if (session.status === "generating")     throw new Error("Quiz is still being generated. Please wait and refresh.");
+      if (session.status === "error")          throw new Error("Quiz generation failed. Please go back and try again.");
+      if (session.file_name)                   setFileName(session.file_name);
+
+      const { data, error: dbErr } = await supabase
+        .from("quiz_questions")
+        .select("*")
+        .eq("session_id", sid)
+        .order("question_order", { ascending: true });
+
+      if (dbErr)                               throw dbErr;
+      if (!data || data.length === 0)          throw new Error("No questions found for this session.");
+
+      setQuestions(mapRows(data));
     } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+      setError(err.message ?? "Failed to load quiz.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelect = (opt: "A" | "B" | "C" | "D") => {
+  // ── Generate via API then persist ─────────────────────────────────────────
+  const generateAndPersist = async (base64File: string, name: string, sid: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      // ✅ Deduplication guard: if the session is already ready or finished
+      //    (e.g. Strict Mode second call), skip generation and load from DB.
+      const { data: existing } = await supabase
+        .from("quiz_sessions")
+        .select("status")
+        .eq("id", sid)
+        .single();
+
+      if (existing?.status === "ready" || existing?.status === "finished") {
+        clearSessionStorage();
+        await loadQuestionsFromDB(sid);
+        return;
+      }
+
+      // Call the generate API
+      const qs = await callGenerateAPI(base64File, name);
+
+      // Persist questions to DB
+      const rows = qs.map((q, i) => ({
+        session_id:     sid,
+        question_order: i + 1,
+        question:       q.question,
+        option_a:       q.options.A,
+        option_b:       q.options.B,
+        option_c:       q.options.C,
+        option_d:       q.options.D,
+        correct_answer: q.correctAnswer,
+        explanation:    q.explanation,
+        category:       q.category,
+        difficulty:     q.difficulty,
+      }));
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("quiz_questions")
+        .insert(rows)
+        .select("id, question_order");
+
+      if (insertErr) throw insertErr;
+
+      // Map DB UUIDs back onto questions
+      const dbIdMap: Record<number, string> = {};
+      (inserted ?? []).forEach((row) => { dbIdMap[row.question_order] = row.id; });
+
+      setQuestions(qs.map((q, i) => ({ ...q, dbId: dbIdMap[i + 1] })));
+
+      // Mark session as ready
+      await supabase
+        .from("quiz_sessions")
+        .update({ status: "ready", total: qs.length })
+        .eq("id", sid);
+
+      // ✅ Only clear sessionStorage after successful generation
+      clearSessionStorage();
+
+    } catch (err: any) {
+      setError(err.message || "Something went wrong generating the quiz.");
+      await supabase.from("quiz_sessions").update({ status: "error" }).eq("id", sid);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const clearSessionStorage = () => {
+    sessionStorage.removeItem("quiz_file");
+    sessionStorage.removeItem("quiz_filename");
+    sessionStorage.removeItem("quiz_session_id");
+  };
+
+  const mapRows = (data: any[]): QuizQuestion[] =>
+    data.map((row) => ({
+      id:            row.question_order,
+      dbId:          row.id,
+      question:      row.question,
+      options:       { A: row.option_a, B: row.option_b, C: row.option_c, D: row.option_d },
+      correctAnswer: row.correct_answer as "A" | "B" | "C" | "D",
+      explanation:   row.explanation,
+      category:      row.category,
+      difficulty:    row.difficulty,
+    }));
+
+  const callGenerateAPI = async (base64File: string, name: string): Promise<QuizQuestion[]> => {
+    const byteString = atob(base64File.split(",")[1] ?? base64File);
+    const mimeType   = base64File.startsWith("data:") ? base64File.split(":")[1].split(";")[0] : "application/pdf";
+    const ab         = new ArrayBuffer(byteString.length);
+    const ia         = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    const file = new File([new Blob([ab], { type: mimeType })], name, { type: mimeType });
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/generate-quiz", { method: "POST", body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to generate quiz");
+    }
+    const data = await res.json();
+    return data.questions as QuizQuestion[];
+  };
+
+  // ── Answer handler ─────────────────────────────────────────────────────────
+  const handleSelect = async (opt: "A" | "B" | "C" | "D") => {
     const q = questions[currentIndex];
     if (answers[q.id]) return;
+
+    const isCorrect = opt === q.correctAnswer;
     setAnswers((prev) => ({ ...prev, [q.id]: opt }));
+
+    if (urlSessionId && q.dbId) {
+      await supabase.from("quiz_answers").upsert({
+        session_id:   urlSessionId,
+        question_id:  q.dbId,
+        given_answer: opt,
+        is_correct:   isCorrect,
+      }, { onConflict: "session_id,question_id" });
+    }
+  };
+
+  // ── Finish handler ─────────────────────────────────────────────────────────
+  const handleFinish = async () => {
+    const correct = questions.filter((q) => answers[q.id] === q.correctAnswer).length;
+    if (urlSessionId) {
+      await supabase
+        .from("quiz_sessions")
+        .update({
+          score:       correct,
+          total:       questions.length,
+          finished_at: new Date().toISOString(),
+          status:      "finished",
+        })
+        .eq("id", urlSessionId);
+    }
+    setShowResults(true);
   };
 
   const handleRetry = () => {
@@ -481,6 +614,7 @@ export default function QuizPage() {
     setShowExplanation(false);
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   if (loading) return <LoadingScreen fileName={fileName} />;
 
   if (error) {
@@ -512,16 +646,15 @@ export default function QuizPage() {
   }
 
   if (showResults) {
-    return <ResultsScreen questions={questions} answers={answers} fileName={fileName} onRetry={handleRetry} />;
+    return <ResultsScreen questions={questions} answers={answers} onRetry={handleRetry} />;
   }
 
   const currentQuestion = questions[currentIndex];
-  const selectedAnswer = answers[currentQuestion.id] ?? null;
-  const answered = selectedAnswer !== null;
+  const selectedAnswer  = answers[currentQuestion.id] ?? null;
+  const answered        = selectedAnswer !== null;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top nav */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition cursor-pointer">
           <ChevronLeft />
@@ -538,7 +671,6 @@ export default function QuizPage() {
         </div>
       </header>
 
-      {/* Question */}
       <QuestionCard
         question={currentQuestion}
         current={currentIndex}
@@ -549,10 +681,9 @@ export default function QuizPage() {
         onShowExplanation={() => setShowExplanation(true)}
         onPrev={() => setCurrentIndex((i) => Math.max(0, i - 1))}
         onNext={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
-        onFinish={() => setShowResults(true)}
+        onFinish={handleFinish}
       />
 
-      {/* Explanation popup */}
       {showExplanation && answered && (
         <ExplanationPopup
           question={currentQuestion}

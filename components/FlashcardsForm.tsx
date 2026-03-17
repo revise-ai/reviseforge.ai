@@ -2,6 +2,7 @@
 
 import { useState, useRef, DragEvent, ChangeEvent, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 interface UploadingFile {
   id: number;
@@ -88,27 +89,67 @@ export default function FlashcardsForm({ onClose }: { onClose?: () => void }) {
     e.target.value = "";
   };
 
-  const handleGenerate = () => {
-    if (!hasDone) return;
-    const firstDone = doneFiles[0];
+  // ── Main action ──────────────────────────────────────────────────────────────
+  const handleGenerate = async () => {
+    if (!hasDone || loading) return;
     setLoading(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      sessionStorage.setItem("flashcard_file", base64);
-      sessionStorage.setItem("flashcard_filename", firstDone.name);
-      const id = Math.random().toString(36).slice(2, 18);
-      onClose?.();
-      router.push(`/flashcards/${id}`);
-    };
-    reader.readAsDataURL(firstDone.file);
+
+    const firstDone = doneFiles[0];
+
+    try {
+      // 1. Verify the user is logged in
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("You must be logged in to create flashcards.");
+
+      // 2. Upload file to Supabase Storage (bucket: flashcard-documents)
+      const storagePath = `${user.id}/${Date.now()}-${firstDone.name}`;
+      const { error: storageError } = await supabase.storage
+        .from("flashcard-documents")
+        .upload(storagePath, firstDone.file, { cacheControl: "3600", upsert: false });
+
+      if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`);
+
+      // 3. Create the flashcard_sessions row (status = 'generating')
+      const { data: session, error: sessionError } = await supabase
+        .from("flashcard_sessions")
+        .insert({
+          user_id:      user.id,
+          file_name:    firstDone.name,
+          storage_path: storagePath,
+          status:       "generating",
+        })
+        .select("id")
+        .single();
+
+      if (sessionError || !session) throw new Error(`Failed to create session: ${sessionError?.message}`);
+
+      // 4. Store base64 in sessionStorage so the flashcards page can call the
+      //    API without a signed URL round-trip, then navigate inside onload
+      //    so sessionStorage is guaranteed to be written before the page mounts.
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        sessionStorage.setItem("flashcard_file",       base64);
+        sessionStorage.setItem("flashcard_filename",   firstDone.name);
+        sessionStorage.setItem("flashcard_session_id", session.id);
+        onClose?.();
+        router.push(`/flashcards/${session.id}`);
+      };
+      reader.onerror = () => { throw new Error("Failed to read file. Please try again."); };
+      reader.readAsDataURL(firstDone.file);
+
+    } catch (err: any) {
+      console.error("[FlashcardsForm] handleGenerate error:", err);
+      alert(err.message ?? "Something went wrong. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (
     <>
-      {/* ── Upload Progress Panel (top-right, like the original) ── */}
+      {/* ── Upload Progress Panel ── */}
       {uploadingFiles.length > 0 && (
-        <div className="fixed top-5 right-5 z-[200] w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div className="fixed top-5 right-5 z-200 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-700">
@@ -196,7 +237,7 @@ export default function FlashcardsForm({ onClose }: { onClose?: () => void }) {
 
           {/* Body */}
           <div className="px-8 pb-8">
-            {/* Drop zone — files appear INSIDE it when done */}
+            {/* Drop zone */}
             <label
               htmlFor="flashcard-file-input"
               onDragOver={handleDragOver}
@@ -208,22 +249,17 @@ export default function FlashcardsForm({ onClose }: { onClose?: () => void }) {
                   : "border-gray-300 hover:border-green-400"
               }`}
             >
-              {/* Icon */}
               <svg className="w-9 h-9 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                   d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
 
-              {/* Done files shown inside dropzone */}
               {doneFiles.length > 0 && (
                 <div className="w-full space-y-1.5 mt-1">
                   {doneFiles.map((f) => {
                     const { bg, text } = extColor(f.ext);
                     return (
-                      <div
-                        key={f.id}
-                        className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2"
-                      >
+                      <div key={f.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${bg} ${text}`}>
                           {f.ext}
                         </span>
@@ -246,16 +282,12 @@ export default function FlashcardsForm({ onClose }: { onClose?: () => void }) {
                 </div>
               )}
 
-              {/* In-progress files shown inside dropzone */}
               {inProgressFiles.length > 0 && (
                 <div className="w-full space-y-1.5">
                   {inProgressFiles.map((f) => {
                     const { bg, text } = extColor(f.ext);
                     return (
-                      <div
-                        key={f.id}
-                        className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
-                      >
+                      <div key={f.id} className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${bg} ${text}`}>
                           {f.ext}
                         </span>

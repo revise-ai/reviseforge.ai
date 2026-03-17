@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Flashcard {
   id: number;
+  dbId?: string;
   term: string;
   definition: string;
   hint: string;
@@ -95,7 +97,7 @@ function LoadingScreen({ fileName }: { fileName: string }) {
           Generating flashcards{".".repeat(dots)}
         </h2>
         <p className="text-sm text-gray-400">Analyzing <span className="font-medium text-gray-600">{fileName}</span></p>
-        <p className="text-xs text-gray-400 mt-1">Gemini is reading your document and creating cards</p>
+        <p className="text-xs text-gray-400 mt-1">Reading your document and creating cards</p>
       </div>
       <div className="w-64 h-1.5 bg-gray-200 rounded-full overflow-hidden">
         <div className="h-full bg-blue-600 rounded-full animate-[loading_2s_ease-in-out_infinite]" />
@@ -114,14 +116,17 @@ function LoadingScreen({ fileName }: { fileName: string }) {
 // ── Edit Mode ──────────────────────────────────────────────────────────────────
 function EditMode({
   cards,
+  sessionId,
   onSave,
   onBack,
 }: {
   cards: Flashcard[];
+  sessionId: string;
   onSave: (cards: Flashcard[]) => void;
   onBack: () => void;
 }) {
   const [editing, setEditing] = useState<Flashcard[]>(cards.map((c) => ({ ...c })));
+  const [saving, setSaving] = useState(false);
 
   const updateCard = (id: number, field: keyof Flashcard, value: string) => {
     setEditing((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
@@ -148,9 +153,52 @@ function EditMode({
     setEditing(newCards);
   };
 
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await supabase.from("flashcards").delete().eq("session_id", sessionId);
+
+      const rows = editing.map((c, i) => ({
+        session_id: sessionId,
+        card_order: i + 1,
+        term:       c.term,
+        definition: c.definition,
+        hint:       c.hint     || "",
+        category:   c.category || "General",
+      }));
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("flashcards")
+        .insert(rows)
+        .select("id, card_order");
+
+      if (insertErr) throw insertErr;
+
+      const dbIdMap: Record<number, string> = {};
+      (inserted ?? []).forEach((row) => { dbIdMap[row.card_order] = row.id; });
+
+      const updated: Flashcard[] = editing.map((c, i) => ({
+        ...c,
+        id:   i + 1,
+        dbId: dbIdMap[i + 1],
+      }));
+
+      await supabase
+        .from("flashcard_sessions")
+        .update({ total: updated.length })
+        .eq("id", sessionId);
+
+      onSave(updated);
+    } catch (err: any) {
+      console.error("[EditMode] save error:", err);
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition cursor-pointer">
           <ChevronLeft />
@@ -165,21 +213,27 @@ function EditMode({
             Add Card
           </button>
           <button
-            onClick={() => onSave(editing)}
-            className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition cursor-pointer"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-semibold transition cursor-pointer"
           >
-            <DownloadIcon />
-            Save
+            {saving ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            ) : (
+              <DownloadIcon />
+            )}
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </header>
 
-      {/* Cards */}
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
         {editing.map((card, idx) => (
           <div key={card.id} id={`card-${card.id}`}
             className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            {/* Card header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-500">Card {idx + 1}</span>
@@ -202,7 +256,6 @@ function EditMode({
               </div>
             </div>
 
-            {/* Fields */}
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-2">
@@ -237,7 +290,6 @@ function EditMode({
           </div>
         ))}
 
-        {/* Add card button at bottom */}
         <button
           onClick={addCard}
           className="w-full py-4 border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-2xl text-sm text-gray-400 hover:text-blue-600 transition cursor-pointer flex items-center justify-center gap-2"
@@ -252,14 +304,8 @@ function EditMode({
 
 // ── Study Card ─────────────────────────────────────────────────────────────────
 function StudyCard({
-  card,
-  current,
-  total,
-  starred,
-  onStar,
-  onPrev,
-  onNext,
-  onEdit,
+  card, current, total, starred,
+  onStar, onPrev, onNext, onEdit,
 }: {
   card: Flashcard;
   current: number;
@@ -273,7 +319,6 @@ function StudyCard({
   const [showHint, setShowHint] = useState(false);
   const [flipped, setFlipped] = useState(false);
 
-  // Reset when card changes
   useEffect(() => {
     setShowHint(false);
     setFlipped(false);
@@ -281,20 +326,17 @@ function StudyCard({
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-50 px-4 py-10">
-      {/* Category badge */}
       <div className="mb-4">
         <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
           {card.category}
         </span>
       </div>
 
-      {/* Card */}
       <div
         onClick={() => setFlipped((f) => !f)}
         className="w-full max-w-2xl bg-white rounded-3xl border border-gray-200 shadow-sm cursor-pointer select-none"
         style={{ minHeight: "340px" }}
       >
-        {/* Card top bar */}
         <div className="flex items-center justify-between px-5 pt-5 pb-2">
           <button
             onClick={(e) => { e.stopPropagation(); setShowHint((v) => !v); }}
@@ -319,27 +361,19 @@ function StudyCard({
           </div>
         </div>
 
-        {/* Card content */}
-        <div className="flex flex-col items-center justify-center px-10 py-12 text-center min-h-[240px]">
+        <div className="flex flex-col items-center justify-center px-10 py-12 text-center min-h-60">
           {!flipped ? (
             <>
-              <p className="text-xl font-medium text-gray-900 leading-relaxed">
-                {card.term}
-              </p>
+              <p className="text-xl font-medium text-gray-900 leading-relaxed">{card.term}</p>
               {showHint && card.hint && (
-                <p className="mt-6 text-sm text-gray-500 italic">
-                  Hint: {card.hint}
-                </p>
+                <p className="mt-6 text-sm text-gray-500 italic">Hint: {card.hint}</p>
               )}
             </>
           ) : (
-            <p className="text-lg text-gray-700 leading-relaxed">
-              {card.definition}
-            </p>
+            <p className="text-lg text-gray-700 leading-relaxed">{card.definition}</p>
           )}
         </div>
 
-        {/* Flip indicator */}
         <div className="pb-4 flex justify-center">
           <span className="text-xs text-gray-300">
             {flipped ? "Showing answer — click to see question" : "Click card to reveal answer"}
@@ -347,7 +381,6 @@ function StudyCard({
         </div>
       </div>
 
-      {/* Navigation */}
       <div className="flex items-center gap-6 mt-8">
         <button
           onClick={onPrev}
@@ -356,11 +389,9 @@ function StudyCard({
         >
           <ChevronLeft />
         </button>
-
-        <span className="text-sm text-gray-500 font-medium min-w-[60px] text-center">
+        <span className="text-sm text-gray-500 font-medium min-w-15 text-center">
           {current + 1} / {total}
         </span>
-
         <button
           onClick={onNext}
           disabled={current === total - 1}
@@ -370,7 +401,6 @@ function StudyCard({
         </button>
       </div>
 
-      {/* Progress dots */}
       <div className="flex gap-1.5 mt-4 flex-wrap justify-center max-w-xs">
         {Array.from({ length: total }).map((_, i) => (
           <div
@@ -387,77 +417,196 @@ function StudyCard({
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function FlashcardsPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const params       = useParams();
+  const urlSessionId = params?.id as string;
 
-  const [cards, setCards] = useState<Flashcard[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [fileName, setFileName] = useState("");
+  const [cards,        setCards]        = useState<Flashcard[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState("");
+  const [fileName,     setFileName]     = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [starred, setStarred] = useState<Set<number>>(new Set());
-  const [mode, setMode] = useState<"study" | "edit">("study");
+  const [starred,      setStarred]      = useState<Set<number>>(new Set());
+  const [mode,         setMode]         = useState<"study" | "edit">("study");
 
-  // Read file from sessionStorage (set by DashboardPage before navigating here)
   useEffect(() => {
-    const storedFile = sessionStorage.getItem("flashcard_file");
-    const storedName = sessionStorage.getItem("flashcard_filename");
-
-    if (storedFile && storedName) {
-      setFileName(storedName);
-      generateFlashcards(storedFile, storedName);
-      sessionStorage.removeItem("flashcard_file");
-      sessionStorage.removeItem("flashcard_filename");
+    if (!urlSessionId) {
+      setError("No flashcard session found. Please start from the dashboard.");
+      setLoading(false);
+      return;
     }
-  }, []);
 
-  const generateFlashcards = async (base64File: string, name: string) => {
+    const b64File    = sessionStorage.getItem("flashcard_file");
+    const name       = sessionStorage.getItem("flashcard_filename");
+    // ✅ Key insight: store which session ID we started generating for.
+    // Strict Mode fires useEffect twice. On the first run we set this key.
+    // On the second run, this key already equals urlSessionId, so we skip
+    // straight to loadCardsFromDB — which by then finds status="ready".
+    const startedFor = sessionStorage.getItem("flashcard_generating_for");
+
+    if (name) setFileName(name);
+
+    const shouldGenerate = b64File && name && startedFor !== urlSessionId;
+
+    if (shouldGenerate) {
+      // ✅ Set the mutex SYNCHRONOUSLY before going async — so the second
+      // Strict Mode mount (which runs almost immediately) sees it
+      sessionStorage.setItem("flashcard_generating_for", urlSessionId);
+      generateAndPersist(b64File!, name!, urlSessionId);
+    } else {
+      loadCardsFromDB(urlSessionId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSessionId]);
+
+  // ── Load from DB ─────────────────────────────────────────────────────────
+  const loadCardsFromDB = async (sid: string) => {
+    setLoading(true);
+    try {
+      const { data: session, error: sessionErr } = await supabase
+        .from("flashcard_sessions")
+        .select("status, file_name")
+        .eq("id", sid)
+        .single();
+
+      if (sessionErr) throw new Error("Flashcard session not found.");
+      if (session.file_name) setFileName(session.file_name);
+
+      // Still generating — keep the loading spinner and poll again in 2s
+      // We do NOT call setLoading(false) here so the spinner stays visible
+      if (session.status === "generating" || session.status === "processing") {
+        setTimeout(() => loadCardsFromDB(sid), 2000);
+        return; // early return — finally still runs but we set loading=true after
+      }
+
+      if (session.status === "error") throw new Error("Flashcard generation failed. Please go back and try again.");
+
+      const { data, error: dbErr } = await supabase
+        .from("flashcards")
+        .select("*")
+        .eq("session_id", sid)
+        .order("card_order", { ascending: true });
+
+      if (dbErr) throw dbErr;
+      if (!data || data.length === 0) throw new Error("No flashcards found for this session.");
+
+      setCards(mapRows(data));
+      setLoading(false); // only set false when we actually have cards
+    } catch (err: any) {
+      setError(err.message ?? "Failed to load flashcards.");
+      setLoading(false);
+    }
+  };
+
+  // ── Generate via API then persist ─────────────────────────────────────────
+  const generateAndPersist = async (base64File: string, name: string, sid: string) => {
     setLoading(true);
     setError("");
     try {
-      // Convert base64 back to blob
-      const byteString = atob(base64File.split(",")[1] ?? base64File);
-      const mimeType = base64File.startsWith("data:") ? base64File.split(":")[1].split(";")[0] : "application/pdf";
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-      }
-      const blob = new Blob([ab], { type: mimeType });
-      const file = new File([blob], name, { type: mimeType });
+      const generatedCards = await callGenerateAPI(base64File, name);
 
-      const formData = new FormData();
-      formData.append("file", file);
+      const rows = generatedCards.map((c, i) => ({
+        session_id: sid,
+        card_order: i + 1,
+        term:       c.term,
+        definition: c.definition,
+        hint:       c.hint     || "",
+        category:   c.category || "General",
+      }));
 
-      const res = await fetch("/api/generate-flashcards", {
-        method: "POST",
-        body: formData,
-      });
+      const { data: inserted, error: insertErr } = await supabase
+        .from("flashcards")
+        .insert(rows)
+        .select("id, card_order");
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to generate flashcards");
-      }
+      if (insertErr) throw insertErr;
 
-      const data = await res.json();
-      setCards(data.flashcards);
+      const dbIdMap: Record<number, string> = {};
+      (inserted ?? []).forEach((row) => { dbIdMap[row.card_order] = row.id; });
+
+      setCards(generatedCards.map((c, i) => ({ ...c, id: i + 1, dbId: dbIdMap[i + 1] })));
+
+      await supabase
+        .from("flashcard_sessions")
+        .update({ status: "ready", total: generatedCards.length })
+        .eq("id", sid);
+
+      // Clean up sessionStorage after successful save
+      sessionStorage.removeItem("flashcard_file");
+      sessionStorage.removeItem("flashcard_filename");
+      sessionStorage.removeItem("flashcard_session_id");
+      // Keep "flashcard_generating_for" so refreshes still route to DB
+
     } catch (err: any) {
-      setError(err.message || "Something went wrong. Please try again.");
+      setError(err.message || "Something went wrong generating the flashcards.");
+      await supabase.from("flashcard_sessions").update({ status: "error" }).eq("id", sid);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleStar = (id: number) => {
-    setStarred((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const mapRows = (data: any[]): Flashcard[] =>
+    data.map((row) => ({
+      id:         row.card_order,
+      dbId:       row.id,
+      term:       row.term,
+      definition: row.definition,
+      hint:       row.hint     ?? "",
+      category:   row.category ?? "General",
+    }));
+
+  const callGenerateAPI = async (base64File: string, name: string): Promise<Flashcard[]> => {
+    const byteString = atob(base64File.split(",")[1] ?? base64File);
+    const mimeType   = base64File.startsWith("data:") ? base64File.split(":")[1].split(";")[0] : "application/pdf";
+    const ab         = new ArrayBuffer(byteString.length);
+    const ia         = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    const file = new File([new Blob([ab], { type: mimeType })], name, { type: mimeType });
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/generate-flashcards", { method: "POST", body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to generate flashcards");
+    }
+    const data = await res.json();
+    return (data.flashcards as Omit<Flashcard, "id">[]).map((c, i) => ({ ...c, id: i + 1 }));
   };
 
-  if (loading) return <LoadingScreen fileName={fileName} />;
+  // ── Star toggle ───────────────────────────────────────────────────────────
+  const toggleStar = async (localId: number) => {
+    const card = cards.find((c) => c.id === localId);
+    const wasStarred = starred.has(localId);
+
+    setStarred((prev) => {
+      const next = new Set(prev);
+      if (next.has(localId)) next.delete(localId);
+      else next.add(localId);
+      return next;
+    });
+
+    if (!card?.dbId) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    if (wasStarred) {
+      await supabase.from("flashcard_stars")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("card_id", card.dbId);
+    } else {
+      await supabase.from("flashcard_stars")
+        .upsert({ user_id: user.id, card_id: card.dbId }, { onConflict: "user_id,card_id" });
+    }
+  };
+
+  // -- Render --
+  // Keep showing loader until cards are ready — never flash the empty state
+  if (loading || (!error && cards.length === 0)) {
+    return <LoadingScreen fileName={fileName} />;
+  }
 
   if (error) {
     return (
@@ -476,21 +625,11 @@ export default function FlashcardsPage() {
     );
   }
 
-  if (cards.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-400 text-sm">No flashcards yet. Upload a file from the dashboard.</p>
-        <Link href="/dashboard" className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
-          Go to Dashboard
-        </Link>
-      </div>
-    );
-  }
-
   if (mode === "edit") {
     return (
       <EditMode
         cards={cards}
+        sessionId={urlSessionId}
         onSave={(updated) => { setCards(updated); setMode("study"); }}
         onBack={() => setMode("study")}
       />
@@ -499,7 +638,6 @@ export default function FlashcardsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top nav */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition">
           <ChevronLeft />
@@ -518,7 +656,6 @@ export default function FlashcardsPage() {
         </div>
       </header>
 
-      {/* Study card */}
       <StudyCard
         card={cards[currentIndex]}
         current={currentIndex}

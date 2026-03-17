@@ -69,7 +69,7 @@ function ProgressPanel({
   if (files.length === 0) return null;
 
   return (
-    <div className="fixed top-5 right-5 z-[200] w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+    <div className="fixed top-5 right-5 z-200 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-gray-700">

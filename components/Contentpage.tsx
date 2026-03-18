@@ -4,6 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 type Mode = "youtube" | "microphone" | "browsertab";
 type ActiveTool = "summary" | "quiz" | "flashcards" | "exams" | null;
@@ -338,6 +339,7 @@ function RightSidebar({
   summary, summaryLoading, summaryError,
   quizQuestions, quizLoading, quizError,
   flashcards, flashcardsLoading, flashcardsError,
+  chatMessages,
   chatInput, setChatInput, onChatSend, chatLoading,
 }: {
   open: boolean; onToggle: () => void; mode: Mode; isChat: boolean;
@@ -345,6 +347,7 @@ function RightSidebar({
   summary: string; summaryLoading: boolean; summaryError: string;
   quizQuestions: QuizQuestion[]; quizLoading: boolean; quizError: string;
   flashcards: Flashcard[]; flashcardsLoading: boolean; flashcardsError: string;
+  chatMessages: { role: "user" | "ai"; message: string }[];
   chatInput: string; setChatInput: (v: string) => void; onChatSend: () => void; chatLoading: boolean;
 }) {
   const isRecording = mode === "microphone" || mode === "browsertab";
@@ -395,7 +398,6 @@ function RightSidebar({
 
         {open && (
           <div className="flex flex-col h-full overflow-hidden">
-            {/* Header */}
             <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-gray-100 shrink-0">
               {activeTool && (
                 <button
@@ -419,7 +421,6 @@ function RightSidebar({
               </div>
             )}
 
-            {/* Content */}
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
               {!activeTool && (
                 <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -460,12 +461,27 @@ function RightSidebar({
               {activeTool === "summary" && <SummaryContent summary={summary} loading={summaryLoading} error={summaryError} />}
               {activeTool === "quiz" && <QuizContent questions={quizQuestions} loading={quizLoading} error={quizError} />}
               {activeTool === "flashcards" && <FlashcardsContent cards={flashcards} loading={flashcardsLoading} error={flashcardsError} />}
-              {/* NOTE: "exams" is NOT handled here — it redirects to /dashboard/exam-mode instead */}
             </div>
 
-            {/* Bottom chat input */}
             {!isChat && (
-              <div className="px-4 py-4 border-t border-gray-100 shrink-0">
+              <div className="border-t border-gray-100 shrink-0">
+                {/* Chat history */}
+                {chatMessages.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto px-4 pt-3 pb-1 space-y-2">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
+                          msg.role === "user"
+                            ? "bg-gray-900 text-white rounded-tr-sm"
+                            : "bg-blue-50 border border-blue-100 text-blue-800 rounded-tl-sm"
+                        }`}>
+                          {msg.message.length > 120 ? msg.message.slice(0, 120) + "…" : msg.message}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="px-4 py-3">
                 <div className={`flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3 border transition-colors ${chatLoading ? "border-blue-200" : "border-gray-200 focus-within:border-gray-300"}`}>
                   <input
                     type="text"
@@ -498,6 +514,7 @@ function RightSidebar({
                     Listening…
                   </p>
                 )}
+                </div>
               </div>
             )}
           </div>
@@ -781,35 +798,264 @@ function ChatView({ initialQuery, uploadedFile }: { initialQuery: string; upload
   );
 }
 
+// ── Supabase persistence helpers ───────────────────────────────────────────────
+
+async function persistSummary(sessionId: string, userId: string, summaryText: string) {
+  await supabase.from("content_summaries").upsert(
+    { session_id: sessionId, user_id: userId, summary: summaryText },
+    { onConflict: "session_id" }
+  );
+}
+
+async function persistQuiz(sessionId: string, userId: string, questions: QuizQuestion[]) {
+  // Upsert the quiz set row
+  const { data: quiz, error: quizErr } = await supabase
+    .from("content_quizzes")
+    .upsert({ session_id: sessionId, user_id: userId }, { onConflict: "session_id" })
+    .select("id")
+    .single();
+
+  if (quizErr || !quiz) return;
+
+  // Replace all questions
+  await supabase.from("content_quiz_questions").delete().eq("quiz_id", quiz.id);
+
+  const rows = questions.map((q, i) => ({
+    quiz_id:        quiz.id,
+    question_order: i + 1,
+    question:       q.question,
+    option_a:       q.options.A,
+    option_b:       q.options.B,
+    option_c:       q.options.C,
+    option_d:       q.options.D,
+    correct_answer: q.correctAnswer,
+    explanation:    q.explanation,
+    category:       q.category,
+  }));
+
+  await supabase.from("content_quiz_questions").insert(rows);
+}
+
+async function persistFlashcards(sessionId: string, userId: string, cards: Flashcard[]) {
+  // Delete existing cards for this session then re-insert
+  await supabase.from("content_flashcards").delete().eq("session_id", sessionId);
+
+  const rows = cards.map((c, i) => ({
+    session_id: sessionId,
+    user_id:    userId,
+    card_order: i + 1,
+    term:       c.term,
+    definition: c.definition,
+    hint:       c.hint     || "",
+    category:   c.category || "General",
+  }));
+
+  await supabase.from("content_flashcards").insert(rows);
+}
+
+async function persistChaptersAndTranscripts(
+  sessionId: string,
+  userId: string,
+  chapters: ChapterItem[],
+  transcripts: TranscriptItem[]
+) {
+  // Delete stale data first so re-visiting re-fetches cleanly
+  await Promise.all([
+    supabase.from("content_chapters").delete().eq("session_id", sessionId),
+    supabase.from("content_transcripts").delete().eq("session_id", sessionId),
+  ]);
+
+  const chapterRows = chapters.map((c, i) => ({
+    session_id:    sessionId,
+    user_id:       userId,
+    chapter_order: i + 1,
+    time:          c.time,
+    title:         c.title,
+    text:          c.text,
+  }));
+
+  const transcriptRows = transcripts.map((t, i) => ({
+    session_id:       sessionId,
+    user_id:          userId,
+    transcript_order: i + 1,
+    time:             t.time,
+    text:             t.text,
+  }));
+
+  await Promise.all([
+    chapterRows.length    ? supabase.from("content_chapters").insert(chapterRows)    : Promise.resolve(),
+    transcriptRows.length ? supabase.from("content_transcripts").insert(transcriptRows) : Promise.resolve(),
+  ]);
+}
+
+async function loadCachedChaptersAndTranscripts(sessionId: string) {
+  const [chaptersRes, transcriptsRes] = await Promise.all([
+    supabase
+      .from("content_chapters")
+      .select("time, title, text")
+      .eq("session_id", sessionId)
+      .order("chapter_order", { ascending: true }),
+    supabase
+      .from("content_transcripts")
+      .select("time, text")
+      .eq("session_id", sessionId)
+      .order("transcript_order", { ascending: true }),
+  ]);
+
+  return {
+    chapters:    (chaptersRes.data    ?? []) as ChapterItem[],
+    transcripts: (transcriptsRes.data ?? []) as TranscriptItem[],
+  };
+}
+
+async function persistChatMessage(
+  sessionId: string,
+  userId: string,
+  role: "user" | "ai",
+  message: string
+) {
+  await supabase.from("content_chat_messages").insert({
+    session_id: sessionId,
+    user_id:    userId,
+    role,
+    message,
+  });
+}
+
+async function loadChatMessages(sessionId: string) {
+  const { data } = await supabase
+    .from("content_chat_messages")
+    .select("role, message, created_at")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: true });
+  return (data ?? []).map((row) => ({
+    role:    row.role as "user" | "ai",
+    message: row.message,
+  }));
+}
+
+async function loadCachedData(sessionId: string) {
+  const [summaryRes, quizRes, flashcardsRes] = await Promise.all([
+    supabase.from("content_summaries").select("summary").eq("session_id", sessionId).single(),
+    supabase.from("content_quizzes").select("id").eq("session_id", sessionId).single(),
+    supabase.from("content_flashcards").select("*").eq("session_id", sessionId).order("card_order"),
+  ]);
+
+  let quizQuestions: QuizQuestion[] = [];
+  if (quizRes.data?.id) {
+    const { data: qRows } = await supabase
+      .from("content_quiz_questions")
+      .select("*")
+      .eq("quiz_id", quizRes.data.id)
+      .order("question_order");
+
+    quizQuestions = (qRows ?? []).map((row, i) => ({
+      id:            i + 1,
+      question:      row.question,
+      options:       { A: row.option_a, B: row.option_b, C: row.option_c, D: row.option_d },
+      correctAnswer: row.correct_answer as "A" | "B" | "C" | "D",
+      explanation:   row.explanation,
+      category:      row.category,
+    }));
+  }
+
+  const flashcards: Flashcard[] = (flashcardsRes.data ?? []).map((row, i) => ({
+    id:         i + 1,
+    term:       row.term,
+    definition: row.definition,
+    hint:       row.hint     ?? "",
+    category:   row.category ?? "General",
+  }));
+
+  return {
+    summary:    summaryRes.data?.summary ?? "",
+    quizQuestions,
+    flashcards,
+  };
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────────
 export default function Contentpages() {
   const params = useSearchParams();
   const router = useRouter();
-  const mode = (params.get("mode") as Mode) ?? "youtube";
-  const url = params.get("url") ?? "";
-  const initialQuery = params.get("q") ?? "";
-  const uploadedFile = params.get("file") ?? "";
+  const mode          = (params.get("mode") as Mode) ?? "youtube";
+  const url           = params.get("url") ?? "";
+  // ✅ session_id is passed as a query param by the dashboard
+  // e.g. /content/<uuid>?url=...&session_id=<uuid>
+  const sessionId     = params.get("session_id") ?? "";
+  const initialQuery  = params.get("q") ?? "";
+  const uploadedFile  = params.get("file") ?? "";
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const isRecording = mode === "microphone" || mode === "browsertab";
-  const isChat = mode === "chat";
+  const isChat      = mode === "chat";
 
-  const [activeTool, setActiveTool] = useState<ActiveTool>(null);
-  const [summary, setSummary] = useState("");
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState("");
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
-  const [quizLoading, setQuizLoading] = useState(false);
-  const [quizError, setQuizError] = useState("");
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  // Current user ref — fetched once on mount
+  const userIdRef = useRef<string>("");
+
+  const [activeTool,        setActiveTool]        = useState<ActiveTool>(null);
+  const [summary,           setSummary]           = useState("");
+  const [summaryLoading,    setSummaryLoading]    = useState(false);
+  const [summaryError,      setSummaryError]      = useState("");
+  const [quizQuestions,     setQuizQuestions]     = useState<QuizQuestion[]>([]);
+  const [quizLoading,       setQuizLoading]       = useState(false);
+  const [quizError,         setQuizError]         = useState("");
+  const [flashcards,        setFlashcards]        = useState<Flashcard[]>([]);
   const [flashcardsLoading, setFlashcardsLoading] = useState(false);
-  const [flashcardsError, setFlashcardsError] = useState("");
-  const [chapters, setChapters] = useState<ChapterItem[]>([]);
-  const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
-  const [chaptersLoading, setChaptersLoading] = useState(false);
-  const [videoTitle, setVideoTitle] = useState("");
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
+  const [flashcardsError,   setFlashcardsError]   = useState("");
+  const [chapters,          setChapters]          = useState<ChapterItem[]>([]);
+  const [transcripts,       setTranscripts]       = useState<TranscriptItem[]>([]);
+  const [chaptersLoading,   setChaptersLoading]   = useState(false);
+  const [videoTitle,        setVideoTitle]        = useState("");
+  const [chatMessages,      setChatMessages]      = useState<{ role: "user" | "ai"; message: string }[]>([]);
+  const [chatInput,         setChatInput]         = useState("");
+  const [chatLoading,       setChatLoading]       = useState(false);
 
+  // ── Fetch user + load cached data on mount ────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        userIdRef.current = user.id;
+
+        // Update video title on the session row when it becomes available
+        if (sessionId && videoTitle) {
+          await supabase
+            .from("youtube_sessions")
+            .update({ video_title: videoTitle })
+            .eq("id", sessionId);
+        }
+
+        // Pre-load any previously generated data for this session
+        if (sessionId) {
+          const [cached, chatHistory, cachedChapters] = await Promise.all([
+            loadCachedData(sessionId),
+            loadChatMessages(sessionId),
+            loadCachedChaptersAndTranscripts(sessionId),
+          ]);
+          if (cached.summary)                    setSummary(cached.summary);
+          if (cached.quizQuestions.length)       setQuizQuestions(cached.quizQuestions);
+          if (cached.flashcards.length)          setFlashcards(cached.flashcards);
+          if (chatHistory.length)                setChatMessages(chatHistory);
+          if (cachedChapters.chapters.length)    setChapters(cachedChapters.chapters);
+          if (cachedChapters.transcripts.length) setTranscripts(cachedChapters.transcripts);
+        }
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  // Update session video_title once we have it from the chapters API
+  useEffect(() => {
+    if (!sessionId || !videoTitle || !userIdRef.current) return;
+    supabase
+      .from("youtube_sessions")
+      .update({ video_title: videoTitle })
+      .eq("id", sessionId)
+      .then(() => {});
+  }, [videoTitle, sessionId]);
+
+  // ── Load chapters/transcripts ─────────────────────────────────────────────
   useEffect(() => {
     if (!url || isRecording || isChat) return;
     (async () => {
@@ -821,15 +1067,26 @@ export default function Contentpages() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        setChapters(data.chapters ?? []);
-        setTranscripts(data.transcripts ?? []);
+        const fetchedChapters    = data.chapters    ?? [];
+        const fetchedTranscripts = data.transcripts ?? [];
+        setChapters(fetchedChapters);
+        setTranscripts(fetchedTranscripts);
         setVideoTitle(data.title ?? "");
+        // ✅ Persist chapters + transcripts so the recent page can reload them
+        if (sessionId && userIdRef.current) {
+          await persistChaptersAndTranscripts(
+            sessionId,
+            userIdRef.current,
+            fetchedChapters,
+            fetchedTranscripts
+          );
+        }
       } catch { } finally { setChaptersLoading(false); }
     })();
   }, [url]);
 
+  // ── Tool click handler — generate + persist ───────────────────────────────
   const handleToolClick = useCallback(async (tool: ActiveTool) => {
-    // ── EXAM MODE: redirect straight to exam page, passing the YouTube URL ──
     if (tool === "exams") {
       const destination = url
         ? `/dashboard/exam-mode?url=${encodeURIComponent(url)}&source=youtube`
@@ -841,6 +1098,9 @@ export default function Contentpages() {
     setActiveTool(tool);
     if (!url) return;
 
+    const userId = userIdRef.current;
+
+    // ── Summary ──────────────────────────────────────────────────────────────
     if (tool === "summary" && !summary && !summaryLoading) {
       setSummaryLoading(true); setSummaryError("");
       try {
@@ -849,11 +1109,15 @@ export default function Contentpages() {
           body: JSON.stringify({ url }),
         });
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
-        const data = await res.json(); setSummary(data.summary);
+        const data = await res.json();
+        setSummary(data.summary);
+        // ✅ Persist to Supabase
+        if (sessionId && userId) await persistSummary(sessionId, userId, data.summary);
       } catch (e: any) { setSummaryError(e.message || "Failed to generate summary"); }
       finally { setSummaryLoading(false); }
     }
 
+    // ── Quiz ─────────────────────────────────────────────────────────────────
     if (tool === "quiz" && !quizQuestions.length && !quizLoading) {
       setQuizLoading(true); setQuizError("");
       try {
@@ -862,11 +1126,16 @@ export default function Contentpages() {
           body: JSON.stringify({ url }),
         });
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
-        const data = await res.json(); setQuizQuestions(data.questions ?? []);
+        const data = await res.json();
+        const questions: QuizQuestion[] = (data.questions ?? []).map((q: any, i: number) => ({ ...q, id: i + 1 }));
+        setQuizQuestions(questions);
+        // ✅ Persist to Supabase
+        if (sessionId && userId) await persistQuiz(sessionId, userId, questions);
       } catch (e: any) { setQuizError(e.message || "Failed to generate quiz"); }
       finally { setQuizLoading(false); }
     }
 
+    // ── Flashcards ───────────────────────────────────────────────────────────
     if (tool === "flashcards" && !flashcards.length && !flashcardsLoading) {
       setFlashcardsLoading(true); setFlashcardsError("");
       try {
@@ -875,27 +1144,57 @@ export default function Contentpages() {
           body: JSON.stringify({ url }),
         });
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
-        const data = await res.json(); setFlashcards(data.flashcards ?? []);
+        const data = await res.json();
+        const cards: Flashcard[] = (data.flashcards ?? []).map((c: any, i: number) => ({ ...c, id: i + 1 }));
+        setFlashcards(cards);
+        // ✅ Persist to Supabase
+        if (sessionId && userId) await persistFlashcards(sessionId, userId, cards);
       } catch (e: any) { setFlashcardsError(e.message || "Failed to generate flashcards"); }
       finally { setFlashcardsLoading(false); }
     }
-  }, [url, summary, summaryLoading, quizQuestions.length, quizLoading, flashcards.length, flashcardsLoading, router]);
+  }, [url, summary, summaryLoading, quizQuestions.length, quizLoading, flashcards.length, flashcardsLoading, sessionId, router]);
 
+  // ── Chat send ─────────────────────────────────────────────────────────────
   const handleChatSend = useCallback(async () => {
     const q = chatInput.trim();
     if (!q || !url || chatLoading) return;
+    const userId = userIdRef.current;
+
+    // Optimistically add user message to local state
+    setChatMessages((prev) => [...prev, { role: "user", message: q }]);
     setChatInput(""); setChatLoading(true);
     setActiveTool("summary"); setSummary(""); setSummaryLoading(true); setSummaryError("");
+
+    // Persist user question to DB
+    if (sessionId && userId) {
+      await persistChatMessage(sessionId, userId, "user", q);
+    }
+
     try {
       const res = await fetch("/api/generate-summary", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, userQuery: q }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
-      const data = await res.json(); setSummary(data.summary);
-    } catch (e: any) { setSummaryError(e.message || "Failed to get answer"); }
+      const data = await res.json();
+      setSummary(data.summary);
+
+      // Add AI answer to local state
+      setChatMessages((prev) => [...prev, { role: "ai", message: data.summary }]);
+
+      // Persist AI answer and summary to DB
+      if (sessionId && userId) {
+        await Promise.all([
+          persistChatMessage(sessionId, userId, "ai", data.summary),
+          persistSummary(sessionId, userId, data.summary),
+        ]);
+      }
+    } catch (e: any) {
+      setSummaryError(e.message || "Failed to get answer");
+      setChatMessages((prev) => [...prev, { role: "ai", message: "Sorry, something went wrong. Please try again." }]);
+    }
     finally { setSummaryLoading(false); setChatLoading(false); }
-  }, [chatInput, url, chatLoading]);
+  }, [chatInput, url, chatLoading, sessionId]);
 
   const title = isRecording
     ? `Recording at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
@@ -938,6 +1237,7 @@ export default function Contentpages() {
           summary={summary} summaryLoading={summaryLoading} summaryError={summaryError}
           quizQuestions={quizQuestions} quizLoading={quizLoading} quizError={quizError}
           flashcards={flashcards} flashcardsLoading={flashcardsLoading} flashcardsError={flashcardsError}
+          chatMessages={chatMessages}
           chatInput={chatInput} setChatInput={setChatInput} onChatSend={handleChatSend} chatLoading={chatLoading}
         />
       </div>

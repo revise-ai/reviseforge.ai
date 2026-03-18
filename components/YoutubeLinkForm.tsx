@@ -3,6 +3,7 @@
 
 import { useState, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 interface YoutubeEntry {
   url: string;
@@ -26,6 +27,7 @@ export default function YoutubeLinkForm() {
   const [inputValue, setInputValue] = useState<string>("");
   const [entries, setEntries] = useState<YoutubeEntry[]>([]);
   const [error, setError] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
   const handleAdd = () => {
     const url = inputValue.trim();
@@ -41,11 +43,62 @@ export default function YoutubeLinkForm() {
     setEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Navigate to content page with the first YouTube URL
-  const handleUse = () => {
-    if (entries.length === 0) return;
+  // ── Create or reuse a youtube_session row then navigate ───────────────────
+  const handleUse = async () => {
+    if (entries.length === 0 || loading) return;
+    setLoading(true);
+
     const firstUrl = entries[0].url;
-    router.push(`/content?mode=youtube&url=${encodeURIComponent(firstUrl)}`);
+
+    try {
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+
+      if (userErr || !user) {
+        // Not logged in — just navigate without persisting
+        router.push(`/content?mode=youtube&url=${encodeURIComponent(firstUrl)}`);
+        return;
+      }
+
+      // Check if a session already exists for this user + URL
+      const { data: existing } = await supabase
+        .from("youtube_sessions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("url", firstUrl)
+        .single();
+
+      let sessionId: string;
+
+      if (existing?.id) {
+        // Reuse existing session and update last_visited
+        sessionId = existing.id;
+        await supabase
+          .from("youtube_sessions")
+          .update({ last_visited: new Date().toISOString() })
+          .eq("id", sessionId);
+      } else {
+        // Create a new session row
+        const { data: created, error: createErr } = await supabase
+          .from("youtube_sessions")
+          .insert({ user_id: user.id, url: firstUrl })
+          .select("id")
+          .single();
+
+        if (createErr || !created) throw new Error("Failed to create session");
+        sessionId = created.id;
+      }
+
+      // Pass the session ID in the URL so the content page can persist data
+      router.push(
+        `/content?mode=youtube&url=${encodeURIComponent(firstUrl)}&session_id=${sessionId}`
+      );
+    } catch (err: any) {
+      console.error("[YoutubeLinkForm] handleUse error:", err);
+      // Fall back to navigation without session ID
+      router.push(`/content?mode=youtube&url=${encodeURIComponent(firstUrl)}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -97,10 +150,10 @@ export default function YoutubeLinkForm() {
         <button
           type="button"
           onClick={handleUse}
-          disabled={entries.length === 0}
-          className={`px-6 py-2 active:scale-95 transition-all text-white rounded ${entries.length === 0 ? "bg-indigo-300 cursor-not-allowed" : "bg-indigo-500 hover:bg-indigo-600"}`}
+          disabled={entries.length === 0 || loading}
+          className={`px-6 py-2 active:scale-95 transition-all text-white rounded ${entries.length === 0 || loading ? "bg-indigo-300 cursor-not-allowed" : "bg-indigo-500 hover:bg-indigo-600"}`}
         >
-          {entries.length === 0 ? "Add Link First" : `Use ${entries.length} Link${entries.length > 1 ? "s" : ""}`}
+          {loading ? "Starting…" : entries.length === 0 ? "Add Link First" : `Use ${entries.length} Link${entries.length > 1 ? "s" : ""}`}
         </button>
       </div>
     </div>

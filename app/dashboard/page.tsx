@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FlashcardsForm from "@/components/FlashcardsForm";
 import QuizForm from "@/components/QuizForms";
+import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,45 @@ function simulateUpload(
       setter((prev) => prev.map((f) => (f.id === id ? { ...f, progress: current } : f)));
     }
   }, 280);
+}
+
+// ─── Supabase session helper ──────────────────────────────────────────────────
+// Creates or reuses a youtube_session row and returns its UUID.
+// Falls back to a random ID if the user is not logged in.
+async function getOrCreateYoutubeSession(url: string): Promise<string> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return Math.random().toString(36).slice(2, 18);
+
+    // Check for existing session with this URL
+    const { data: existing } = await supabase
+      .from("youtube_sessions")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("url", url)
+      .single();
+
+    if (existing?.id) {
+      // Reuse — update last_visited
+      await supabase
+        .from("youtube_sessions")
+        .update({ last_visited: new Date().toISOString() })
+        .eq("id", existing.id);
+      return existing.id;
+    }
+
+    // Create new session
+    const { data: created, error } = await supabase
+      .from("youtube_sessions")
+      .insert({ user_id: user.id, url })
+      .select("id")
+      .single();
+
+    if (error || !created) throw error;
+    return created.id;
+  } catch {
+    return Math.random().toString(36).slice(2, 18);
+  }
 }
 
 // ─── Progress Panel ───────────────────────────────────────────────────────────
@@ -412,6 +452,7 @@ function YoutubeModal({ onClose, onSave }: { onClose: () => void; onSave: (url: 
         title="Paste a YouTube Link"
         subtitle="Turn any video into study material"
         onClose={onClose}
+        // ✅ onSave now passes the URL up — the parent handles session creation
         onSave={() => { onSave(firstDoneUrl); onClose(); }}
         saveLabel={!anyDone ? "Process a Video First" : "Continue"}
         saveDisabled={!anyDone}
@@ -508,7 +549,7 @@ function RecordingModal({
         <div className="px-6 pb-6 pt-4 space-y-3">
           <button
             onClick={onMicrophone}
-            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-blue-400 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
           >
             <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 group-hover:bg-gray-200 transition-colors">
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -524,7 +565,7 @@ function RecordingModal({
 
           <button
             onClick={onBrowserTab}
-            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-blue-400 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
           >
             <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 group-hover:bg-gray-200 transition-colors">
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -553,17 +594,21 @@ export default function DashboardPage() {
 
   const closeModal = () => setActiveModal(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // ✅ handleSubmit: creates a Supabase session for YouTube URLs, falls back
+  //    to random ID for chat/file queries (no session needed there)
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = youtubeLink.trim();
     if (!text) return;
-    const id = Math.random().toString(36).slice(2, 18);
+    setYoutubeLink("");
+
     if (text.includes("youtube.com") || text.includes("youtu.be")) {
-      router.push(`/content/${id}?url=${encodeURIComponent(text)}`);
+      const id = await getOrCreateYoutubeSession(text);
+      router.push(`/content/${id}?url=${encodeURIComponent(text)}&session_id=${id}`);
     } else {
+      const id = Math.random().toString(36).slice(2, 18);
       router.push(`/content/${id}?mode=chat&q=${encodeURIComponent(text)}`);
     }
-    setYoutubeLink("");
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -711,7 +756,7 @@ export default function DashboardPage() {
           <h1>Recent</h1>
         </div>
         <div>
-          <Link href="/history" className="flex items-center gap-2 hover:text-gray-700 transition-colors duration-200">
+          <Link href="/dashboard/history" className="flex items-center gap-2 hover:text-gray-700 transition-colors duration-200">
             <h1>View all</h1>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -724,16 +769,15 @@ export default function DashboardPage() {
 
       {/* Modals */}
       {activeModal === "quiz" && <QuizForm onClose={closeModal} />}
-
-      {/* ── Flashcards: uses FlashcardsForm component ── */}
       {activeModal === "flashcards" && <FlashcardsForm onClose={closeModal} />}
 
       {activeModal === "youtube" && (
         <YoutubeModal
           onClose={closeModal}
-          onSave={(url) => {
-            const id = Math.random().toString(36).slice(2, 18);
-            router.push(`/content/${id}?url=${encodeURIComponent(url)}`);
+          // ✅ Creates Supabase session then navigates with session_id in URL
+          onSave={async (url) => {
+            const id = await getOrCreateYoutubeSession(url);
+            router.push(`/content/${id}?url=${encodeURIComponent(url)}&session_id=${id}`);
           }}
         />
       )}

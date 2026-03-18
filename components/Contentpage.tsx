@@ -102,8 +102,8 @@ function Spinner({ label }: { label: string }) {
   );
 }
 
-function SummaryContent({ summary, loading, error }: { summary: string; loading: boolean; error: string }) {
-  if (loading) return <Spinner label="Analysing video and generating summary…" />;
+function SummaryContent({ summary, loading, error, isRec = false }: { summary: string; loading: boolean; error: string; isRec?: boolean }) {
+  if (loading) return <Spinner label={isRec ? "Analysing recording and generating summary…" : "Analysing video and generating summary…"} />;
   if (error) return <div className="px-5 py-6 text-center"><p className="text-xs text-red-400">{error}</p></div>;
   if (!summary) return null;
   return (
@@ -113,13 +113,13 @@ function SummaryContent({ summary, loading, error }: { summary: string; loading:
   );
 }
 
-function QuizContent({ questions, loading, error }: { questions: QuizQuestion[]; loading: boolean; error: string }) {
+function QuizContent({ questions, loading, error, isRec = false }: { questions: QuizQuestion[]; loading: boolean; error: string; isRec?: boolean }) {
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState<Record<number, "A" | "B" | "C" | "D">>({});
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   const [done, setDone] = useState(false);
 
-  if (loading) return <Spinner label="Generating quiz from video…" />;
+  if (loading) return <Spinner label={isRec ? "Generating quiz from recording…" : "Generating quiz from video…"} />;
   if (error) return <div className="px-5 py-6 text-center"><p className="text-xs text-red-400">{error}</p></div>;
   if (!questions.length) return null;
 
@@ -254,12 +254,12 @@ function QuizContent({ questions, loading, error }: { questions: QuizQuestion[];
   );
 }
 
-function FlashcardsContent({ cards, loading, error }: { cards: Flashcard[]; loading: boolean; error: string }) {
+function FlashcardsContent({ cards, loading, error, isRec = false }: { cards: Flashcard[]; loading: boolean; error: string; isRec?: boolean }) {
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [showHint, setShowHint] = useState(false);
 
-  if (loading) return <Spinner label="Generating flashcards from video…" />;
+  if (loading) return <Spinner label={isRec ? "Generating flashcards from recording…" : "Generating flashcards from video…"} />;
   if (error) return <div className="px-5 py-6 text-center"><p className="text-xs text-red-400">{error}</p></div>;
   if (!cards.length) return null;
 
@@ -341,6 +341,7 @@ function RightSidebar({
   flashcards, flashcardsLoading, flashcardsError,
   chatMessages,
   chatInput, setChatInput, onChatSend, chatLoading,
+  recordingReady = false,
 }: {
   open: boolean; onToggle: () => void; mode: Mode; isChat: boolean;
   activeTool: ActiveTool; onToolClick: (tool: ActiveTool) => void; onBack: () => void;
@@ -349,10 +350,23 @@ function RightSidebar({
   flashcards: Flashcard[]; flashcardsLoading: boolean; flashcardsError: string;
   chatMessages: { role: "user" | "ai"; message: string }[];
   chatInput: string; setChatInput: (v: string) => void; onChatSend: () => void; chatLoading: boolean;
+  recordingReady?: boolean;
 }) {
   const isRecording = mode === "microphone" || mode === "browsertab";
   const [isListening, setIsListening] = useState(false);
+  const [isChatMode, setIsChatMode] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (isChatMode) chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, isChatMode]);
+
+  const handleChatSendWrapper = () => {
+    setIsChatMode(true);
+    onChatSend();
+  };
 
   const toggleVoice = () => {
     if (isListening) { recognitionRef.current?.stop(); setIsListening(false); return; }
@@ -399,30 +413,65 @@ function RightSidebar({
         {open && (
           <div className="flex flex-col h-full overflow-hidden">
             <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-gray-100 shrink-0">
-              {activeTool && (
+              {/* Back button: shown when a tool is active OR when in chat mode */}
+              {(activeTool || isChatMode) && (
                 <button
-                  onClick={onBack}
-                  className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-700 transition cursor-pointer shrink-0 mr-1"
+                  onClick={() => {
+                    if (isChatMode) {
+                      setIsChatMode(false);
+                    } else {
+                      onBack();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition cursor-pointer shrink-0 mr-1"
                 >
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                   </svg>
+                  <span>Back</span>
                 </button>
               )}
               <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
               <span className="text-sm font-medium text-gray-700">
-                {activeTool ? toolTitle : "StudyForge"}
+                {isChatMode ? "Chat" : activeTool ? toolTitle : "StudyForge"}
               </span>
             </div>
 
-            {!activeTool && (
+            {/* ── Show Generate panels OR active tool OR chat history ── */}
+            {!isChatMode && !activeTool && (
               <div className="px-5 pt-4 pb-3 shrink-0">
                 <p className="text-xs text-gray-400 font-medium tracking-wide">Generate</p>
               </div>
             )}
 
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-              {!activeTool && (
+
+              {/* ── CHAT MODE: full conversation view ── */}
+              {isChatMode && (
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                      <p className="text-sm text-gray-800 leading-relaxed max-w-[90%]">
+                        {msg.message}
+                      </p>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-[10px] text-gray-400 px-1">AI</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatBottomRef} />
+                </div>
+              )}
+
+              {/* ── GENERATE PANELS ── */}
+              {!isChatMode && !activeTool && (
                 <div className="flex-1 overflow-y-auto px-4 pb-4">
                   {!isRecording ? (
                     <div className="grid grid-cols-2 gap-2">
@@ -446,54 +495,59 @@ function RightSidebar({
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">
                         {panels.map((p) => (
-                          <div key={p.label} className="flex items-center gap-2.5 px-3 py-3.5 rounded-xl border border-gray-100 bg-white opacity-40">
-                            <span className="shrink-0">{p.icon}</span>
-                            <span className="text-sm text-gray-500 font-medium leading-tight">{p.label}</span>
-                          </div>
+                          recordingReady ? (
+                            <button
+                              key={p.label}
+                              onClick={() => onToolClick(p.id)}
+                              className="flex items-center gap-2.5 px-3 py-3.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 hover:border-gray-200 transition-all cursor-pointer text-left group"
+                            >
+                              <span className="shrink-0">{p.icon}</span>
+                              <span className="text-sm text-gray-700 font-medium leading-tight">{p.label}</span>
+                              <span className="ml-auto text-gray-300 group-hover:text-gray-400 shrink-0">
+                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                              </span>
+                            </button>
+                          ) : (
+                            <div key={p.label} className="flex items-center gap-2.5 px-3 py-3.5 rounded-xl border border-gray-100 bg-white opacity-40">
+                              <span className="shrink-0">{p.icon}</span>
+                              <span className="text-sm text-gray-500 font-medium leading-tight">{p.label}</span>
+                            </div>
+                          )
                         ))}
                       </div>
-                      <p className="text-xs text-gray-400 px-1 pt-1">Finish a recording to generate study tools</p>
+                      <p className="text-xs text-gray-400 px-1 pt-1">
+                        {recordingReady
+                          ? "Recording ready — generate study tools above"
+                          : "Finish a recording to generate study tools"}
+                      </p>
                     </div>
                   )}
                 </div>
               )}
 
-              {activeTool === "summary" && <SummaryContent summary={summary} loading={summaryLoading} error={summaryError} />}
-              {activeTool === "quiz" && <QuizContent questions={quizQuestions} loading={quizLoading} error={quizError} />}
-              {activeTool === "flashcards" && <FlashcardsContent cards={flashcards} loading={flashcardsLoading} error={flashcardsError} />}
+              {/* ── TOOL PANELS ── */}
+              {!isChatMode && activeTool === "summary" && <SummaryContent summary={summary} loading={summaryLoading} error={summaryError} isRec={isRecording} />}
+              {!isChatMode && activeTool === "quiz" && <QuizContent questions={quizQuestions} loading={quizLoading} error={quizError} isRec={isRecording} />}
+              {!isChatMode && activeTool === "flashcards" && <FlashcardsContent cards={flashcards} loading={flashcardsLoading} error={flashcardsError} isRec={isRecording} />}
             </div>
 
+            {/* ── INPUT BAR — always visible at bottom ── */}
             {!isChat && (
-              <div className="border-t border-gray-100 shrink-0">
-                {/* Chat history */}
-                {chatMessages.length > 0 && (
-                  <div className="max-h-48 overflow-y-auto px-4 pt-3 pb-1 space-y-2">
-                    {chatMessages.map((msg, i) => (
-                      <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
-                          msg.role === "user"
-                            ? "bg-gray-900 text-white rounded-tr-sm"
-                            : "bg-blue-50 border border-blue-100 text-blue-800 rounded-tl-sm"
-                        }`}>
-                          {msg.message.length > 120 ? msg.message.slice(0, 120) + "…" : msg.message}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="px-4 py-3">
-                <div className={`flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3 border transition-colors ${chatLoading ? "border-blue-200" : "border-gray-200 focus-within:border-gray-300"}`}>
+              <div className="border-t border-gray-100 shrink-0 px-4 py-3">
+                <div className={`flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3 border transition-colors ${chatLoading ? "border-gray-300" : "border-gray-200 focus-within:border-gray-300"}`}>
                   <input
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && onChatSend()}
-                    placeholder="Ask anything about this video…"
+                    onKeyDown={(e) => e.key === "Enter" && !chatLoading && handleChatSendWrapper()}
+                    placeholder={isRecording ? "Ask anything about the recording…" : "Ask anything about this video…"}
                     className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none"
                     disabled={chatLoading}
                   />
                   {chatLoading ? (
-                    <svg className="w-4 h-4 animate-spin text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 animate-spin text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                     </svg>
@@ -514,7 +568,6 @@ function RightSidebar({
                     Listening…
                   </p>
                 )}
-                </div>
               </div>
             )}
           </div>
@@ -612,18 +665,34 @@ function YoutubeView({ url, chapters, transcripts, chaptersLoading }: {
   );
 }
 
-function RecordingView({ mode }: { mode: "microphone" | "browsertab" }) {
+function RecordingView({ mode, onAudioReady, onChaptersReady }: {
+  mode: "microphone" | "browsertab";
+  onAudioReady: (base64: string, mimeType: string) => void;
+  onChaptersReady: (chapters: ChapterItem[], transcripts: TranscriptItem[]) => void;
+}) {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const elapsedRef = useRef(0); // ref version so onstop can read the final value
   const [activeTab, setActiveTab] = useState<"chapters" | "transcripts">("chapters");
+  const [localChapters, setLocalChapters] = useState<ChapterItem[]>([]);
+  // Live transcript built up by Web Speech API during recording
+  const [liveTranscripts, setLiveTranscripts] = useState<TranscriptItem[]>([]);
+  const [processingChapters, setProcessingChapters] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const animRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const speechRef = useRef<any>(null); // Web Speech API recognition instance
+  const liveTranscriptsRef = useRef<TranscriptItem[]>([]); // ref for onstop access
   const [bars, setBars] = useState<number[]>(Array(60).fill(2));
   const isBrowserTab = mode === "browsertab";
 
   useEffect(() => {
     if (isRecording) {
-      intervalRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+      intervalRef.current = setInterval(() => {
+        setElapsed((e) => { elapsedRef.current = e + 1; return e + 1; });
+      }, 1000);
       animRef.current = setInterval(() => { setBars(Array(60).fill(0).map(() => Math.random() * 28 + 2)); }, 120);
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -634,19 +703,173 @@ function RecordingView({ mode }: { mode: "microphone" | "browsertab" }) {
   }, [isRecording]);
 
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
-  const handleStartStop = async () => {
-    if (!isRecording && isBrowserTab) {
-      try { await (navigator.mediaDevices as any).getDisplayMedia({ video: true, audio: true }); } catch { return; }
-    }
-    if (isRecording) setElapsed(0);
-    setIsRecording((r) => !r);
-  };
 
-  const mockTranscript = [
-    { time: "00:00", text: "Recording started. Listening for audio..." },
-    { time: "00:08", text: "Welcome everyone, today we're going to cover the fundamentals of neural networks and deep learning." },
-    { time: "00:25", text: "We'll start with the basics of how neurons work and build up from there to understand backpropagation." },
-  ];
+  const handleStartStop = async () => {
+    if (!isRecording) {
+      try {
+        let audioStream: MediaStream;
+
+        if (isBrowserTab) {
+          // 1. Ask user to share their screen — video:true is required by browsers
+          const displayStream: MediaStream = await (navigator.mediaDevices as any).getDisplayMedia({
+            video: true,
+            audio: true,
+          });
+
+          // 2. Check if the display stream already has audio (user ticked "Share audio")
+          const displayAudioTracks = displayStream.getAudioTracks();
+
+          if (displayAudioTracks.length > 0) {
+            // Has audio from the tab — use it directly
+            audioStream = new MediaStream(displayAudioTracks);
+          } else {
+            // No tab audio — fall back to microphone so recording still works
+            try {
+              const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              audioStream = micStream;
+            } catch {
+              audioStream = new MediaStream(displayAudioTracks);
+            }
+          }
+
+          // Store the full display stream so we can stop the video track on finish
+          streamRef.current = displayStream;
+        } else {
+          // Microphone mode
+          audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          streamRef.current = audioStream;
+        }
+
+        // Pick the best supported audio format
+        const mimeType =
+          MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" :
+          MediaRecorder.isTypeSupported("audio/webm")             ? "audio/webm" :
+          MediaRecorder.isTypeSupported("audio/mp4")              ? "audio/mp4"  :
+          "audio/ogg";
+
+        const recorder = new MediaRecorder(audioStream, { mimeType });
+        chunksRef.current = [];
+
+        // timeslice=1000 means ondataavailable fires every second —
+        // without this the event only fires once at the very end
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = async () => {
+          // Stop speech recognition
+          speechRef.current?.stop();
+          speechRef.current = null;
+
+          // Stop all tracks (removes the red recording indicator from browser)
+          streamRef.current?.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+
+          if (chunksRef.current.length === 0) return;
+
+          const finalDuration = elapsedRef.current; // actual seconds recorded
+          const blob = new Blob(chunksRef.current, { type: mimeType });
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(",")[1];
+
+            // Pass audio to parent — unlocks tool buttons + chat input
+            onAudioReady(base64, mimeType.split(";")[0]);
+
+            // Auto-generate chapters + transcript via Gemini
+            // Pass the real duration so Gemini can't hallucinate timestamps
+            setProcessingChapters(true);
+            try {
+              const res = await fetch("/api/generate-chapters-recording", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  audioBase64:  base64,
+                  mimeType:     mimeType.split(";")[0],
+                  durationSecs: finalDuration,
+                }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                const ch = data.chapters    ?? [];
+                // Prefer Gemini transcript; fall back to live Web Speech transcript
+                const tr = (data.transcripts ?? []).length > 0
+                  ? data.transcripts
+                  : liveTranscriptsRef.current;
+                setLocalChapters(ch);
+                setLiveTranscripts(tr);
+                onChaptersReady(ch, tr);
+              } else {
+                // Gemini failed — use the live transcript we already have
+                onChaptersReady([], liveTranscriptsRef.current);
+              }
+            } catch {
+              onChaptersReady([], liveTranscriptsRef.current);
+            }
+            finally { setProcessingChapters(false); }
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        // Start with a 1 second timeslice so data flows in immediately
+        recorder.start(1000);
+        mediaRecorderRef.current = recorder;
+        elapsedRef.current = 0;
+        liveTranscriptsRef.current = [];
+        setLiveTranscripts([]);
+        setLocalChapters([]);
+        setIsRecording(true);
+
+        // ── Web Speech API — live transcript while recording ──────────────────
+        // Only works for microphone mode (browser tab audio isn't capturable
+        // by SpeechRecognition). Falls back gracefully if not supported.
+        if (!isBrowserTab) {
+          const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          if (SR) {
+            const recognition = new SR();
+            recognition.continuous     = true;
+            recognition.interimResults = false;
+            recognition.lang           = "en-US";
+            recognition.onresult = (e: any) => {
+              const transcript = Array.from(e.results)
+                .slice(e.resultIndex)
+                .map((r: any) => r[0].transcript)
+                .join(" ")
+                .trim();
+              if (!transcript) return;
+              const timestamp = `${Math.floor(elapsedRef.current / 60).toString().padStart(2, "0")}:${(elapsedRef.current % 60).toString().padStart(2, "0")}`;
+              const newEntry: TranscriptItem = { time: timestamp, text: transcript };
+              liveTranscriptsRef.current = [...liveTranscriptsRef.current, newEntry];
+              setLiveTranscripts([...liveTranscriptsRef.current]);
+            };
+            recognition.onerror = () => {}; // silent — live transcript is best-effort
+            recognition.start();
+            speechRef.current = recognition;
+          }
+        }
+
+        // If the user stops sharing from the browser toolbar, auto-stop recording
+        streamRef.current?.getVideoTracks()[0]?.addEventListener("ended", () => {
+          if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            setElapsed(0);
+          }
+        });
+
+      } catch {
+        // User cancelled the permission dialog — do nothing
+        return;
+      }
+    } else {
+      // STOP — elapsedRef.current holds the final duration for the API call
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+      setElapsed(0);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -689,23 +912,60 @@ function RecordingView({ mode }: { mode: "microphone" | "browsertab" }) {
         </button>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "chapters" ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-8">
-            <p className="text-sm text-gray-400">{isRecording ? "Recording… chapters will appear here" : "Start recording to view chapters"}</p>
+        {processingChapters ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+            <svg className="w-5 h-5 animate-spin text-gray-300" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <p className="text-xs text-gray-400">Processing recording…</p>
           </div>
+        ) : activeTab === "chapters" ? (
+          localChapters.length > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {localChapters.map((item, i) => (
+                <div key={i} className="px-5 py-4 hover:bg-gray-50 transition-colors">
+                  <p className="text-xs text-gray-400 font-mono mb-1">{item.time}</p>
+                  <p className="text-sm font-semibold text-gray-800 mb-1">{item.title}</p>
+                  <p className="text-sm text-gray-500 leading-relaxed">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center px-8">
+              <p className="text-sm text-gray-400">
+                {isRecording ? "Recording… chapters will appear when you stop" : "Start recording to view chapters"}
+              </p>
+            </div>
+          )
         ) : (
-          <div className="divide-y divide-gray-50">
-            {isRecording ? mockTranscript.map((item, i) => (
-              <div key={i} className="px-5 py-3">
-                <p className="text-xs font-mono text-gray-400 mb-1">{item.time}</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{item.text}</p>
-              </div>
-            )) : (
-              <div className="flex flex-col items-center justify-center h-40 text-center px-8">
-                <p className="text-sm text-gray-400">Start recording to see live transcription</p>
-              </div>
-            )}
-          </div>
+          /* Transcript tab — show live transcript while recording, final after */
+          liveTranscripts.length > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {liveTranscripts.map((item, i) => (
+                <div key={i} className="px-5 py-3 hover:bg-gray-50 transition-colors">
+                  <p className="text-xs font-mono text-gray-400 mb-1">{item.time}</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{item.text}</p>
+                </div>
+              ))}
+              {isRecording && (
+                <div className="px-5 py-3 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse shrink-0" />
+                  <p className="text-xs text-gray-400 italic">Listening…</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 text-center px-8">
+              <p className="text-sm text-gray-400">
+                {isRecording && !isBrowserTab
+                  ? "Transcribing live…"
+                  : isRecording && isBrowserTab
+                  ? "Transcript will appear after recording stops"
+                  : "Start recording to see transcript"}
+              </p>
+            </div>
+          )
         )}
       </div>
     </div>
@@ -800,25 +1060,44 @@ function ChatView({ initialQuery, uploadedFile }: { initialQuery: string; upload
 
 // ── Supabase persistence helpers ───────────────────────────────────────────────
 
-async function persistSummary(sessionId: string, userId: string, summaryText: string) {
-  await supabase.from("content_summaries").upsert(
-    { session_id: sessionId, user_id: userId, summary: summaryText },
-    { onConflict: "session_id" }
-  );
+// ── Session ID helper ─────────────────────────────────────────────────────────
+// YouTube rows use "session_id", recording rows use "recording_session_id"
+function sessionCol(id: string, isRec: boolean) {
+  return isRec ? { recording_session_id: id } : { session_id: id };
+}
+function sessionFilter(query: any, id: string, isRec: boolean) {
+  return isRec
+    ? query.eq("recording_session_id", id)
+    : query.eq("session_id", id);
 }
 
-async function persistQuiz(sessionId: string, userId: string, questions: QuizQuestion[]) {
-  // Upsert the quiz set row
+// ── Persist helpers ───────────────────────────────────────────────────────────
+
+async function persistSummary(
+  sessionId: string, userId: string, summaryText: string, isRec = false
+) {
+  const col = sessionCol(sessionId, isRec);
+  // Delete existing then insert — upsert needs unique constraint per col combo
+  await sessionFilter(supabase.from("content_summaries").delete(), sessionId, isRec);
+  await supabase.from("content_summaries").insert({
+    ...col, user_id: userId, summary: summaryText,
+  });
+}
+
+async function persistQuiz(
+  sessionId: string, userId: string, questions: QuizQuestion[], isRec = false
+) {
+  const col = sessionCol(sessionId, isRec);
+  // Delete existing quiz for this session, then re-insert
+  await sessionFilter(supabase.from("content_quizzes").delete(), sessionId, isRec);
+
   const { data: quiz, error: quizErr } = await supabase
     .from("content_quizzes")
-    .upsert({ session_id: sessionId, user_id: userId }, { onConflict: "session_id" })
+    .insert({ ...col, user_id: userId })
     .select("id")
     .single();
 
   if (quizErr || !quiz) return;
-
-  // Replace all questions
-  await supabase.from("content_quiz_questions").delete().eq("quiz_id", quiz.id);
 
   const rows = questions.map((q, i) => ({
     quiz_id:        quiz.id,
@@ -836,12 +1115,14 @@ async function persistQuiz(sessionId: string, userId: string, questions: QuizQue
   await supabase.from("content_quiz_questions").insert(rows);
 }
 
-async function persistFlashcards(sessionId: string, userId: string, cards: Flashcard[]) {
-  // Delete existing cards for this session then re-insert
-  await supabase.from("content_flashcards").delete().eq("session_id", sessionId);
+async function persistFlashcards(
+  sessionId: string, userId: string, cards: Flashcard[], isRec = false
+) {
+  const col = sessionCol(sessionId, isRec);
+  await sessionFilter(supabase.from("content_flashcards").delete(), sessionId, isRec);
 
   const rows = cards.map((c, i) => ({
-    session_id: sessionId,
+    ...col,
     user_id:    userId,
     card_order: i + 1,
     term:       c.term,
@@ -857,51 +1138,41 @@ async function persistChaptersAndTranscripts(
   sessionId: string,
   userId: string,
   chapters: ChapterItem[],
-  transcripts: TranscriptItem[]
+  transcripts: TranscriptItem[],
+  isRec = false
 ) {
-  // Delete stale data first so re-visiting re-fetches cleanly
+  const col = sessionCol(sessionId, isRec);
   await Promise.all([
-    supabase.from("content_chapters").delete().eq("session_id", sessionId),
-    supabase.from("content_transcripts").delete().eq("session_id", sessionId),
+    sessionFilter(supabase.from("content_chapters").delete(),   sessionId, isRec),
+    sessionFilter(supabase.from("content_transcripts").delete(), sessionId, isRec),
   ]);
 
   const chapterRows = chapters.map((c, i) => ({
-    session_id:    sessionId,
-    user_id:       userId,
+    ...col, user_id: userId,
     chapter_order: i + 1,
-    time:          c.time,
-    title:         c.title,
-    text:          c.text,
+    time: c.time, title: c.title, text: c.text,
   }));
 
   const transcriptRows = transcripts.map((t, i) => ({
-    session_id:       sessionId,
-    user_id:          userId,
+    ...col, user_id: userId,
     transcript_order: i + 1,
-    time:             t.time,
-    text:             t.text,
+    time: t.time, text: t.text,
   }));
 
   await Promise.all([
-    chapterRows.length    ? supabase.from("content_chapters").insert(chapterRows)    : Promise.resolve(),
+    chapterRows.length    ? supabase.from("content_chapters").insert(chapterRows)       : Promise.resolve(),
     transcriptRows.length ? supabase.from("content_transcripts").insert(transcriptRows) : Promise.resolve(),
   ]);
 }
 
-async function loadCachedChaptersAndTranscripts(sessionId: string) {
+async function loadCachedChaptersAndTranscripts(sessionId: string, isRec = false) {
+  const col = isRec ? "recording_session_id" : "session_id";
   const [chaptersRes, transcriptsRes] = await Promise.all([
-    supabase
-      .from("content_chapters")
-      .select("time, title, text")
-      .eq("session_id", sessionId)
-      .order("chapter_order", { ascending: true }),
-    supabase
-      .from("content_transcripts")
-      .select("time, text")
-      .eq("session_id", sessionId)
-      .order("transcript_order", { ascending: true }),
+    supabase.from("content_chapters").select("time, title, text")
+      .eq(col, sessionId).order("chapter_order", { ascending: true }),
+    supabase.from("content_transcripts").select("time, text")
+      .eq(col, sessionId).order("transcript_order", { ascending: true }),
   ]);
-
   return {
     chapters:    (chaptersRes.data    ?? []) as ChapterItem[],
     transcripts: (transcriptsRes.data ?? []) as TranscriptItem[],
@@ -909,69 +1180,50 @@ async function loadCachedChaptersAndTranscripts(sessionId: string) {
 }
 
 async function persistChatMessage(
-  sessionId: string,
-  userId: string,
-  role: "user" | "ai",
-  message: string
+  sessionId: string, userId: string,
+  role: "user" | "ai", message: string, isRec = false
 ) {
-  await supabase.from("content_chat_messages").insert({
-    session_id: sessionId,
-    user_id:    userId,
-    role,
-    message,
-  });
+  const col = sessionCol(sessionId, isRec);
+  await supabase.from("content_chat_messages").insert({ ...col, user_id: userId, role, message });
 }
 
-async function loadChatMessages(sessionId: string) {
+async function loadChatMessages(sessionId: string, isRec = false) {
+  const col = isRec ? "recording_session_id" : "session_id";
   const { data } = await supabase
     .from("content_chat_messages")
     .select("role, message, created_at")
-    .eq("session_id", sessionId)
+    .eq(col, sessionId)
     .order("created_at", { ascending: true });
-  return (data ?? []).map((row) => ({
-    role:    row.role as "user" | "ai",
-    message: row.message,
-  }));
+  return (data ?? []).map((row) => ({ role: row.role as "user" | "ai", message: row.message }));
 }
 
-async function loadCachedData(sessionId: string) {
+async function loadCachedData(sessionId: string, isRec = false) {
+  const col = isRec ? "recording_session_id" : "session_id";
   const [summaryRes, quizRes, flashcardsRes] = await Promise.all([
-    supabase.from("content_summaries").select("summary").eq("session_id", sessionId).single(),
-    supabase.from("content_quizzes").select("id").eq("session_id", sessionId).single(),
-    supabase.from("content_flashcards").select("*").eq("session_id", sessionId).order("card_order"),
+    supabase.from("content_summaries").select("summary").eq(col, sessionId).maybeSingle(),
+    supabase.from("content_quizzes").select("id").eq(col, sessionId).maybeSingle(),
+    supabase.from("content_flashcards").select("*").eq(col, sessionId).order("card_order"),
   ]);
 
   let quizQuestions: QuizQuestion[] = [];
   if (quizRes.data?.id) {
     const { data: qRows } = await supabase
-      .from("content_quiz_questions")
-      .select("*")
-      .eq("quiz_id", quizRes.data.id)
-      .order("question_order");
-
+      .from("content_quiz_questions").select("*")
+      .eq("quiz_id", quizRes.data.id).order("question_order");
     quizQuestions = (qRows ?? []).map((row, i) => ({
-      id:            i + 1,
-      question:      row.question,
-      options:       { A: row.option_a, B: row.option_b, C: row.option_c, D: row.option_d },
+      id: i + 1, question: row.question,
+      options: { A: row.option_a, B: row.option_b, C: row.option_c, D: row.option_d },
       correctAnswer: row.correct_answer as "A" | "B" | "C" | "D",
-      explanation:   row.explanation,
-      category:      row.category,
+      explanation: row.explanation, category: row.category,
     }));
   }
 
   const flashcards: Flashcard[] = (flashcardsRes.data ?? []).map((row, i) => ({
-    id:         i + 1,
-    term:       row.term,
-    definition: row.definition,
-    hint:       row.hint     ?? "",
-    category:   row.category ?? "General",
+    id: i + 1, term: row.term, definition: row.definition,
+    hint: row.hint ?? "", category: row.category ?? "General",
   }));
 
-  return {
-    summary:    summaryRes.data?.summary ?? "",
-    quizQuestions,
-    flashcards,
-  };
+  return { summary: summaryRes.data?.summary ?? "", quizQuestions, flashcards };
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────────
@@ -992,6 +1244,14 @@ export default function Contentpages() {
 
   // Current user ref — fetched once on mount
   const userIdRef = useRef<string>("");
+  // Stores the audio blob after recording stops so the chat input can use it
+  const recordingAudioRef = useRef<{ base64: string; mimeType: string } | null>(null);
+  // Supabase session ID for the current recording (created when recording stops)
+  const [recordingSessionId, setRecordingSessionId] = useState<string>("");
+
+  // Derived: true when this is a recording session with a valid Supabase session ID
+  // Must be declared AFTER recordingSessionId state
+  const isRec = isRecording && !!recordingSessionId;
 
   const [activeTool,        setActiveTool]        = useState<ActiveTool>(null);
   const [summary,           setSummary]           = useState("");
@@ -1029,9 +1289,9 @@ export default function Contentpages() {
         // Pre-load any previously generated data for this session
         if (sessionId) {
           const [cached, chatHistory, cachedChapters] = await Promise.all([
-            loadCachedData(sessionId),
-            loadChatMessages(sessionId),
-            loadCachedChaptersAndTranscripts(sessionId),
+            loadCachedData(sessionId, false),
+            loadChatMessages(sessionId, false),
+            loadCachedChaptersAndTranscripts(sessionId, false),
           ]);
           if (cached.summary)                    setSummary(cached.summary);
           if (cached.quizQuestions.length)       setQuizQuestions(cached.quizQuestions);
@@ -1044,6 +1304,19 @@ export default function Contentpages() {
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  // When a new recording session is created, persist chapters/transcripts
+  // that were already generated (onChaptersReady fires before session exists)
+  useEffect(() => {
+    if (!recordingSessionId || !userIdRef.current) return;
+    // If chapters were already generated, persist them now that we have a session ID
+    if (chapters.length > 0 || transcripts.length > 0) {
+      persistChaptersAndTranscripts(
+        recordingSessionId, userIdRef.current, chapters, transcripts, true
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordingSessionId]);
 
   // Update session video_title once we have it from the chapters API
   useEffect(() => {
@@ -1078,7 +1351,8 @@ export default function Contentpages() {
             sessionId,
             userIdRef.current,
             fetchedChapters,
-            fetchedTranscripts
+            fetchedTranscripts,
+            false  // YouTube session
           );
         }
       } catch { } finally { setChaptersLoading(false); }
@@ -1087,20 +1361,119 @@ export default function Contentpages() {
 
   // ── Tool click handler — generate + persist ───────────────────────────────
   const handleToolClick = useCallback(async (tool: ActiveTool) => {
+    // ── Exams mode ────────────────────────────────────────────────────────────
     if (tool === "exams") {
-      const destination = url
-        ? `/dashboard/exam-mode?url=${encodeURIComponent(url)}&source=youtube`
-        : "/dashboard/exam-mode";
-      router.push(destination);
+      if (isRecording) {
+        // Guard: need audio before going to exam
+        if (!recordingAudioRef.current?.base64 && !transcripts.length) return;
+        // Store audio in sessionStorage so exam-mode page can read it
+        try {
+          sessionStorage.setItem("rec_exam_audio",      recordingAudioRef.current?.base64   ?? "");
+          sessionStorage.setItem("rec_exam_mimeType",   recordingAudioRef.current?.mimeType ?? "");
+          sessionStorage.setItem("rec_exam_transcript", transcripts.map((t) => `[${t.time}] ${t.text}`).join("\n"));
+        } catch { /* sessionStorage might be full for large recordings */ }
+        router.push("/dashboard/exam-mode?source=recording");
+      } else {
+        const destination = url
+          ? `/dashboard/exam-mode?url=${encodeURIComponent(url)}&source=youtube`
+          : "/dashboard/exam-mode";
+        router.push(destination);
+      }
       return;
     }
 
     setActiveTool(tool);
-    if (!url) return;
-
     const userId = userIdRef.current;
 
-    // ── Summary ──────────────────────────────────────────────────────────────
+    // ── Helper: get audio payload for recording routes ────────────────────────
+    const audioPayload = {
+      audioBase64: recordingAudioRef.current?.base64   ?? null,
+      mimeType:    recordingAudioRef.current?.mimeType ?? null,
+      transcript:  transcripts.map((t) => `[${t.time}] ${t.text}`).join("\n"),
+    };
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RECORDING SESSION — uses recording-specific routes
+    // ════════════════════════════════════════════════════════════════════════
+    if (isRecording) {
+      // Guard: must have audio blob OR transcript before calling any API
+      if (!audioPayload.audioBase64 && !audioPayload.transcript) {
+        if (tool === "summary")    setSummaryError("Please finish recording before generating a summary.");
+        if (tool === "quiz")       setQuizError("Please finish recording before generating a quiz.");
+        if (tool === "flashcards") setFlashcardsError("Please finish recording before generating flashcards.");
+        return;
+      }
+      // ── Summary (recording) ────────────────────────────────────────────────
+      if (tool === "summary" && !summary && !summaryLoading) {
+        setSummaryLoading(true); setSummaryError("");
+        try {
+          const res = await fetch("/api/generate-summary-recording", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(audioPayload),
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            const msg = text.startsWith("{") ? JSON.parse(text).error : "Failed to generate summary";
+            throw new Error(msg);
+          }
+          const data = await res.json();
+          setSummary(data.summary);
+          if (recordingSessionId && userId) await persistSummary(recordingSessionId, userId, data.summary, true);
+        } catch (e: any) { setSummaryError(e.message || "Failed to generate summary"); }
+        finally { setSummaryLoading(false); }
+      }
+
+      // ── Quiz (recording) ───────────────────────────────────────────────────
+      if (tool === "quiz" && !quizQuestions.length && !quizLoading) {
+        setQuizLoading(true); setQuizError("");
+        try {
+          const res = await fetch("/api/generate-quiz-recording", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(audioPayload),
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            const msg = text.startsWith("{") ? JSON.parse(text).error : "Failed to generate quiz";
+            throw new Error(msg);
+          }
+          const data = await res.json();
+          const questions: QuizQuestion[] = (data.questions ?? []).map((q: any, i: number) => ({ ...q, id: i + 1 }));
+          setQuizQuestions(questions);
+          if (recordingSessionId && userId) await persistQuiz(recordingSessionId, userId, questions, true);
+        } catch (e: any) { setQuizError(e.message || "Failed to generate quiz"); }
+        finally { setQuizLoading(false); }
+      }
+
+      // ── Flashcards (recording) ─────────────────────────────────────────────
+      if (tool === "flashcards" && !flashcards.length && !flashcardsLoading) {
+        setFlashcardsLoading(true); setFlashcardsError("");
+        try {
+          const res = await fetch("/api/generate-flashcards-recording", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(audioPayload),
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            const msg = text.startsWith("{") ? JSON.parse(text).error : "Failed to generate flashcards";
+            throw new Error(msg);
+          }
+          const data = await res.json();
+          const cards: Flashcard[] = (data.flashcards ?? []).map((c: any, i: number) => ({ ...c, id: i + 1 }));
+          setFlashcards(cards);
+          if (recordingSessionId && userId) await persistFlashcards(recordingSessionId, userId, cards, true);
+        } catch (e: any) { setFlashcardsError(e.message || "Failed to generate flashcards"); }
+        finally { setFlashcardsLoading(false); }
+      }
+
+      return; // done for recording session
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // YOUTUBE SESSION — uses YouTube-specific routes
+    // ════════════════════════════════════════════════════════════════════════
+    if (!url) return;
+
+    // ── Summary (YouTube) ──────────────────────────────────────────────────
     if (tool === "summary" && !summary && !summaryLoading) {
       setSummaryLoading(true); setSummaryError("");
       try {
@@ -1111,13 +1484,12 @@ export default function Contentpages() {
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
         const data = await res.json();
         setSummary(data.summary);
-        // ✅ Persist to Supabase
-        if (sessionId && userId) await persistSummary(sessionId, userId, data.summary);
+        if (sessionId && userId) await persistSummary(sessionId, userId, data.summary, false);
       } catch (e: any) { setSummaryError(e.message || "Failed to generate summary"); }
       finally { setSummaryLoading(false); }
     }
 
-    // ── Quiz ─────────────────────────────────────────────────────────────────
+    // ── Quiz (YouTube) ─────────────────────────────────────────────────────
     if (tool === "quiz" && !quizQuestions.length && !quizLoading) {
       setQuizLoading(true); setQuizError("");
       try {
@@ -1129,13 +1501,12 @@ export default function Contentpages() {
         const data = await res.json();
         const questions: QuizQuestion[] = (data.questions ?? []).map((q: any, i: number) => ({ ...q, id: i + 1 }));
         setQuizQuestions(questions);
-        // ✅ Persist to Supabase
-        if (sessionId && userId) await persistQuiz(sessionId, userId, questions);
+        if (sessionId && userId) await persistQuiz(sessionId, userId, questions, false);
       } catch (e: any) { setQuizError(e.message || "Failed to generate quiz"); }
       finally { setQuizLoading(false); }
     }
 
-    // ── Flashcards ───────────────────────────────────────────────────────────
+    // ── Flashcards (YouTube) ───────────────────────────────────────────────
     if (tool === "flashcards" && !flashcards.length && !flashcardsLoading) {
       setFlashcardsLoading(true); setFlashcardsError("");
       try {
@@ -1147,54 +1518,85 @@ export default function Contentpages() {
         const data = await res.json();
         const cards: Flashcard[] = (data.flashcards ?? []).map((c: any, i: number) => ({ ...c, id: i + 1 }));
         setFlashcards(cards);
-        // ✅ Persist to Supabase
-        if (sessionId && userId) await persistFlashcards(sessionId, userId, cards);
+        if (sessionId && userId) await persistFlashcards(sessionId, userId, cards, false);
       } catch (e: any) { setFlashcardsError(e.message || "Failed to generate flashcards"); }
       finally { setFlashcardsLoading(false); }
     }
-  }, [url, summary, summaryLoading, quizQuestions.length, quizLoading, flashcards.length, flashcardsLoading, sessionId, router]);
+  }, [url, isRecording, transcripts, recordingSessionId, summary, summaryLoading, quizQuestions.length, quizLoading, flashcards.length, flashcardsLoading, sessionId, router]);
 
   // ── Chat send ─────────────────────────────────────────────────────────────
+  // The input bar is a pure Q&A — the AI answers directly in the chat history.
+  // It does NOT open the Summary panel or overwrite any generated content.
   const handleChatSend = useCallback(async () => {
     const q = chatInput.trim();
-    if (!q || !url || chatLoading) return;
+    if (!q || chatLoading) return;
     const userId = userIdRef.current;
 
-    // Optimistically add user message to local state
+    // Add user message immediately so the UI feels instant
     setChatMessages((prev) => [...prev, { role: "user", message: q }]);
-    setChatInput(""); setChatLoading(true);
-    setActiveTool("summary"); setSummary(""); setSummaryLoading(true); setSummaryError("");
+    setChatInput("");
+    setChatLoading(true);
 
     // Persist user question to DB
-    if (sessionId && userId) {
-      await persistChatMessage(sessionId, userId, "user", q);
+    const activeSid = isRec ? recordingSessionId : sessionId;
+    if (activeSid && userId) {
+      await persistChatMessage(activeSid, userId, "user", q, isRec);
     }
 
     try {
-      const res = await fetch("/api/generate-summary", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, userQuery: q }),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
-      const data = await res.json();
-      setSummary(data.summary);
+      let answer = "";
 
-      // Add AI answer to local state
-      setChatMessages((prev) => [...prev, { role: "ai", message: data.summary }]);
+      if (isRecording) {
+        // ── Recording session ─────────────────────────────────────────────
+        // Send audio blob (if available) or the live transcript as context
+        const res = await fetch("/api/chat-recording", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            audioBase64: recordingAudioRef.current?.base64   ?? null,
+            mimeType:    recordingAudioRef.current?.mimeType ?? null,
+            transcript:  transcripts.map((t) => `[${t.time}] ${t.text}`).join("\n"),
+            question:    q,
+            history:     chatMessages.slice(-6),
+          }),
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
+        const data = await res.json();
+        answer = data.answer;
+      } else {
+        // ── YouTube session ───────────────────────────────────────────────
+        // Send the video URL — Gemini watches the video and answers
+        if (!url) throw new Error("No video URL available.");
+        const res = await fetch("/api/chat-youtube", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url,
+            question: q,
+            history:  chatMessages.slice(-6),
+          }),
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
+        const data = await res.json();
+        answer = data.answer;
+      }
 
-      // Persist AI answer and summary to DB
-      if (sessionId && userId) {
-        await Promise.all([
-          persistChatMessage(sessionId, userId, "ai", data.summary),
-          persistSummary(sessionId, userId, data.summary),
-        ]);
+      // Show AI answer in chat history only — no summary panel interference
+      setChatMessages((prev) => [...prev, { role: "ai", message: answer }]);
+
+      // Persist AI answer to DB
+      if (activeSid && userId) {
+        await persistChatMessage(activeSid, userId, "ai", answer, isRec);
       }
     } catch (e: any) {
-      setSummaryError(e.message || "Failed to get answer");
-      setChatMessages((prev) => [...prev, { role: "ai", message: "Sorry, something went wrong. Please try again." }]);
+      setChatMessages((prev) => [...prev, {
+        role: "ai",
+        message: e.message?.includes("quota")
+          ? "API quota exceeded. Please wait a moment and try again."
+          : "Sorry, something went wrong. Please try again.",
+      }]);
+    } finally {
+      setChatLoading(false);
     }
-    finally { setSummaryLoading(false); setChatLoading(false); }
-  }, [chatInput, url, chatLoading, sessionId]);
+  }, [chatInput, url, isRecording, isRec, recordingSessionId, chatMessages, chatLoading, sessionId, transcripts]);
 
   const title = isRecording
     ? `Recording at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
@@ -1226,7 +1628,28 @@ export default function Contentpages() {
           {!isRecording && !isChat && (
             <YoutubeView url={url} chapters={chapters} transcripts={transcripts} chaptersLoading={chaptersLoading} />
           )}
-          {isRecording && <RecordingView mode={mode as "microphone" | "browsertab"} />}
+          {isRecording && (
+            <RecordingView
+              mode={mode as "microphone" | "browsertab"}
+              onAudioReady={async (base64, mimeType) => {
+                recordingAudioRef.current = { base64, mimeType };
+                // Create a recording_session row so we can persist everything
+                const userId = userIdRef.current;
+                if (userId) {
+                  const { data: recSession } = await supabase
+                    .from("recording_sessions")
+                    .insert({ user_id: userId, mode: mode as "microphone" | "browsertab" })
+                    .select("id")
+                    .single();
+                  if (recSession?.id) setRecordingSessionId(recSession.id);
+                }
+              }}
+              onChaptersReady={(ch, tr) => {
+                setChapters(ch);
+                setTranscripts(tr);
+              }}
+            />
+          )}
           {isChat && <ChatView initialQuery={initialQuery} uploadedFile={uploadedFile} />}
         </div>
 
@@ -1239,6 +1662,7 @@ export default function Contentpages() {
           flashcards={flashcards} flashcardsLoading={flashcardsLoading} flashcardsError={flashcardsError}
           chatMessages={chatMessages}
           chatInput={chatInput} setChatInput={setChatInput} onChatSend={handleChatSend} chatLoading={chatLoading}
+          recordingReady={!!recordingAudioRef.current}
         />
       </div>
     </div>

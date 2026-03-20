@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import AddNotePanel from "@/components/AddNotePanel";
 import NoteEditor from "@/components/NoteEditor";
 
 interface Note {
@@ -11,77 +10,45 @@ interface Note {
   name: string;
 }
 
-const NotePage = () => {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-  const pathname = usePathname();
+export default function NotePage() {
+  const params = useParams();
+  const noteName = decodeURIComponent(params.name as string);
+  const [note, setNote] = useState<Note | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Every time the sidebar clicks "Add Note" and lands on this page,
-  // close the editor and show the panel
   useEffect(() => {
-    setSelectedNote(null);
-  }, [pathname]);
-
-  // ── Load notes from Supabase on mount ──────────────────────
-  useEffect(() => {
-    const fetchNotes = async () => {
+    const fetchNote = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { setLoading(false); return; }
 
       const { data, error } = await supabase
         .from("notes")
         .select("id, name")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .eq("name", noteName)
+        .single();
 
-      if (!error && data) setNotes(data as Note[]);
+      if (!error && data) setNote(data as Note);
+      setLoading(false);
     };
+    fetchNote();
+  }, [noteName]);
 
-    fetchNotes();
-  }, []);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  // ── Create note in Supabase ─────────────────────────────────
-  const handleCreateNote = async (name: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  if (!note) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <p className="text-sm text-gray-400">Note not found.</p>
+      </div>
+    );
+  }
 
-    const { data, error } = await supabase
-      .from("notes")
-      .insert({ name, user_id: user.id, content: "" })
-      .select("id, name")
-      .single();
-
-    if (!error && data) {
-      setNotes((prev) => [data as Note, ...prev]);
-    }
-  };
-
-  // ── Delete note from Supabase ───────────────────────────────
-  const handleDeleteNote = async (id: string) => {
-    await supabase.from("notes").delete().eq("id", id);
-    setNotes((prev) => prev.filter((n) => n.id !== id));
-  };
-
-  return (
-    <div className="h-screen bg-gray-50">
-      <AddNotePanel
-        show={!selectedNote}
-        notes={notes}
-        onClose={() => window.history.back()}
-        onNoteSelected={(note) => setSelectedNote(note)}
-        onNoteCreated={handleCreateNote}
-        onNoteDeleted={handleDeleteNote}
-      />
-
-      {selectedNote && (
-        <NoteEditor
-          noteId={selectedNote.id}
-          initialName={selectedNote.name}
-          // NoteEditor handles back via window.history.back() or internal logic
-        />
-      )}
-    </div>
-  );
-};
-
-export default NotePage;
+  return <NoteEditor noteId={note.id} initialName={note.name} />;
+}

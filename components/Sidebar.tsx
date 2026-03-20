@@ -98,7 +98,7 @@ export default function Sidebar({
     setChannels((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // ── Note created — save to Supabase then navigate ─────────
+  // ── Note created — save to Supabase then navigate by name ─
   const handleNoteCreated = async (name: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -112,14 +112,14 @@ export default function Sidebar({
     if (!error && data) {
       setNotes((prev) => [data as Note, ...prev]);
       setShowAddNote(false);
-      router.push(`/dashboard/note/${nameToSlug(data.name)}`);
+      router.push(`/dashboard/note/${encodeURIComponent(data.name)}`);
     }
   };
 
-  // ── Note selected — navigate to /dashboard/note/[name] ────
+  // ── Note selected — navigate by name ─────────────────────
   const handleNoteSelected = (note: Note) => {
     setShowAddNote(false);
-    router.push(`/dashboard/note/${nameToSlug(note.name)}`);
+    router.push(`/dashboard/note/${encodeURIComponent(note.name)}`);
   };
 
   // ── Note deleted ──────────────────────────────────────────
@@ -388,4 +388,4 @@ export default function Sidebar({
       />
     </>
   );
-} 
+}

@@ -8,7 +8,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
-    if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    if (!url)
+      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
     const prompt = `You are ReviseForge AI — an elite, merciless exam generator. Watch this entire YouTube video from start to finish and produce the hardest possible formal exam a well-prepared student could face based exclusively on what is taught in the video.
 
@@ -93,16 +94,16 @@ Return only a valid JSON object. No text before or after. No markdown code fence
       contents: [
         {
           role: "user",
-          parts: [
-            { fileData: { fileUri: url } },
-            { text: prompt },
-          ],
+          parts: [{ fileData: { fileUri: url } }, { text: prompt }],
         },
       ],
     });
 
     const rawText = response.text ?? "";
-    const cleaned = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const cleaned = rawText
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "")
+      .trim();
 
     let exam;
     try {
@@ -116,6 +117,9 @@ Return only a valid JSON object. No text before or after. No markdown code fence
     return NextResponse.json({ exam });
   } catch (error: any) {
     console.error("Exam generation error:", error);
-    return NextResponse.json({ error: error.message || "Failed to generate exam" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to generate exam" },
+      { status: 500 },
+    );
   }
 }

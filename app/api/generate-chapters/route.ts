@@ -7,7 +7,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
-    if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    if (!url)
+      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
     const prompt = `Watch this entire YouTube video from start to finish before doing anything else.
 
@@ -54,16 +55,16 @@ Return only a valid JSON object. No text before or after. No markdown code fence
       contents: [
         {
           role: "user",
-          parts: [
-            { fileData: { fileUri: url } },
-            { text: prompt },
-          ],
+          parts: [{ fileData: { fileUri: url } }, { text: prompt }],
         },
       ],
     });
 
     const rawText = response.text ?? "";
-    const cleaned = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const cleaned = rawText
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "")
+      .trim();
 
     let data;
     try {
@@ -71,12 +72,16 @@ Return only a valid JSON object. No text before or after. No markdown code fence
     } catch {
       const match = cleaned.match(/\{[\s\S]*\}/);
       if (match) data = JSON.parse(match[0]);
-      else throw new Error("Could not parse chapters JSON from Gemini response");
+      else
+        throw new Error("Could not parse chapters JSON from Gemini response");
     }
 
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("Chapters generation error:", error);
-    return NextResponse.json({ error: error.message || "Failed to generate chapters" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to generate chapters" },
+      { status: 500 },
+    );
   }
 }

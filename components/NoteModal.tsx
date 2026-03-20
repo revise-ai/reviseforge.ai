@@ -79,8 +79,8 @@ export default function NoteModal({
                   About notes
                 </p>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  Notes help you capture ideas and key concepts from your
-                  study sessions.
+                  Notes help you capture ideas and key concepts from your study
+                  sessions.
                 </p>
               </div>
             </div>

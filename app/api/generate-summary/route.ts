@@ -7,7 +7,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 export async function POST(req: NextRequest) {
   try {
     const { url, userQuery } = await req.json();
-    if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    if (!url)
+      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
     const prompt = userQuery
       ? `The user is watching this YouTube video and has asked the following question: "${userQuery}"
@@ -19,7 +20,6 @@ If they reference a chapter title or topic name, explain in detail what is cover
 If they ask a conceptual question, explain the answer using the specific content, examples, and language from the video.
 
 Write your answer in clear, plain prose. Use a heading if the answer has multiple distinct parts. Be specific — reference actual moments, examples, and explanations from the video rather than speaking in generalities. Do not use asterisks or hashtags.`
-
       : `Watch this entire YouTube video and produce a thorough study summary. Write everything in clear, flowing prose. Do not use asterisks, hashtags, or bullet symbols anywhere.
 
 Overview
@@ -49,10 +49,7 @@ Base everything strictly on the actual content of this specific video. Do not ad
       contents: [
         {
           role: "user",
-          parts: [
-            { fileData: { fileUri: url } },
-            { text: prompt },
-          ],
+          parts: [{ fileData: { fileUri: url } }, { text: prompt }],
         },
       ],
     });
@@ -61,6 +58,9 @@ Base everything strictly on the actual content of this specific video. Do not ad
     return NextResponse.json({ summary });
   } catch (error: any) {
     console.error("Summary generation error:", error);
-    return NextResponse.json({ error: error.message || "Failed to generate summary" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to generate summary" },
+      { status: 500 },
+    );
   }
 }

@@ -97,7 +97,6 @@
 //   }
 // }
 
-
 // File path: app/api/generate-quiz-youtube/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
@@ -115,11 +114,13 @@ function extractJSON(raw: string): any {
   // 2. Try direct parse first
   try {
     return JSON.parse(text);
-  } catch { /* continue */ }
+  } catch {
+    /* continue */
+  }
 
   // 3. Extract the outermost { ... } block
   const start = text.indexOf("{");
-  const end   = text.lastIndexOf("}");
+  const end = text.lastIndexOf("}");
   if (start !== -1 && end !== -1 && end > start) {
     text = text.slice(start, end + 1);
   }
@@ -134,21 +135,25 @@ function extractJSON(raw: string): any {
     .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
     // Remove any control characters that break JSON
     .replace(/[\u0000-\u001F\u007F]/g, (ch) =>
-      ch === "\n" || ch === "\r" || ch === "\t" ? ch : ""
+      ch === "\n" || ch === "\r" || ch === "\t" ? ch : "",
     );
 
   // 5. Try again after sanitizing
   try {
     return JSON.parse(text);
-  } catch { /* continue */ }
+  } catch {
+    /* continue */
+  }
 
   // 6. Last resort — line-by-line fix for broken string escapes
   const lines = text.split("\n");
-  const fixed = lines.map((line) => {
-    // If line has an unescaped single backslash not part of valid escape,
-    // replace it so JSON.parse doesn't choke
-    return line.replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
-  }).join("\n");
+  const fixed = lines
+    .map((line) => {
+      // If line has an unescaped single backslash not part of valid escape,
+      // replace it so JSON.parse doesn't choke
+      return line.replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
+    })
+    .join("\n");
 
   return JSON.parse(fixed);
 }
@@ -156,7 +161,8 @@ function extractJSON(raw: string): any {
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
-    if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    if (!url)
+      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
     const prompt = `You are ReviseForge AI — the world's most ruthlessly difficult MCQ exam generator. Watch this entire YouTube video and generate exactly 15 multiple-choice questions that will genuinely challenge even the most prepared students. These questions must separate students who truly understood the video from those who merely watched it passively.
 
@@ -219,10 +225,7 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
       contents: [
         {
           role: "user",
-          parts: [
-            { fileData: { fileUri: url } },
-            { text: prompt },
-          ],
+          parts: [{ fileData: { fileUri: url } }, { text: prompt }],
         },
       ],
     });
@@ -237,20 +240,23 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
       console.error("Raw response (first 500 chars):", rawText.slice(0, 500));
       return NextResponse.json(
         { error: "Failed to parse quiz response. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     // Validate we actually got questions
-    if (!data?.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+    if (
+      !data?.questions ||
+      !Array.isArray(data.questions) ||
+      data.questions.length === 0
+    ) {
       return NextResponse.json(
         { error: "No questions were generated. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json(data);
-
   } catch (error: any) {
     console.error("Quiz generation error:", error);
 
@@ -258,13 +264,13 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
     if (error?.message?.includes("429") || error?.message?.includes("quota")) {
       return NextResponse.json(
         { error: "API quota exceeded. Please wait a moment and try again." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to generate quiz" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

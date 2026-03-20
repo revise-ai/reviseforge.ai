@@ -7,7 +7,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
-    if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    if (!url)
+      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
     const prompt = `You are ReviseForge AI — the world's most advanced flashcard generation engine. Watch this entire YouTube video and create flashcards that will help students truly master the subject matter, not just recognise surface details.
 
@@ -83,16 +84,16 @@ Minimum 15 cards, no maximum — cover every piece of meaningful knowledge from 
       contents: [
         {
           role: "user",
-          parts: [
-            { fileData: { fileUri: url } },
-            { text: prompt },
-          ],
+          parts: [{ fileData: { fileUri: url } }, { text: prompt }],
         },
       ],
     });
 
     const rawText = response.text ?? "";
-    const cleaned = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const cleaned = rawText
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "")
+      .trim();
 
     let data;
     try {
@@ -106,6 +107,9 @@ Minimum 15 cards, no maximum — cover every piece of meaningful knowledge from 
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("Flashcards generation error:", error);
-    return NextResponse.json({ error: error.message || "Failed to generate flashcards" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to generate flashcards" },
+      { status: 500 },
+    );
   }
 }

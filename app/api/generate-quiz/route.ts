@@ -141,7 +141,7 @@ Generate exactly 30 questions. The difficulty must be genuinely high — these q
     console.error("Quiz generation error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to generate quiz" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -77,7 +77,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No mode provided" }, { status: 400 });
     }
     if (!noteContent?.trim()) {
-      return NextResponse.json({ error: "Note content is empty" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Note content is empty" },
+        { status: 400 },
+      );
     }
 
     let parts: any[] = [];
@@ -85,14 +88,22 @@ export async function POST(req: NextRequest) {
     if (mode === "polish-only") {
       // Text only — no resource needed
       parts = [{ text: buildPolishOnlyPrompt(noteContent) }];
-
     } else if (mode === "polish-resource") {
-      if (!resourceParts || !Array.isArray(resourceParts) || resourceParts.length === 0) {
-        return NextResponse.json({ error: "No resource provided" }, { status: 400 });
+      if (
+        !resourceParts ||
+        !Array.isArray(resourceParts) ||
+        resourceParts.length === 0
+      ) {
+        return NextResponse.json(
+          { error: "No resource provided" },
+          { status: 400 },
+        );
       }
       // Resource parts (file or YouTube) come first, then the prompt
-      parts = [...resourceParts, { text: buildPolishWithResourcePrompt(noteContent) }];
-
+      parts = [
+        ...resourceParts,
+        { text: buildPolishWithResourcePrompt(noteContent) },
+      ];
     } else {
       return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
     }
@@ -110,12 +121,11 @@ export async function POST(req: NextRequest) {
     if (!result) throw new Error("Empty response from Gemini");
 
     return NextResponse.json({ result });
-
   } catch (error: any) {
     console.error("Gemini polish error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to polish note" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

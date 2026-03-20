@@ -1,4 +1,3 @@
-
 // app/api/generate-flashcards/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
@@ -160,7 +159,7 @@ Return ONLY a valid JSON array — no preamble, no explanation, no markdown fenc
     console.error("Flashcard generation error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to generate flashcards" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

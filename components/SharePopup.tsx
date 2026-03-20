@@ -29,7 +29,11 @@ function daysLeft(expiresAt: string) {
   return `Expires in ${days} days`;
 }
 
-export default function SharePopup({ channelId, channelName, onClose }: SharePopupProps) {
+export default function SharePopup({
+  channelId,
+  channelName,
+  onClose,
+}: SharePopupProps) {
   const [invite, setInvite] = useState<InviteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -46,10 +50,15 @@ export default function SharePopup({ channelId, channelName, onClose }: SharePop
 
   const fetchInvite = async () => {
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     const uid = session?.user?.id;
 
-    if (!uid) { setLoading(false); return; }
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
 
     // Check if admin
     const { data: membership } = await supabase
@@ -96,9 +105,9 @@ export default function SharePopup({ channelId, channelName, onClose }: SharePop
 
     // Create new one via RPC (secure — checks admin role server-side)
     const { data } = await supabase.rpc("create_channel_invite", {
-      p_channel_id:   channelId,
-      p_max_uses:     null,
-      p_expire_days:  7,
+      p_channel_id: channelId,
+      p_max_uses: null,
+      p_expire_days: 7,
     });
 
     if (data && !data.error) {
@@ -127,9 +136,22 @@ export default function SharePopup({ channelId, channelName, onClose }: SharePop
               Share this link — anyone who opens it can join.
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 cursor-pointer rounded-lg hover:bg-gray-100 text-gray-400 ml-3 shrink-0">
-            <svg className="w-4 h-4 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={onClose}
+            className="p-1.5 cursor-pointer rounded-lg hover:bg-gray-100 text-gray-400 ml-3 shrink-0"
+          >
+            <svg
+              className="w-4 h-4 cursor-pointer"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -143,21 +165,34 @@ export default function SharePopup({ channelId, channelName, onClose }: SharePop
             <>
               {/* Link box */}
               <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-3">
-                <p className="text-[11px] font-mono text-gray-500 truncate">{inviteUrl}</p>
+                <p className="text-[11px] font-mono text-gray-500 truncate">
+                  {inviteUrl}
+                </p>
               </div>
 
               {/* Expiry + uses info */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-3.5 h-3.5 text-amber-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <span className="text-xs text-amber-600 font-medium">
                     {daysLeft(invite.expires_at)}
                   </span>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {invite.use_count} {invite.max_uses ? `/ ${invite.max_uses}` : ""} uses
+                  {invite.use_count}{" "}
+                  {invite.max_uses ? `/ ${invite.max_uses}` : ""} uses
                 </span>
               </div>
 
@@ -171,9 +206,39 @@ export default function SharePopup({ channelId, channelName, onClose }: SharePop
                 }`}
               >
                 {copied ? (
-                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Link Copied!</>
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    Link Copied!
+                  </>
                 ) : (
-                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy Invite Link</>
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
+                    </svg>
+                    Copy Invite Link
+                  </>
                 )}
               </button>
 
@@ -187,7 +252,22 @@ export default function SharePopup({ channelId, channelName, onClose }: SharePop
                   {resetting ? (
                     <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Reset Invite Link</>
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      Reset Invite Link
+                    </>
                   )}
                 </button>
               )}
@@ -199,14 +279,16 @@ export default function SharePopup({ channelId, channelName, onClose }: SharePop
           ) : (
             /* No active invite — create one */
             <div className="text-center py-4">
-              <p className="text-sm text-gray-500 mb-4">No active invite link. Create one to invite people.</p>
+              <p className="text-sm text-gray-500 mb-4">
+                No active invite link. Create one to invite people.
+              </p>
               {isAdmin && (
                 <button
                   onClick={async () => {
                     setResetting(true);
                     await supabase.rpc("create_channel_invite", {
-                      p_channel_id:  channelId,
-                      p_max_uses:    null,
+                      p_channel_id: channelId,
+                      p_max_uses: null,
                       p_expire_days: 7,
                     });
                     await fetchInvite();

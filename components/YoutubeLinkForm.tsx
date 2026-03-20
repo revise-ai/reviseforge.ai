@@ -31,10 +31,22 @@ export default function YoutubeLinkForm() {
 
   const handleAdd = () => {
     const url = inputValue.trim();
-    if (!url) { setError("Please enter a YouTube link."); return; }
-    if (!isValidYoutubeUrl(url)) { setError("Please enter a valid YouTube URL."); return; }
-    if (entries.some((e) => e.url === url)) { setError("This link has already been added."); return; }
-    setEntries((prev) => [...prev, { url, thumbnail: getYoutubeThumbnail(url), title: url }]);
+    if (!url) {
+      setError("Please enter a YouTube link.");
+      return;
+    }
+    if (!isValidYoutubeUrl(url)) {
+      setError("Please enter a valid YouTube URL.");
+      return;
+    }
+    if (entries.some((e) => e.url === url)) {
+      setError("This link has already been added.");
+      return;
+    }
+    setEntries((prev) => [
+      ...prev,
+      { url, thumbnail: getYoutubeThumbnail(url), title: url },
+    ]);
     setInputValue("");
     setError("");
   };
@@ -51,11 +63,16 @@ export default function YoutubeLinkForm() {
     const firstUrl = entries[0].url;
 
     try {
-      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser();
 
       if (userErr || !user) {
         // Not logged in — just navigate without persisting
-        router.push(`/content?mode=youtube&url=${encodeURIComponent(firstUrl)}`);
+        router.push(
+          `/content?mode=youtube&url=${encodeURIComponent(firstUrl)}`,
+        );
         return;
       }
 
@@ -90,7 +107,7 @@ export default function YoutubeLinkForm() {
 
       // Pass the session ID in the URL so the content page can persist data
       router.push(
-        `/content?mode=youtube&url=${encodeURIComponent(firstUrl)}&session_id=${sessionId}`
+        `/content?mode=youtube&url=${encodeURIComponent(firstUrl)}&session_id=${sessionId}`,
       );
     } catch (err: any) {
       console.error("[YoutubeLinkForm] handleUse error:", err);
@@ -107,10 +124,24 @@ export default function YoutubeLinkForm() {
       {entries.length > 0 && (
         <div className="mb-4 space-y-2 max-h-44 overflow-y-auto">
           {entries.map((entry, i) => (
-            <div key={i} className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              <img src={entry.thumbnail} alt="thumbnail" className="w-12 h-8 object-cover rounded shrink-0" />
-              <span className="truncate flex-1 text-gray-600 text-xs">{entry.url}</span>
-              <button onClick={() => handleRemove(i)} className="text-gray-400 hover:text-red-500 transition shrink-0">✕</button>
+            <div
+              key={i}
+              className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
+            >
+              <img
+                src={entry.thumbnail}
+                alt="thumbnail"
+                className="w-12 h-8 object-cover rounded shrink-0"
+              />
+              <span className="truncate flex-1 text-gray-600 text-xs">
+                {entry.url}
+              </span>
+              <button
+                onClick={() => handleRemove(i)}
+                className="text-gray-400 hover:text-red-500 transition shrink-0"
+              >
+                ✕
+              </button>
             </div>
           ))}
         </div>
@@ -118,7 +149,13 @@ export default function YoutubeLinkForm() {
 
       {/* Drop-zone styled input area */}
       <div className="border-2 border-dotted border-gray-400 hover:border-red-400 transition rounded-lg p-8 mt-2 flex flex-col items-center gap-4">
-        <svg width="38" height="38" viewBox="0 0 24 24" fill="#EF4444" xmlns="http://www.w3.org/2000/svg">
+        <svg
+          width="38"
+          height="38"
+          viewBox="0 0 24 24"
+          fill="#EF4444"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
         </svg>
         <p className="text-gray-500">Paste a YouTube link below</p>
@@ -130,21 +167,34 @@ export default function YoutubeLinkForm() {
           <input
             type="url"
             value={inputValue}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => { setInputValue(e.target.value); setError(""); }}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              setInputValue(e.target.value);
+              setError("");
+            }}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
             placeholder="https://www.youtube.com/watch?v=..."
             className={`flex-1 px-4 py-2 text-sm border rounded-lg outline-none transition text-gray-700 placeholder-gray-300 ${error ? "border-red-400 focus:border-red-500" : "border-gray-300 focus:border-red-400"}`}
           />
-          <button type="button" onClick={handleAdd} className="px-4 py-2 bg-red-500 hover:bg-red-600 active:scale-95 transition-all text-white text-sm rounded-lg shrink-0">
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="px-4 py-2 bg-red-500 hover:bg-red-600 active:scale-95 transition-all text-white text-sm rounded-lg shrink-0"
+          >
             Add
           </button>
         </div>
-        {error && <p className="text-red-400 text-xs self-start -mt-2">{error}</p>}
+        {error && (
+          <p className="text-red-400 text-xs self-start -mt-2">{error}</p>
+        )}
       </div>
 
       {/* Actions */}
       <div className="mt-6 flex justify-end gap-4">
-        <button type="button" onClick={() => setEntries([])} className="px-9 py-2 border border-gray-500/50 bg-white hover:bg-blue-100/30 active:scale-95 transition-all text-gray-500 rounded">
+        <button
+          type="button"
+          onClick={() => setEntries([])}
+          className="px-9 py-2 border border-gray-500/50 bg-white hover:bg-blue-100/30 active:scale-95 transition-all text-gray-500 rounded"
+        >
           Clear
         </button>
         <button
@@ -153,7 +203,11 @@ export default function YoutubeLinkForm() {
           disabled={entries.length === 0 || loading}
           className={`px-6 py-2 active:scale-95 transition-all text-white rounded ${entries.length === 0 || loading ? "bg-indigo-300 cursor-not-allowed" : "bg-indigo-500 hover:bg-indigo-600"}`}
         >
-          {loading ? "Starting…" : entries.length === 0 ? "Add Link First" : `Use ${entries.length} Link${entries.length > 1 ? "s" : ""}`}
+          {loading
+            ? "Starting…"
+            : entries.length === 0
+              ? "Add Link First"
+              : `Use ${entries.length} Link${entries.length > 1 ? "s" : ""}`}
         </button>
       </div>
     </div>

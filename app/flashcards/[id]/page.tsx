@@ -17,62 +17,146 @@ interface Flashcard {
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 const HintIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.8}
+      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+    />
   </svg>
 );
 
 const StarIcon = ({ filled }: { filled?: boolean }) => (
-  <svg className="w-5 h-5" fill={filled ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+  <svg
+    className="w-5 h-5"
+    fill={filled ? "currentColor" : "none"}
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.8}
+      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+    />
   </svg>
 );
 
 const EditIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.8}
+      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+    />
   </svg>
 );
 
 const ChevronLeft = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M15 19l-7-7 7-7"
+    />
   </svg>
 );
 
 const ChevronRight = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9 5l7 7-7 7"
+    />
   </svg>
 );
 
 const DownloadIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.8}
+      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+    />
   </svg>
 );
 
 const GridIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-      d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+    />
   </svg>
 );
 
 const TrashIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.8}
+      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+    />
   </svg>
 );
 
 const PlusIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 4v16m8-8H4"
+    />
   </svg>
 );
 
@@ -87,17 +171,31 @@ function LoadingScreen({ fileName }: { fileName: string }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-6">
       <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center">
-        <svg className="w-8 h-8 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        <svg
+          className="w-8 h-8 text-white animate-pulse"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.8}
+            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+          />
         </svg>
       </div>
       <div className="text-center">
         <h2 className="text-xl font-semibold text-gray-800 mb-1">
           Generating flashcards{".".repeat(dots)}
         </h2>
-        <p className="text-sm text-gray-400">Analyzing <span className="font-medium text-gray-600">{fileName}</span></p>
-        <p className="text-xs text-gray-400 mt-1">Reading your document and creating cards</p>
+        <p className="text-sm text-gray-400">
+          Analyzing{" "}
+          <span className="font-medium text-gray-600">{fileName}</span>
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Reading your document and creating cards
+        </p>
       </div>
       <div className="w-64 h-1.5 bg-gray-200 rounded-full overflow-hidden">
         <div className="h-full bg-blue-600 rounded-full animate-[loading_2s_ease-in-out_infinite]" />
@@ -125,18 +223,27 @@ function EditMode({
   onSave: (cards: Flashcard[]) => void;
   onBack: () => void;
 }) {
-  const [editing, setEditing] = useState<Flashcard[]>(cards.map((c) => ({ ...c })));
+  const [editing, setEditing] = useState<Flashcard[]>(
+    cards.map((c) => ({ ...c })),
+  );
   const [saving, setSaving] = useState(false);
 
   const updateCard = (id: number, field: keyof Flashcard, value: string) => {
-    setEditing((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
+    setEditing((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)),
+    );
   };
 
   const addCard = () => {
     const newId = Math.max(...editing.map((c) => c.id)) + 1;
-    setEditing((prev) => [...prev, { id: newId, term: "", definition: "", hint: "", category: "General" }]);
+    setEditing((prev) => [
+      ...prev,
+      { id: newId, term: "", definition: "", hint: "", category: "General" },
+    ]);
     setTimeout(() => {
-      document.getElementById(`card-${newId}`)?.scrollIntoView({ behavior: "smooth" });
+      document
+        .getElementById(`card-${newId}`)
+        ?.scrollIntoView({ behavior: "smooth" });
     }, 100);
   };
 
@@ -149,7 +256,13 @@ function EditMode({
     const idx = editing.findIndex((c) => c.id === afterId);
     const newId = Math.max(...editing.map((c) => c.id)) + 1;
     const newCards = [...editing];
-    newCards.splice(idx + 1, 0, { id: newId, term: "", definition: "", hint: "", category: "General" });
+    newCards.splice(idx + 1, 0, {
+      id: newId,
+      term: "",
+      definition: "",
+      hint: "",
+      category: "General",
+    });
     setEditing(newCards);
   };
 
@@ -161,10 +274,10 @@ function EditMode({
       const rows = editing.map((c, i) => ({
         session_id: sessionId,
         card_order: i + 1,
-        term:       c.term,
+        term: c.term,
         definition: c.definition,
-        hint:       c.hint     || "",
-        category:   c.category || "General",
+        hint: c.hint || "",
+        category: c.category || "General",
       }));
 
       const { data: inserted, error: insertErr } = await supabase
@@ -175,11 +288,13 @@ function EditMode({
       if (insertErr) throw insertErr;
 
       const dbIdMap: Record<number, string> = {};
-      (inserted ?? []).forEach((row) => { dbIdMap[row.card_order] = row.id; });
+      (inserted ?? []).forEach((row) => {
+        dbIdMap[row.card_order] = row.id;
+      });
 
       const updated: Flashcard[] = editing.map((c, i) => ({
         ...c,
-        id:   i + 1,
+        id: i + 1,
         dbId: dbIdMap[i + 1],
       }));
 
@@ -200,7 +315,10 @@ function EditMode({
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition cursor-pointer">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition cursor-pointer"
+        >
           <ChevronLeft />
           Go Back
         </button>
@@ -218,9 +336,24 @@ function EditMode({
             className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-semibold transition cursor-pointer"
           >
             {saving ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              <svg
+                className="w-4 h-4 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8z"
+                />
               </svg>
             ) : (
               <DownloadIcon />
@@ -232,25 +365,36 @@ function EditMode({
 
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
         {editing.map((card, idx) => (
-          <div key={card.id} id={`card-${card.id}`}
-            className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div
+            key={card.id}
+            id={`card-${card.id}`}
+            className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
+          >
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
               <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-500">Card {idx + 1}</span>
+                <span className="text-sm font-medium text-gray-500">
+                  Card {idx + 1}
+                </span>
                 <StarIcon />
-                <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-600 rounded-full">{card.category}</span>
+                <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-600 rounded-full">
+                  {card.category}
+                </span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => addBelow(card.id)}
-                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition cursor-pointer px-2 py-1 rounded-lg hover:bg-blue-50">
+                <button
+                  onClick={() => addBelow(card.id)}
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition cursor-pointer px-2 py-1 rounded-lg hover:bg-blue-50"
+                >
                   <PlusIcon />
                   Add below
                 </button>
                 <button className="p-1.5 rounded-lg hover:bg-gray-200 transition cursor-pointer text-gray-400">
                   <GridIcon />
                 </button>
-                <button onClick={() => deleteCard(card.id)}
-                  className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition cursor-pointer">
+                <button
+                  onClick={() => deleteCard(card.id)}
+                  className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition cursor-pointer"
+                >
                   <TrashIcon />
                 </button>
               </div>
@@ -275,7 +419,9 @@ function EditMode({
                 </label>
                 <textarea
                   value={card.definition}
-                  onChange={(e) => updateCard(card.id, "definition", e.target.value)}
+                  onChange={(e) =>
+                    updateCard(card.id, "definition", e.target.value)
+                  }
                   rows={3}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition resize-none"
                   placeholder="Answer or definition..."
@@ -304,8 +450,14 @@ function EditMode({
 
 // ── Study Card ─────────────────────────────────────────────────────────────────
 function StudyCard({
-  card, current, total, starred,
-  onStar, onPrev, onNext, onEdit,
+  card,
+  current,
+  total,
+  starred,
+  onStar,
+  onPrev,
+  onNext,
+  onEdit,
 }: {
   card: Flashcard;
   current: number;
@@ -339,7 +491,10 @@ function StudyCard({
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-2">
           <button
-            onClick={(e) => { e.stopPropagation(); setShowHint((v) => !v); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowHint((v) => !v);
+            }}
             className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition cursor-pointer"
           >
             <HintIcon />
@@ -347,13 +502,19 @@ function StudyCard({
           </button>
           <div className="flex items-center gap-2">
             <button
-              onClick={(e) => { e.stopPropagation(); onStar(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStar();
+              }}
               className={`cursor-pointer transition ${starred ? "text-yellow-400" : "text-gray-300 hover:text-gray-500"}`}
             >
               <StarIcon filled={starred} />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
               className="text-gray-300 hover:text-gray-600 transition cursor-pointer"
             >
               <EditIcon />
@@ -364,19 +525,27 @@ function StudyCard({
         <div className="flex flex-col items-center justify-center px-10 py-12 text-center min-h-[240px]">
           {!flipped ? (
             <>
-              <p className="text-xl font-medium text-gray-900 leading-relaxed">{card.term}</p>
+              <p className="text-xl font-medium text-gray-900 leading-relaxed">
+                {card.term}
+              </p>
               {showHint && card.hint && (
-                <p className="mt-6 text-sm text-gray-500 italic">Hint: {card.hint}</p>
+                <p className="mt-6 text-sm text-gray-500 italic">
+                  Hint: {card.hint}
+                </p>
               )}
             </>
           ) : (
-            <p className="text-lg text-gray-700 leading-relaxed">{card.definition}</p>
+            <p className="text-lg text-gray-700 leading-relaxed">
+              {card.definition}
+            </p>
           )}
         </div>
 
         <div className="pb-4 flex justify-center">
           <span className="text-xs text-gray-300">
-            {flipped ? "Showing answer — click to see question" : "Click card to reveal answer"}
+            {flipped
+              ? "Showing answer — click to see question"
+              : "Click card to reveal answer"}
           </span>
         </div>
       </div>
@@ -417,16 +586,16 @@ function StudyCard({
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function FlashcardsPage() {
-  const params       = useParams();
+  const params = useParams();
   const urlSessionId = params?.id as string;
 
-  const [cards,        setCards]        = useState<Flashcard[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState("");
-  const [fileName,     setFileName]     = useState("");
+  const [cards, setCards] = useState<Flashcard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [fileName, setFileName] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [starred,      setStarred]      = useState<Set<number>>(new Set());
-  const [mode,         setMode]         = useState<"study" | "edit">("study");
+  const [starred, setStarred] = useState<Set<number>>(new Set());
+  const [mode, setMode] = useState<"study" | "edit">("study");
 
   useEffect(() => {
     if (!urlSessionId) {
@@ -435,8 +604,8 @@ export default function FlashcardsPage() {
       return;
     }
 
-    const b64File    = sessionStorage.getItem("flashcard_file");
-    const name       = sessionStorage.getItem("flashcard_filename");
+    const b64File = sessionStorage.getItem("flashcard_file");
+    const name = sessionStorage.getItem("flashcard_filename");
     // ✅ Key insight: store which session ID we started generating for.
     // Strict Mode fires useEffect twice. On the first run we set this key.
     // On the second run, this key already equals urlSessionId, so we skip
@@ -455,7 +624,7 @@ export default function FlashcardsPage() {
     } else {
       loadCardsFromDB(urlSessionId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSessionId]);
 
   // ── Load from DB ─────────────────────────────────────────────────────────
@@ -471,7 +640,10 @@ export default function FlashcardsPage() {
       if (sessionErr) throw new Error("Flashcard session not found.");
       if (session.file_name) setFileName(session.file_name);
       // Bump last_visited so this session appears at top of history/recent
-      await supabase.from("flashcard_sessions").update({ last_visited: new Date().toISOString() }).eq("id", sid);
+      await supabase
+        .from("flashcard_sessions")
+        .update({ last_visited: new Date().toISOString() })
+        .eq("id", sid);
 
       // Still generating — keep the loading spinner and poll again in 2s
       // We do NOT call setLoading(false) here so the spinner stays visible
@@ -480,7 +652,10 @@ export default function FlashcardsPage() {
         return; // early return — finally still runs but we set loading=true after
       }
 
-      if (session.status === "error") throw new Error("Flashcard generation failed. Please go back and try again.");
+      if (session.status === "error")
+        throw new Error(
+          "Flashcard generation failed. Please go back and try again.",
+        );
 
       const { data, error: dbErr } = await supabase
         .from("flashcards")
@@ -489,7 +664,8 @@ export default function FlashcardsPage() {
         .order("card_order", { ascending: true });
 
       if (dbErr) throw dbErr;
-      if (!data || data.length === 0) throw new Error("No flashcards found for this session.");
+      if (!data || data.length === 0)
+        throw new Error("No flashcards found for this session.");
 
       setCards(mapRows(data));
       setLoading(false); // only set false when we actually have cards
@@ -500,7 +676,11 @@ export default function FlashcardsPage() {
   };
 
   // ── Generate via API then persist ─────────────────────────────────────────
-  const generateAndPersist = async (base64File: string, name: string, sid: string) => {
+  const generateAndPersist = async (
+    base64File: string,
+    name: string,
+    sid: string,
+  ) => {
     setLoading(true);
     setError("");
     try {
@@ -509,10 +689,10 @@ export default function FlashcardsPage() {
       const rows = generatedCards.map((c, i) => ({
         session_id: sid,
         card_order: i + 1,
-        term:       c.term,
+        term: c.term,
         definition: c.definition,
-        hint:       c.hint     || "",
-        category:   c.category || "General",
+        hint: c.hint || "",
+        category: c.category || "General",
       }));
 
       const { data: inserted, error: insertErr } = await supabase
@@ -523,13 +703,25 @@ export default function FlashcardsPage() {
       if (insertErr) throw insertErr;
 
       const dbIdMap: Record<number, string> = {};
-      (inserted ?? []).forEach((row) => { dbIdMap[row.card_order] = row.id; });
+      (inserted ?? []).forEach((row) => {
+        dbIdMap[row.card_order] = row.id;
+      });
 
-      setCards(generatedCards.map((c, i) => ({ ...c, id: i + 1, dbId: dbIdMap[i + 1] })));
+      setCards(
+        generatedCards.map((c, i) => ({
+          ...c,
+          id: i + 1,
+          dbId: dbIdMap[i + 1],
+        })),
+      );
 
       await supabase
         .from("flashcard_sessions")
-        .update({ status: "ready", total: generatedCards.length, last_visited: new Date().toISOString() })
+        .update({
+          status: "ready",
+          total: generatedCards.length,
+          last_visited: new Date().toISOString(),
+        })
         .eq("id", sid);
 
       // Clean up sessionStorage after successful save
@@ -537,10 +729,14 @@ export default function FlashcardsPage() {
       sessionStorage.removeItem("flashcard_filename");
       sessionStorage.removeItem("flashcard_session_id");
       // Keep "flashcard_generating_for" so refreshes still route to DB
-
     } catch (err: any) {
-      setError(err.message || "Something went wrong generating the flashcards.");
-      await supabase.from("flashcard_sessions").update({ status: "error" }).eq("id", sid);
+      setError(
+        err.message || "Something went wrong generating the flashcards.",
+      );
+      await supabase
+        .from("flashcard_sessions")
+        .update({ status: "error" })
+        .eq("id", sid);
     } finally {
       setLoading(false);
     }
@@ -549,32 +745,46 @@ export default function FlashcardsPage() {
   // ── Helpers ───────────────────────────────────────────────────────────────
   const mapRows = (data: any[]): Flashcard[] =>
     data.map((row) => ({
-      id:         row.card_order,
-      dbId:       row.id,
-      term:       row.term,
+      id: row.card_order,
+      dbId: row.id,
+      term: row.term,
       definition: row.definition,
-      hint:       row.hint     ?? "",
-      category:   row.category ?? "General",
+      hint: row.hint ?? "",
+      category: row.category ?? "General",
     }));
 
-  const callGenerateAPI = async (base64File: string, name: string): Promise<Flashcard[]> => {
+  const callGenerateAPI = async (
+    base64File: string,
+    name: string,
+  ): Promise<Flashcard[]> => {
     const byteString = atob(base64File.split(",")[1] ?? base64File);
-    const mimeType   = base64File.startsWith("data:") ? base64File.split(":")[1].split(";")[0] : "application/pdf";
-    const ab         = new ArrayBuffer(byteString.length);
-    const ia         = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-    const file = new File([new Blob([ab], { type: mimeType })], name, { type: mimeType });
+    const mimeType = base64File.startsWith("data:")
+      ? base64File.split(":")[1].split(";")[0]
+      : "application/pdf";
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++)
+      ia[i] = byteString.charCodeAt(i);
+    const file = new File([new Blob([ab], { type: mimeType })], name, {
+      type: mimeType,
+    });
 
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("/api/generate-flashcards", { method: "POST", body: formData });
+    const res = await fetch("/api/generate-flashcards", {
+      method: "POST",
+      body: formData,
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || "Failed to generate flashcards");
     }
     const data = await res.json();
-    return (data.flashcards as Omit<Flashcard, "id">[]).map((c, i) => ({ ...c, id: i + 1 }));
+    return (data.flashcards as Omit<Flashcard, "id">[]).map((c, i) => ({
+      ...c,
+      id: i + 1,
+    }));
   };
 
   // ── Star toggle ───────────────────────────────────────────────────────────
@@ -590,17 +800,24 @@ export default function FlashcardsPage() {
     });
 
     if (!card?.dbId) return;
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     if (wasStarred) {
-      await supabase.from("flashcard_stars")
+      await supabase
+        .from("flashcard_stars")
         .delete()
         .eq("user_id", user.id)
         .eq("card_id", card.dbId);
     } else {
-      await supabase.from("flashcard_stars")
-        .upsert({ user_id: user.id, card_id: card.dbId }, { onConflict: "user_id,card_id" });
+      await supabase
+        .from("flashcard_stars")
+        .upsert(
+          { user_id: user.id, card_id: card.dbId },
+          { onConflict: "user_id,card_id" },
+        );
     }
   };
 
@@ -614,13 +831,28 @@ export default function FlashcardsPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 px-4">
         <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
-          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg
+            className="w-6 h-6 text-red-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </div>
-        <h2 className="text-lg font-semibold text-gray-800">Something went wrong</h2>
+        <h2 className="text-lg font-semibold text-gray-800">
+          Something went wrong
+        </h2>
         <p className="text-sm text-gray-500 text-center max-w-sm">{error}</p>
-        <Link href="/dashboard" className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
+        <Link
+          href="/dashboard"
+          className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition"
+        >
           Go back to dashboard
         </Link>
       </div>
@@ -632,7 +864,10 @@ export default function FlashcardsPage() {
       <EditMode
         cards={cards}
         sessionId={urlSessionId}
-        onSave={(updated) => { setCards(updated); setMode("study"); }}
+        onSave={(updated) => {
+          setCards(updated);
+          setMode("study");
+        }}
         onBack={() => setMode("study")}
       />
     );
@@ -641,13 +876,18 @@ export default function FlashcardsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <Link href="/dashboard" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition"
+        >
           <ChevronLeft />
           Dashboard
         </Link>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{fileName}</span>
-          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">{cards.length} cards</span>
+          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">
+            {cards.length} cards
+          </span>
           <button
             onClick={() => setMode("edit")}
             className="flex items-center gap-2 px-4 py-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-sm text-gray-600 transition cursor-pointer"

@@ -23,7 +23,11 @@ function daysLeft(expiresAt: string) {
   return `Expires in ${days} days`;
 }
 
-export default function JoinPage({ params }: { params: { invite_code: string } }) {
+export default function JoinPage({
+  params,
+}: {
+  params: { invite_code: string };
+}) {
   const router = useRouter();
   const { invite_code } = params;
 
@@ -37,19 +41,23 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
   // ── Load invite info ──────────────────────────────────────
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       setIsLoggedIn(!!session);
 
       // Fetch invite + channel info
       const { data: invite, error: invErr } = await supabase
         .from("channel_invites")
-        .select(`
+        .select(
+          `
           expires_at,
           use_count,
           max_uses,
           is_revoked,
           channels (name, id)
-        `)
+        `,
+        )
         .eq("invite_code", invite_code)
         .single();
 
@@ -86,10 +94,10 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
       setInviteInfo({
         channel_name: (invite.channels as any).name,
         member_count: count ?? 0,
-        expires_at:   invite.expires_at,
-        use_count:    invite.use_count,
-        max_uses:     invite.max_uses,
-        is_revoked:   invite.is_revoked,
+        expires_at: invite.expires_at,
+        use_count: invite.use_count,
+        max_uses: invite.max_uses,
+        is_revoked: invite.is_revoked,
       });
 
       setLoadingInfo(false);
@@ -104,9 +112,12 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
   // ── Join ──────────────────────────────────────────────────
   const joinChannel = async () => {
     setJoining(true);
-    const { data, error: joinErr } = await supabase.rpc("join_channel_by_invite", {
-      p_invite_code: invite_code,
-    });
+    const { data, error: joinErr } = await supabase.rpc(
+      "join_channel_by_invite",
+      {
+        p_invite_code: invite_code,
+      },
+    );
 
     if (joinErr || data?.error) {
       setError(joinErr?.message ?? data?.error ?? "Failed to join.");
@@ -115,7 +126,10 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
     }
 
     setJoined(true);
-    setTimeout(() => router.replace(`/dashboard/channel/${data.channel_id}`), 1000);
+    setTimeout(
+      () => router.replace(`/dashboard/channel/${data.channel_id}`),
+      1000,
+    );
   };
 
   // ── Not logged in — show branded preview, redirect to signin ──
@@ -154,13 +168,27 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
       <div className="min-h-screen bg-[#1a1b1e] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
-            <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <svg
+              className="w-8 h-8 text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           </div>
           <div>
-            <p className="text-white font-bold text-lg">You joined #{inviteInfo?.channel_name}!</p>
-            <p className="text-gray-400 text-sm mt-1">Redirecting you to the channel…</p>
+            <p className="text-white font-bold text-lg">
+              You joined #{inviteInfo?.channel_name}!
+            </p>
+            <p className="text-gray-400 text-sm mt-1">
+              Redirecting you to the channel…
+            </p>
           </div>
         </div>
       </div>
@@ -173,8 +201,18 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
       <div className="min-h-screen bg-[#1a1b1e] flex items-center justify-center px-4">
         <div className="bg-[#2b2d31] rounded-2xl p-8 max-w-sm w-full text-center border border-white/10">
           <div className="w-14 h-14 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-7 h-7 text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <h2 className="text-white font-bold text-lg mb-2">Invite Invalid</h2>
@@ -194,11 +232,15 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
   return (
     <div className="min-h-screen bg-[#1a1b1e] flex items-center justify-center px-4">
       <div className="bg-[#2b2d31] rounded-2xl w-full max-w-sm border border-white/10 overflow-hidden shadow-2xl">
-
         {/* Top banner */}
         <div className="h-24 bg-gradient-to-br from-blue-600 to-blue-800 relative">
-          <div className="absolute inset-0 opacity-20"
-            style={{ backgroundImage: "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)", backgroundSize: "30px 30px" }}
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
+              backgroundSize: "30px 30px",
+            }}
           />
         </div>
 
@@ -211,7 +253,9 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
               </span>
             </div>
             <div className="pb-1">
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">You've been invited to join</p>
+              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                You've been invited to join
+              </p>
             </div>
           </div>
 
@@ -225,7 +269,8 @@ export default function JoinPage({ params }: { params: { invite_code: string } }
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-green-400" />
               <span className="text-sm text-gray-300">
-                {inviteInfo?.member_count} member{inviteInfo?.member_count !== 1 ? "s" : ""}
+                {inviteInfo?.member_count} member
+                {inviteInfo?.member_count !== 1 ? "s" : ""}
               </span>
             </div>
             <div className="w-1 h-1 rounded-full bg-gray-600" />

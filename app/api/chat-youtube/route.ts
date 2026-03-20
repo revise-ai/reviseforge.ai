@@ -8,21 +8,29 @@ export async function POST(req: NextRequest) {
   try {
     const { url, question, history } = await req.json();
 
-    if (!url)      return NextResponse.json({ error: "No video URL provided" }, { status: 400 });
-    if (!question) return NextResponse.json({ error: "No question provided"  }, { status: 400 });
+    if (!url)
+      return NextResponse.json(
+        { error: "No video URL provided" },
+        { status: 400 },
+      );
+    if (!question)
+      return NextResponse.json(
+        { error: "No question provided" },
+        { status: 400 },
+      );
 
     // Last 6 messages give the AI memory of the conversation without
     // blowing up the token limit
-    const historyContext = history && history.length > 0
-      ? `\n\nPrevious conversation in this session:\n${
-          history
+    const historyContext =
+      history && history.length > 0
+        ? `\n\nPrevious conversation in this session:\n${history
             .slice(-6)
-            .map((m: { role: string; message: string }) =>
-              `${m.role === "user" ? "Student" : "AI"}: ${m.message}`
+            .map(
+              (m: { role: string; message: string }) =>
+                `${m.role === "user" ? "Student" : "AI"}: ${m.message}`,
             )
-            .join("\n")
-        }\n`
-      : "";
+            .join("\n")}\n`
+        : "";
 
     const prompt = `You are a knowledgeable study assistant. The student is watching this YouTube video and has typed a question in the chat input.
 ${historyContext}
@@ -45,10 +53,7 @@ Instructions:
       contents: [
         {
           role: "user",
-          parts: [
-            { fileData: { fileUri: url } },
-            { text: prompt },
-          ],
+          parts: [{ fileData: { fileUri: url } }, { text: prompt }],
         },
       ],
     });
@@ -58,25 +63,24 @@ Instructions:
     if (!answer) {
       return NextResponse.json(
         { error: "No answer was generated. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json({ answer });
-
   } catch (error: any) {
     console.error("Chat YouTube error:", error);
 
     if (error?.message?.includes("429") || error?.message?.includes("quota")) {
       return NextResponse.json(
         { error: "API quota exceeded. Please wait a moment and try again." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to answer question" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

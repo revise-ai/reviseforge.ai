@@ -6,28 +6,36 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 export async function POST(req: NextRequest) {
   try {
-    const { audioBase64, mimeType, transcript, question, history } = await req.json();
+    const { audioBase64, mimeType, transcript, question, history } =
+      await req.json();
 
-    if (!question) return NextResponse.json({ error: "No question provided" }, { status: 400 });
+    if (!question)
+      return NextResponse.json(
+        { error: "No question provided" },
+        { status: 400 },
+      );
 
     if (!audioBase64 && !transcript) {
       return NextResponse.json(
-        { error: "No audio or transcript provided. Please record something first." },
-        { status: 400 }
+        {
+          error:
+            "No audio or transcript provided. Please record something first.",
+        },
+        { status: 400 },
       );
     }
 
     // Last 6 messages give the AI memory of the conversation
-    const historyContext = history && history.length > 0
-      ? `\n\nPrevious conversation in this session:\n${
-          history
+    const historyContext =
+      history && history.length > 0
+        ? `\n\nPrevious conversation in this session:\n${history
             .slice(-6)
-            .map((m: { role: string; message: string }) =>
-              `${m.role === "user" ? "Student" : "AI"}: ${m.message}`
+            .map(
+              (m: { role: string; message: string }) =>
+                `${m.role === "user" ? "Student" : "AI"}: ${m.message}`,
             )
-            .join("\n")
-        }\n`
-      : "";
+            .join("\n")}\n`
+        : "";
 
     const prompt = `You are a knowledgeable study assistant. The student has recorded a lecture and has typed a question in the chat input.
 ${historyContext}
@@ -56,7 +64,7 @@ Instructions:
           parts: [
             {
               inlineData: {
-                mimeType,          // e.g. "audio/webm", "audio/mp4", "audio/wav"
+                mimeType, // e.g. "audio/webm", "audio/mp4", "audio/wav"
                 data: audioBase64, // raw base64, no "data:..." prefix
               },
             },
@@ -67,8 +75,7 @@ Instructions:
     } else {
       // ── Path B: transcript text fallback ──────────────────────────────────
       // Used when audio blob is unavailable (e.g. cleared after processing)
-      const transcriptContext =
-        `The following is a transcript of the recorded lecture. Use it as the sole source of content to answer the student.\n\n${transcript}\n\n`;
+      const transcriptContext = `The following is a transcript of the recorded lecture. Use it as the sole source of content to answer the student.\n\n${transcript}\n\n`;
       contents = [
         {
           role: "user",
@@ -87,32 +94,33 @@ Instructions:
     if (!answer) {
       return NextResponse.json(
         { error: "No answer was generated. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json({ answer });
-
   } catch (error: any) {
     console.error("Chat recording error:", error);
 
     if (error?.message?.includes("429") || error?.message?.includes("quota")) {
       return NextResponse.json(
         { error: "API quota exceeded. Please wait a moment and try again." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     if (error?.message?.includes("size") || error?.message?.includes("limit")) {
       return NextResponse.json(
-        { error: "Recording is too large to process. Try a shorter recording." },
-        { status: 413 }
+        {
+          error: "Recording is too large to process. Try a shorter recording.",
+        },
+        { status: 413 },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to answer question" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

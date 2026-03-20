@@ -11,10 +11,14 @@ function extractJSON(raw: string): any {
     .replace(/```\s*/g, "")
     .trim();
 
-  try { return JSON.parse(text); } catch { /* continue */ }
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* continue */
+  }
 
   const start = text.indexOf("{");
-  const end   = text.lastIndexOf("}");
+  const end = text.lastIndexOf("}");
   if (start !== -1 && end !== -1 && end > start) {
     text = text.slice(start, end + 1);
   }
@@ -24,14 +28,19 @@ function extractJSON(raw: string): any {
     .replace(/:\s*'([^']*)'/g, (_, val) => `: "${val.replace(/"/g, '\\"')}"`)
     .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
     .replace(/[\u0000-\u001F\u007F]/g, (ch) =>
-      ch === "\n" || ch === "\r" || ch === "\t" ? ch : ""
+      ch === "\n" || ch === "\r" || ch === "\t" ? ch : "",
     );
 
-  try { return JSON.parse(text); } catch { /* continue */ }
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* continue */
+  }
 
-  const fixed = text.split("\n").map((line) =>
-    line.replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
-  ).join("\n");
+  const fixed = text
+    .split("\n")
+    .map((line) => line.replace(/\\(?!["\\/bfnrtu])/g, "\\\\"))
+    .join("\n");
 
   return JSON.parse(fixed);
 }
@@ -42,8 +51,11 @@ export async function POST(req: NextRequest) {
 
     if (!audioBase64 && !transcript) {
       return NextResponse.json(
-        { error: "No audio or transcript provided. Please record something first." },
-        { status: 400 }
+        {
+          error:
+            "No audio or transcript provided. Please record something first.",
+        },
+        { status: 400 },
       );
     }
 
@@ -113,7 +125,7 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
           parts: [
             {
               inlineData: {
-                mimeType,          // e.g. "audio/webm", "audio/mp4", "audio/wav"
+                mimeType, // e.g. "audio/webm", "audio/mp4", "audio/wav"
                 data: audioBase64, // raw base64, no "data:..." prefix
               },
             },
@@ -123,8 +135,7 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
       ];
     } else {
       // ── Path B: fallback to transcript text ───────────────────────────────
-      const transcriptContext =
-        `The following is a transcript of the recorded lecture. Use it as the sole source of content for the quiz.\n\n${transcript}\n\n`;
+      const transcriptContext = `The following is a transcript of the recorded lecture. Use it as the sole source of content for the quiz.\n\n${transcript}\n\n`;
       contents = [
         {
           role: "user",
@@ -148,39 +159,44 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
       console.error("Raw response (first 500 chars):", rawText.slice(0, 500));
       return NextResponse.json(
         { error: "Failed to parse quiz response. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    if (!data?.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+    if (
+      !data?.questions ||
+      !Array.isArray(data.questions) ||
+      data.questions.length === 0
+    ) {
       return NextResponse.json(
         { error: "No questions were generated. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json(data);
-
   } catch (error: any) {
     console.error("Quiz recording generation error:", error);
 
     if (error?.message?.includes("429") || error?.message?.includes("quota")) {
       return NextResponse.json(
         { error: "API quota exceeded. Please wait a moment and try again." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     if (error?.message?.includes("size") || error?.message?.includes("limit")) {
       return NextResponse.json(
-        { error: "Recording is too large to process. Try a shorter recording." },
-        { status: 413 }
+        {
+          error: "Recording is too large to process. Try a shorter recording.",
+        },
+        { status: 413 },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to generate quiz" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -10,8 +10,11 @@ export async function POST(req: NextRequest) {
 
     if (!audioBase64 && !transcript) {
       return NextResponse.json(
-        { error: "No audio or transcript provided. Please record something first." },
-        { status: 400 }
+        {
+          error:
+            "No audio or transcript provided. Please record something first.",
+        },
+        { status: 400 },
       );
     }
 
@@ -25,7 +28,6 @@ If they reference a topic or section name, explain in detail what is covered in 
 If they ask a conceptual question, explain the answer using the specific content, examples, and language from the recording.
 
 Write your answer in clear, plain prose. Use a heading if the answer has multiple distinct parts. Be specific — reference actual moments, examples, and explanations from the recording rather than speaking in generalities. Do not use asterisks or hashtags.`
-
       : `Listen to this entire recorded lecture and produce a thorough study summary. Write everything in clear, flowing prose. Do not use asterisks, hashtags, or bullet symbols anywhere.
 
 Overview
@@ -60,7 +62,7 @@ Base everything strictly on the actual content of this specific recording. Do no
           parts: [
             {
               inlineData: {
-                mimeType,          // e.g. "audio/webm", "audio/mp4", "audio/wav"
+                mimeType, // e.g. "audio/webm", "audio/mp4", "audio/wav"
                 data: audioBase64, // raw base64, no "data:..." prefix
               },
             },
@@ -70,8 +72,7 @@ Base everything strictly on the actual content of this specific recording. Do no
       ];
     } else {
       // ── Path B: fallback to transcript text ───────────────────────────────
-      const transcriptContext =
-        `The following is a transcript of the recorded lecture. Use it as the sole source of content for the summary.\n\n${transcript}\n\n`;
+      const transcriptContext = `The following is a transcript of the recorded lecture. Use it as the sole source of content for the summary.\n\n${transcript}\n\n`;
       contents = [
         {
           role: "user",
@@ -90,32 +91,33 @@ Base everything strictly on the actual content of this specific recording. Do no
     if (!summary) {
       return NextResponse.json(
         { error: "No summary was generated. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json({ summary });
-
   } catch (error: any) {
     console.error("Summary recording generation error:", error);
 
     if (error?.message?.includes("429") || error?.message?.includes("quota")) {
       return NextResponse.json(
         { error: "API quota exceeded. Please wait a moment and try again." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     if (error?.message?.includes("size") || error?.message?.includes("limit")) {
       return NextResponse.json(
-        { error: "Recording is too large to process. Try a shorter recording." },
-        { status: 413 }
+        {
+          error: "Recording is too large to process. Try a shorter recording.",
+        },
+        { status: 413 },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to generate summary" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

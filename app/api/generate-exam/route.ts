@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File;
-    if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (!file)
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
     const arrayBuffer = await file.arrayBuffer();
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
@@ -118,7 +119,10 @@ OUTPUT — RETURN ONLY VALID JSON. NO TEXT BEFORE OR AFTER. NO MARKDOWN FENCES.
     });
 
     const rawText = response.text ?? "";
-    const cleaned = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const cleaned = rawText
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "")
+      .trim();
 
     let exam;
     try {
@@ -132,6 +136,9 @@ OUTPUT — RETURN ONLY VALID JSON. NO TEXT BEFORE OR AFTER. NO MARKDOWN FENCES.
     return NextResponse.json({ exam });
   } catch (error: any) {
     console.error("Exam generation error:", error);
-    return NextResponse.json({ error: error.message || "Failed to generate exam" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to generate exam" },
+      { status: 500 },
+    );
   }
 }

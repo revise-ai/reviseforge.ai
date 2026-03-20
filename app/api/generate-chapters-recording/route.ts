@@ -11,10 +11,14 @@ function extractJSON(raw: string): any {
     .replace(/```\s*/g, "")
     .trim();
 
-  try { return JSON.parse(text); } catch { /* continue */ }
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* continue */
+  }
 
   const start = text.indexOf("{");
-  const end   = text.lastIndexOf("}");
+  const end = text.lastIndexOf("}");
   if (start !== -1 && end !== -1 && end > start) {
     text = text.slice(start, end + 1);
   }
@@ -24,14 +28,19 @@ function extractJSON(raw: string): any {
     .replace(/:\s*'([^']*)'/g, (_, val) => `: "${val.replace(/"/g, '\\"')}"`)
     .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
     .replace(/[\u0000-\u001F\u007F]/g, (ch) =>
-      ch === "\n" || ch === "\r" || ch === "\t" ? ch : ""
+      ch === "\n" || ch === "\r" || ch === "\t" ? ch : "",
     );
 
-  try { return JSON.parse(text); } catch { /* continue */ }
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* continue */
+  }
 
-  const fixed = text.split("\n").map((line) =>
-    line.replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
-  ).join("\n");
+  const fixed = text
+    .split("\n")
+    .map((line) => line.replace(/\\(?!["\\/bfnrtu])/g, "\\\\"))
+    .join("\n");
 
   return JSON.parse(fixed);
 }
@@ -46,16 +55,17 @@ function toSeconds(ts: string): number {
 
 // ── Format seconds to MM:SS ───────────────────────────────────────────────────
 function toMMSS(secs: number): string {
-  const m = Math.floor(secs / 60).toString().padStart(2, "0");
-  const s = Math.floor(secs % 60).toString().padStart(2, "0");
+  const m = Math.floor(secs / 60)
+    .toString()
+    .padStart(2, "0");
+  const s = Math.floor(secs % 60)
+    .toString()
+    .padStart(2, "0");
   return `${m}:${s}`;
 }
 
 // ── Strip hallucinated timestamps that exceed actual duration ─────────────────
-function clampToDuration(
-  data: any,
-  durationSecs: number | null
-): any {
+function clampToDuration(data: any, durationSecs: number | null): any {
   if (!durationSecs || durationSecs <= 0) return data;
 
   // Filter chapters — remove any whose timestamp exceeds real duration
@@ -66,11 +76,13 @@ function clampToDuration(
     });
     // Always keep at least one chapter at 00:00
     if (data.chapters.length === 0 && data.chapters !== undefined) {
-      data.chapters = [{
-        time: "00:00",
-        title: "Recording",
-        text: "Full content of the recording.",
-      }];
+      data.chapters = [
+        {
+          time: "00:00",
+          title: "Recording",
+          text: "Full content of the recording.",
+        },
+      ];
     }
   }
 
@@ -95,29 +107,32 @@ export async function POST(req: NextRequest) {
     if (!audioBase64 || !mimeType) {
       return NextResponse.json(
         { error: "No audio provided. Please record something first." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Use the client-supplied duration (from MediaRecorder elapsed timer)
     // to enforce accurate timestamps in the prompt and clamp bad ones after
-    const knownDuration = typeof durationSecs === "number" && durationSecs > 0
-      ? durationSecs
-      : null;
+    const knownDuration =
+      typeof durationSecs === "number" && durationSecs > 0
+        ? durationSecs
+        : null;
 
     const durationNote = knownDuration
       ? `CRITICAL: This recording is exactly ${toMMSS(knownDuration)} (${knownDuration} seconds) long. Every timestamp you produce MUST be between 00:00 and ${toMMSS(knownDuration)}. Any timestamp beyond ${toMMSS(knownDuration)} is wrong and must not appear.`
       : "Use only timestamps that fall within the actual duration of the recording.";
 
-    const transcriptInterval = knownDuration && knownDuration < 120
-      ? "every 5 to 10 seconds"   // short recording — dense transcript
-      : "every 20 to 30 seconds"; // longer recording — normal interval
+    const transcriptInterval =
+      knownDuration && knownDuration < 120
+        ? "every 5 to 10 seconds" // short recording — dense transcript
+        : "every 20 to 30 seconds"; // longer recording — normal interval
 
-    const chapterNote = knownDuration && knownDuration < 60
-      ? "Because this recording is under 1 minute, create only 1 chapter starting at 00:00 covering the full content."
-      : knownDuration && knownDuration < 180
-      ? "Because this recording is under 3 minutes, create 2 to 3 chapters maximum — only where genuine topic shifts occur."
-      : "Identify 4 to 8 natural topic breaks where the speaker genuinely shifts to a new idea.";
+    const chapterNote =
+      knownDuration && knownDuration < 60
+        ? "Because this recording is under 1 minute, create only 1 chapter starting at 00:00 covering the full content."
+        : knownDuration && knownDuration < 180
+          ? "Because this recording is under 3 minutes, create 2 to 3 chapters maximum — only where genuine topic shifts occur."
+          : "Identify 4 to 8 natural topic breaks where the speaker genuinely shifts to a new idea.";
 
     const prompt = `Listen to this entire recorded audio from start to finish.
 
@@ -188,14 +203,17 @@ IMPORTANT: Return ONLY a valid JSON object. No text before or after. No markdown
       console.error("Raw response (first 500 chars):", rawText.slice(0, 500));
       return NextResponse.json(
         { error: "Failed to parse chapters response. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!data?.chapters || !data?.transcripts) {
       return NextResponse.json(
-        { error: "Chapters and transcript were not generated correctly. Please try again." },
-        { status: 500 }
+        {
+          error:
+            "Chapters and transcript were not generated correctly. Please try again.",
+        },
+        { status: 500 },
       );
     }
 
@@ -203,27 +221,28 @@ IMPORTANT: Return ONLY a valid JSON object. No text before or after. No markdown
     data = clampToDuration(data, knownDuration);
 
     return NextResponse.json(data);
-
   } catch (error: any) {
     console.error("Chapters recording generation error:", error);
 
     if (error?.message?.includes("429") || error?.message?.includes("quota")) {
       return NextResponse.json(
         { error: "API quota exceeded. Please wait a moment and try again." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     if (error?.message?.includes("size") || error?.message?.includes("limit")) {
       return NextResponse.json(
-        { error: "Recording is too large to process. Try a shorter recording." },
-        { status: 413 }
+        {
+          error: "Recording is too large to process. Try a shorter recording.",
+        },
+        { status: 413 },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to generate chapters" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

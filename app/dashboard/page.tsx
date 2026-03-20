@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, ChangeEvent, DragEvent, useRef, useCallback } from "react";
+import { useState, useEffect, ChangeEvent, DragEvent, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FlashcardsForm from "@/components/FlashcardsForm";
@@ -17,6 +17,35 @@ interface UploadedFile {
   ext: string;
   progress: number;
   done: boolean;
+}
+
+// ─── Recent session types ─────────────────────────────────────────────────────
+
+interface RecentItem {
+  id:           string;
+  type:         "youtube" | "recording" | "quiz" | "flashcard" | "exam";
+  title:        string;
+  subtitle:     string;
+  last_visited: string;
+  href:         string;
+  videoId?:     string;
+}
+
+function timeAgo(dateStr: string): string {
+  const diff  = Date.now() - new Date(dateStr).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins  < 1)  return "just now";
+  if (mins  < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days  < 30) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+function extractVideoId(url: string): string | null {
+  const m = url.match(/(?:v=|youtu\.be\/|shorts\/|live\/|embed\/)([\w-]{11})/);
+  return m ? m[1] : null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -549,7 +578,7 @@ function RecordingModal({
         <div className="px-6 pb-6 pt-4 space-y-3">
           <button
             onClick={onMicrophone}
-            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-blue-400 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
           >
             <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 group-hover:bg-gray-200 transition-colors">
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -565,7 +594,7 @@ function RecordingModal({
 
           <button
             onClick={onBrowserTab}
-            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-blue-400 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-left group"
           >
             <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 group-hover:bg-gray-200 transition-colors">
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -584,15 +613,245 @@ function RecordingModal({
   );
 }
 
+// ─── Recent card with three-dot ──────────────────────────────────────────────
+
+function RecentCard({ item, onDelete, onRename }: {
+  item: RecentItem;
+  onDelete: (id: string, type: "youtube"|"recording") => Promise<void>;
+  onRename: (id: string, type: "youtube"|"recording", title: string) => Promise<void>;
+}) {
+  const [menuOpen,    setMenuOpen]    = useState(false);
+  const [menuPos,     setMenuPos]     = useState({ top: 0, right: 0 });
+  const [showRename,  setShowRename]  = useState(false);
+  const [showDelete,  setShowDelete]  = useState(false);
+  const [renameVal,   setRenameVal]   = useState(item.title);
+  const [saving,      setSaving]      = useState(false);
+  const [deleting,    setDeleting]    = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const router  = useRouter();
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+    if (menuOpen) document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [menuOpen]);
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md hover:border-gray-200 transition-all duration-200 group">
+      {/* Rename modal */}
+      {showRename && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => setShowRename(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-5 pb-2"><h3 className="text-base font-semibold text-gray-900">Rename</h3></div>
+            <div className="px-6 py-4">
+              <input type="text" value={renameVal} onChange={e => setRenameVal(e.target.value)} onKeyDown={async e => { if (e.key === "Enter") { setSaving(true); await onRename(item.id, item.type, renameVal.trim()); setSaving(false); setShowRename(false); }}} className="w-full px-3 py-2.5 text-sm text-gray-800 border border-gray-200 rounded-xl outline-none focus:border-blue-400 transition" autoFocus />
+            </div>
+            <div className="px-6 pb-5 flex justify-end gap-3">
+              <button onClick={() => setShowRename(false)} className="px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer">Cancel</button>
+              <button onClick={async () => { setSaving(true); await onRename(item.id, item.type, renameVal.trim()); setSaving(false); setShowRename(false); }} disabled={saving||!renameVal.trim()} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer disabled:opacity-60 flex items-center gap-2">
+                {saving && <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete modal */}
+      {showDelete && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => setShowDelete(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-5 pb-2">
+              <h3 className="text-base font-semibold text-gray-900">Delete session?</h3>
+              <p className="text-sm text-gray-400 mt-1">This cannot be undone.</p>
+            </div>
+            <div className="px-6 pb-5 pt-4 flex justify-end gap-3">
+              <button onClick={() => setShowDelete(false)} className="px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer">Cancel</button>
+              <button onClick={async () => { setDeleting(true); await onDelete(item.id, item.type); setDeleting(false); setShowDelete(false); }} disabled={deleting} className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl cursor-pointer disabled:opacity-60 flex items-center gap-2">
+                {deleting && <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Thumbnail */}
+      <div className="relative w-full bg-gray-100 overflow-hidden cursor-pointer" style={{ aspectRatio: "16/9" }} onClick={() => router.push(item.href)}>
+        {item.videoId ? (
+          <img src={`https://img.youtube.com/vi/${item.videoId}/mqdefault.jpg`} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        ) : (
+          <div className={`w-full h-full flex items-center justify-center ${
+            item.type==="quiz"?"bg-yellow-50":item.type==="flashcard"?"bg-orange-50":item.type==="exam"?"bg-indigo-50":"bg-blue-50"
+          }`}>
+            {item.type==="quiz" ? (
+              <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#EAB308" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            ) : item.type==="flashcard" ? (
+              <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#F97316" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            ) : item.type==="exam" ? (
+              <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#6366F1" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
+            ) : (
+              <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#3B82F6" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+            )}
+          </div>
+        )}
+        <div className="absolute top-1.5 left-1.5">
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+            item.type==="youtube"?"bg-red-500 text-white":
+            item.type==="quiz"?"bg-yellow-500 text-white":
+            item.type==="flashcard"?"bg-orange-500 text-white":
+            item.type==="exam"?"bg-indigo-500 text-white":
+            "bg-blue-500 text-white"
+          }`}>{item.type==="youtube"?"YT":item.type==="quiz"?"QZ":item.type==="flashcard"?"FC":item.type==="exam"?"EX":"REC"}</span>
+        </div>
+      </div>
+
+      {/* Info + three-dot */}
+      <div className="px-3 py-2 flex items-start justify-between gap-1">
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(item.href)}>
+          <p className="text-xs font-semibold text-gray-800 leading-snug line-clamp-1">{item.title}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{timeAgo(item.last_visited)}</p>
+        </div>
+        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+          <button
+            ref={menuRef as any}
+            onClick={e => {
+              e.stopPropagation();
+              if (menuRef.current) {
+                const r = (menuRef.current as HTMLElement).getBoundingClientRect();
+                setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+              }
+              setMenuOpen(o => !o);
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+          >
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+          </button>
+          {menuOpen && (
+            <div style={{ position:"fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }} className="w-36 bg-white border border-gray-200 rounded-xl shadow-xl py-1">
+              <button onClick={e => { e.stopPropagation(); setMenuOpen(false); setRenameVal(item.title); setShowRename(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                Rename
+              </button>
+              <button onClick={e => { e.stopPropagation(); setMenuOpen(false); setShowDelete(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-gray-50 cursor-pointer">
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const [youtubeLink, setYoutubeLink] = useState("");
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const closeModal = () => setActiveModal(null);
+
+  // ── Load 6 most recent sessions on mount ────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const [ytRes, recRes, quizRes, flashRes] = await Promise.all([
+        supabase
+          .from("youtube_sessions")
+          .select("id, url, video_title, last_visited")
+          .eq("user_id", user.id)
+          .order("last_visited", { ascending: false })
+          .limit(6),
+        supabase
+          .from("recording_sessions")
+          .select("id, mode, title, last_visited")
+          .eq("user_id", user.id)
+          .order("last_visited", { ascending: false })
+          .limit(6),
+        supabase
+          .from("quiz_sessions")
+          .select("id, file_name, last_visited, created_at")
+          .eq("user_id", user.id)
+          .in("status", ["ready","finished"])
+          .order("last_visited", { ascending: false })
+          .limit(6),
+        supabase
+          .from("flashcard_sessions")
+          .select("id, file_name, last_visited, created_at")
+          .eq("user_id", user.id)
+          .eq("status", "ready")
+          .order("last_visited", { ascending: false })
+          .limit(6),
+      ]);
+
+      const ytItems: RecentItem[] = (ytRes.data ?? []).map(s => ({
+        id:           s.id,
+        type:         "youtube",
+        title:        s.video_title || s.url.replace("https://", "").replace("www.", "").slice(0, 50),
+        subtitle:     s.url,
+        last_visited: s.last_visited,
+        href:         `/content/${s.id}?url=${encodeURIComponent(s.url)}&session_id=${s.id}`,
+        videoId:      extractVideoId(s.url) ?? undefined,
+      }));
+
+      const recItems: RecentItem[] = (recRes.data ?? []).map(s => ({
+        id:           s.id,
+        type:         "recording",
+        title:        s.title || `Recording — ${s.mode === "browsertab" ? "Browser Tab" : "Microphone"}`,
+        subtitle:     s.mode,
+        last_visited: s.last_visited,
+        href:         `/content/${s.id}?mode=${s.mode}&recording_session_id=${s.id}`,
+      }));
+
+      const quizItems: RecentItem[] = (quizRes.data ?? []).map(s => ({
+        id:           s.id,
+        type:         "quiz",
+        title:        s.file_name || "Quiz",
+        subtitle:     "quiz",
+        last_visited: s.last_visited || s.created_at,
+        href:         `/quiz/${s.id}`,
+      }));
+
+      const flashItems: RecentItem[] = (flashRes.data ?? []).map(s => ({
+        id:           s.id,
+        type:         "flashcard",
+        title:        s.file_name || "Flashcards",
+        subtitle:     "flashcard",
+        last_visited: s.last_visited || s.created_at,
+        href:         `/flashcards/${s.id}`,
+      }));
+
+      const { data: examRes } = await supabase
+        .from("exam_sessions")
+        .select("id, source, source_label, last_visited, created_at")
+        .eq("user_id", user.id)
+        .order("last_visited", { ascending: false })
+        .limit(6);
+
+      const examItems: RecentItem[] = (examRes ?? []).map(s => ({
+        id:           s.id,
+        type:         "exam",
+        title:        s.source_label || "Exam",
+        subtitle:     s.source,
+        last_visited: s.last_visited || s.created_at,
+        href:         `/dashboard/exam-mode?session_id=${s.id}`,
+      }));
+
+      const all = [...ytItems, ...recItems, ...quizItems, ...flashItems, ...examItems]
+        .sort((a, b) => new Date(b.last_visited).getTime() - new Date(a.last_visited).getTime())
+        .slice(0, 6);
+
+      setRecentItems(all);
+      setRecentLoading(false);
+    })();
+  }, []);
 
   // ✅ handleSubmit: creates a Supabase session for YouTube URLs, falls back
   //    to random ID for chat/file queries (no session needed there)
@@ -766,6 +1025,37 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Recent cards grid */}
+      {recentLoading ? (
+        <div className="w-full max-w-2xl flex flex-col items-center justify-center py-10 mb-8 gap-3">
+          <svg className="w-5 h-5 animate-spin text-gray-300" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
+          <p className="text-sm text-gray-400">Loading recent sessions…</p>
+        </div>
+      ) : recentItems.length > 0 && (
+        <div className="w-full max-w-2xl grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+          {recentItems.map(item => (
+            <RecentCard
+              key={item.id}
+              item={item}
+              onDelete={async (id, type) => {
+                const t:Record<string,string> = { youtube:"youtube_sessions", recording:"recording_sessions", quiz:"quiz_sessions", flashcard:"flashcard_sessions", exam:"exam_sessions" };
+                await supabase.from(t[type]).delete().eq("id", id);
+                setRecentItems(prev => prev.filter(i => i.id !== id));
+              }}
+              onRename={async (id, type, newTitle) => {
+                const t:Record<string,string> = { youtube:"youtube_sessions", recording:"recording_sessions", quiz:"quiz_sessions", flashcard:"flashcard_sessions", exam:"exam_sessions" };
+                const f:Record<string,string> = { youtube:"video_title", recording:"title", quiz:"file_name", flashcard:"file_name", exam:"source_label" };
+                await supabase.from(t[type]).update({ [f[type]]: newTitle }).eq("id", id);
+                setRecentItems(prev => prev.map(i => i.id === id ? { ...i, title: newTitle } : i));
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Modals */}
       {activeModal === "quiz" && <QuizForm onClose={closeModal} />}

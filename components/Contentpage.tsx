@@ -5,6 +5,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import Sidebar from "@/components/Sidebar";
 
 type Mode = "youtube" | "microphone" | "browsertab";
 type ActiveTool = "summary" | "quiz" | "flashcards" | "exams" | null;
@@ -334,6 +335,199 @@ function FlashcardsContent({ cards, loading, error, isRec = false }: { cards: Fl
   );
 }
 
+// ── Message action buttons (copy, thumbs up/down, three-dot menu) ────────────
+function MessageActions({
+  message, onThumbUp, onThumbDown, onMenuAction, showMenu = true,
+}: {
+  message: string;
+  onThumbUp: () => void;
+  onThumbDown: () => void;
+  onMenuAction: (action: "quiz" | "flashcards" | "exams") => void;
+  showMenu?: boolean;
+}) {
+  const [copied, setCopied]     = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [thumbState, setThumbState] = useState<"up" | "down" | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-1 mt-1.5">
+      {/* Copy */}
+      <button
+        onClick={handleCopy}
+        title="Copy"
+        className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+      >
+        {copied ? (
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        )}
+      </button>
+
+      {/* Thumb up */}
+      <button
+        onClick={() => { setThumbState("up"); onThumbUp(); }}
+        title="Good response"
+        className={`w-7 h-7 flex items-center justify-center rounded-lg transition cursor-pointer ${thumbState === "up" ? "text-blue-600 bg-blue-50" : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"}`}
+      >
+        <svg width="14" height="14" fill={thumbState === "up" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+        </svg>
+      </button>
+
+      {/* Thumb down */}
+      <button
+        onClick={() => { setThumbState("down"); onThumbDown(); }}
+        title="Bad response"
+        className={`w-7 h-7 flex items-center justify-center rounded-lg transition cursor-pointer ${thumbState === "down" ? "text-red-500 bg-red-50" : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"}`}
+      >
+        <svg width="14" height="14" fill={thumbState === "down" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+        </svg>
+      </button>
+
+      {/* Three-dot menu — only shown in general chat, not YouTube/recording */}
+      {showMenu && <div className="relative" ref={menuRef}>
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          title="More options"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+        >
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+          </svg>
+        </button>
+        {menuOpen && (
+          <div className="absolute left-0 bottom-8 z-50 w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-1 overflow-hidden">
+            {[
+              { key: "quiz"      as const, label: "Generate Quiz",       icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
+              { key: "flashcards"as const, label: "Generate Flashcards", icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" },
+              { key: "exams"     as const, label: "Exam Mode",           icon: "M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => { setMenuOpen(false); onMenuAction(item.key); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer text-left"
+              >
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                </svg>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>}
+    </div>
+  );
+}
+
+// ── Toast notification ───────────────────────────────────────────────────────
+function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2500);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div className="fixed top-4 right-4 z-[300] flex items-center gap-2.5 px-4 py-3 bg-gray-900 text-white text-sm font-medium rounded-xl shadow-xl animate-in">
+      <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+      {message}
+    </div>
+  );
+}
+
+// ── Feedback modal (thumb up / down) ─────────────────────────────────────────
+function FeedbackModal({
+  type, onClose, onSubmit,
+}: {
+  type: "up" | "down";
+  onClose: () => void;
+  onSubmit: (note: string) => void;
+}) {
+  const [note, setNote]         = useState("");
+  const [loading, setLoading]   = useState(false);
+  const isPositive = type === "up";
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    await new Promise((r) => setTimeout(r, 400)); // slight delay so spinner shows
+    onSubmit(note);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="px-6 pt-6 pb-2">
+          <h3 className="text-base font-semibold text-gray-900">
+            {isPositive ? "What was helpful?" : "What went wrong?"}
+          </h3>
+          {!isPositive && (
+            <p className="text-xs text-gray-400 mt-1">Help us improve</p>
+          )}
+        </div>
+        <div className="px-6 py-4">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={4}
+            placeholder={isPositive ? "What was satisfying about this response?" : "What was unsatisfying about this response?"}
+            className="w-full px-3 py-2.5 text-sm text-gray-700 border border-gray-200 rounded-xl outline-none resize-none focus:border-blue-400 transition placeholder-gray-300"
+            autoFocus
+            disabled={loading}
+          />
+        </div>
+        <div className="px-6 pb-6 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition cursor-pointer disabled:opacity-70 flex items-center gap-2"
+          >
+            {loading && (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            )}
+            {loading ? "Submitting…" : "Submit"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RightSidebar({
   open, onToggle, mode, isChat, activeTool, onToolClick, onBack,
   summary, summaryLoading, summaryError,
@@ -342,6 +536,8 @@ function RightSidebar({
   chatMessages,
   chatInput, setChatInput, onChatSend, chatLoading,
   recordingReady = false,
+  onFeedback,
+  onMenuAction,
 }: {
   open: boolean; onToggle: () => void; mode: Mode; isChat: boolean;
   activeTool: ActiveTool; onToolClick: (tool: ActiveTool) => void; onBack: () => void;
@@ -351,10 +547,14 @@ function RightSidebar({
   chatMessages: { role: "user" | "ai"; message: string }[];
   chatInput: string; setChatInput: (v: string) => void; onChatSend: () => void; chatLoading: boolean;
   recordingReady?: boolean;
+  onFeedback: (message: string, type: "up" | "down", note: string) => void;
+  onMenuAction: (action: "quiz" | "flashcards" | "exams") => void;
 }) {
   const isRecording = mode === "microphone" || mode === "browsertab";
   const [isListening, setIsListening] = useState(false);
   const [isChatMode, setIsChatMode] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState<{ type: "up" | "down"; message: string } | null>(null);
+  const [showToast, setShowToast] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -396,6 +596,19 @@ function RightSidebar({
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
+      )}
+
+      {showToast && <Toast message="Feedback submitted — thank you!" onDone={() => setShowToast(false)} />}
+
+      {feedbackModal && (
+        <FeedbackModal
+          type={feedbackModal.type}
+          onClose={() => setFeedbackModal(null)}
+          onSubmit={(note) => {
+            onFeedback(feedbackModal.message, feedbackModal.type, note);
+            setShowToast(true);
+          }}
+        />
       )}
 
       <div className={`relative flex flex-col border-l border-gray-200 bg-white transition-all duration-300 ease-in-out shrink-0 ${open ? "w-130" : "w-0 overflow-hidden"}`}>
@@ -454,11 +667,19 @@ function RightSidebar({
                       <p className="text-sm text-gray-800 leading-relaxed max-w-[90%]">
                         {msg.message}
                       </p>
+                      {msg.role === "ai" && (
+                        <MessageActions
+                          message={msg.message}
+                          onThumbUp={() => setFeedbackModal({ type: "up", message: msg.message })}
+                          onThumbDown={() => setFeedbackModal({ type: "down", message: msg.message })}
+                          onMenuAction={onMenuAction}
+                          showMenu={false}
+                        />
+                      )}
                     </div>
                   ))}
                   {chatLoading && (
                     <div className="flex flex-col items-start gap-1">
-                      <span className="text-[10px] text-gray-400 px-1">AI</span>
                       <div className="flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0ms" }} />
                         <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -973,33 +1194,56 @@ function RecordingView({ mode, onAudioReady, onChaptersReady }: {
 }
 
 function ChatView({ initialQuery, uploadedFile }: { initialQuery: string; uploadedFile: string }) {
+  const router = useRouter();
   const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>(() => {
     const msgs: { role: "user" | "ai"; text: string }[] = [];
     if (uploadedFile) {
       msgs.push({ role: "user", text: `Uploaded: ${uploadedFile}` });
-      msgs.push({ role: "ai", text: `I've received your file **${uploadedFile}**. What would you like to do?` });
+      msgs.push({ role: "ai", text: `I've received your file ${uploadedFile}. What would you like to do with it? I can help summarise, explain, or quiz you on the content.` });
     } else if (initialQuery) {
       msgs.push({ role: "user", text: initialQuery });
-      msgs.push({ role: "ai", text: `Hi! I'm your AI study assistant. You said: "${initialQuery}". How can I help you study this topic?` });
-    } else {
-      msgs.push({ role: "ai", text: "Hi! I'm your AI study assistant. Paste a YouTube link, upload a document, or ask me anything to get started." });
     }
     return msgs;
   });
-  const [input, setInput] = useState("");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [input, setInput]       = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState<{ type: "up" | "down"; message: string } | null>(null);
+  const bottomRef   = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  const sendMessage = () => {
+  // If there's an initial query send it to the AI on mount
+  useEffect(() => {
+    if (initialQuery && messages.length === 1) {
+      sendToAI(initialQuery);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sendToAI = async (question: string) => {
+    setLoading(true);
+    try {
+      const history = messages.slice(-6).map((m) => ({ role: m.role, message: m.text }));
+      const res = await fetch("/api/chat-general", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, history }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setMessages((prev) => [...prev, { role: "ai", text: data.answer }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "ai", text: "Sorry, something went wrong. Please try again." }]);
+    } finally { setLoading(false); }
+  };
+
+  const sendMessage = async () => {
     const text = input.trim();
-    if (!text) return;
-    setMessages((prev) => [...prev,
-      { role: "user", text },
-      { role: "ai", text: `Got it! Working on: "${text}". This is where the AI response will appear once connected to your backend.` },
-    ]);
+    if (!text || loading) return;
+    setMessages((prev) => [...prev, { role: "user", text }]);
     setInput("");
+    await sendToAI(text);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1007,35 +1251,57 @@ function ChatView({ initialQuery, uploadedFile }: { initialQuery: string; upload
     if (!file) return;
     setMessages((prev) => [...prev,
       { role: "user", text: `Uploaded: ${file.name}` },
-      { role: "ai", text: `I've received **${file.name}**. What would you like to do?` },
+      { role: "ai", text: `I've received ${file.name}. What would you like to do with it?` },
     ]);
     e.target.value = "";
   };
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+      {showToast && <Toast message="Feedback submitted — thank you!" onDone={() => setShowToast(false)} />}
+      {feedbackModal && (
+        <FeedbackModal
+          type={feedbackModal.type}
+          onClose={() => setFeedbackModal(null)}
+          onSubmit={(note) => { setShowToast(true); }}
+        />
+      )}
+      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} gap-3`}>
-            {msg.role === "ai" && (
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-            )}
-            <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user" ? "bg-gray-900 text-white rounded-tr-sm" : "bg-gray-50 border border-gray-100 text-gray-700 rounded-tl-sm"}`}>
+          <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+            <p className="text-sm text-gray-800 leading-relaxed max-w-[90%]">
               {msg.text}
-            </div>
-            {msg.role === "user" && (
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mt-0.5">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#6B7280" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
+            </p>
+            {msg.role === "ai" && (
+              <MessageActions
+                message={msg.text}
+                onThumbUp={() => setFeedbackModal({ type: "up", message: msg.text })}
+                onThumbDown={() => setFeedbackModal({ type: "down", message: msg.text })}
+                onMenuAction={(action) => {
+                  // In general chat there's no source material to generate from.
+                  // Send the user to the dashboard to pick a proper source first.
+                  if (action === "exams") {
+                    router.push("/dashboard/exam-mode");
+                  } else {
+                    setMessages((prev) => [...prev, {
+                      role: "ai",
+                      text: `To generate ${action === "quiz" ? "a quiz" : "flashcards"}, please start from the dashboard by pasting a YouTube link or recording a lecture. That gives me the source material to work from.`,
+                    }]);
+                  }
+                }}
+              />
             )}
           </div>
         ))}
+        {loading && (
+          <div className="flex flex-col items-start">
+            <div className="flex items-center gap-1.5 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
       <div className="px-6 py-4 border-t border-gray-100 bg-white shrink-0">
@@ -1046,12 +1312,27 @@ function ChatView({ initialQuery, uploadedFile }: { initialQuery: string; upload
             </svg>
           </button>
           <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.mp3,.wav,.m4a" className="hidden" onChange={handleFileUpload} />
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMessage()} placeholder="Ask anything, or paste a YouTube link..." className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none" />
-          <button type="button" onClick={sendMessage} disabled={!input.trim()} className="w-8 h-8 shrink-0 rounded-xl bg-blue-600 disabled:bg-gray-200 flex items-center justify-center transition-colors cursor-pointer">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            placeholder="Ask anything…"
+            disabled={loading}
+            className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none"
+          />
+          {loading ? (
+            <svg className="w-4 h-4 animate-spin text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
-          </button>
+          ) : (
+            <button type="button" onClick={sendMessage} disabled={!input.trim()} className="w-8 h-8 shrink-0 rounded-xl bg-blue-600 disabled:bg-gray-200 flex items-center justify-center transition-colors cursor-pointer">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1059,6 +1340,27 @@ function ChatView({ initialQuery, uploadedFile }: { initialQuery: string; upload
 }
 
 // ── Supabase persistence helpers ───────────────────────────────────────────────
+
+// ── Feedback persistence ──────────────────────────────────────────────────────
+async function persistFeedback(
+  userId: string,
+  messageText: string,
+  type: "up" | "down",
+  note: string,
+  sessionId: string,
+  isRec: boolean
+) {
+  const col = isRec ? { recording_session_id: sessionId } : { session_id: sessionId };
+  try {
+    await supabase.from("message_feedback").insert({
+      user_id:      userId,
+      message_text: messageText.slice(0, 1000),
+      feedback_type: type,
+      note,
+      ...col,
+    });
+  } catch { /* non-critical — fail silently */ }
+}
 
 // ── Session ID helper ─────────────────────────────────────────────────────────
 // YouTube rows use "session_id", recording rows use "recording_session_id"
@@ -1278,20 +1580,43 @@ export default function Contentpages() {
       if (user) {
         userIdRef.current = user.id;
 
-        // Update video title on the session row when it becomes available
-        if (sessionId && videoTitle) {
-          await supabase
-            .from("youtube_sessions")
-            .update({ video_title: videoTitle })
-            .eq("id", sessionId);
-        }
-
         // Pre-load any previously generated data for this session
         if (sessionId) {
+          // Update last_visited timestamp so this appears first in history
+          await supabase
+            .from("youtube_sessions")
+            .update({ last_visited: new Date().toISOString() })
+            .eq("id", sessionId);
+
           const [cached, chatHistory, cachedChapters] = await Promise.all([
             loadCachedData(sessionId, false),
             loadChatMessages(sessionId, false),
             loadCachedChaptersAndTranscripts(sessionId, false),
+          ]);
+          // Restore all previously generated content — survives refresh
+          if (cached.summary)                    setSummary(cached.summary);
+          if (cached.quizQuestions.length)       setQuizQuestions(cached.quizQuestions);
+          if (cached.flashcards.length)          setFlashcards(cached.flashcards);
+          if (chatHistory.length)                setChatMessages(chatHistory);
+          if (cachedChapters.chapters.length)    setChapters(cachedChapters.chapters);
+          if (cachedChapters.transcripts.length) setTranscripts(cachedChapters.transcripts);
+        }
+
+        // For recording sessions coming from history, load by recording_session_id param
+        const recSidParam = (new URLSearchParams(window.location.search)).get("recording_session_id");
+        if (recSidParam && !sessionId) {
+          // Update last_visited for recording
+          await supabase
+            .from("recording_sessions")
+            .update({ last_visited: new Date().toISOString() })
+            .eq("id", recSidParam);
+
+          setRecordingSessionId(recSidParam);
+
+          const [cached, chatHistory, cachedChapters] = await Promise.all([
+            loadCachedData(recSidParam, true),
+            loadChatMessages(recSidParam, true),
+            loadCachedChaptersAndTranscripts(recSidParam, true),
           ]);
           if (cached.summary)                    setSummary(cached.summary);
           if (cached.quizQuestions.length)       setQuizQuestions(cached.quizQuestions);
@@ -1603,6 +1928,20 @@ export default function Contentpages() {
     : isChat ? (initialQuery || uploadedFile || "Chat")
     : url ? url.replace("https://", "").replace("www.", "").slice(0, 70) : "Content";
 
+  // When in chat mode (came from dashboard input), show the dashboard sidebar
+  if (isChat) {
+    return (
+      <div className="flex h-screen bg-white overflow-hidden">
+        <Sidebar />
+        <div className="flex flex-col flex-1 overflow-hidden ml-[90px]">
+          <div className="flex flex-1 overflow-hidden min-w-0">
+            <ChatView initialQuery={initialQuery} uploadedFile={uploadedFile} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       <header className="h-12 flex items-center justify-between px-4 border-b border-gray-200 bg-white shrink-0">
@@ -1638,32 +1977,54 @@ export default function Contentpages() {
                 if (userId) {
                   const { data: recSession } = await supabase
                     .from("recording_sessions")
-                    .insert({ user_id: userId, mode: mode as "microphone" | "browsertab" })
+                    .insert({
+                      user_id:      userId,
+                      mode:         mode as "microphone" | "browsertab",
+                      last_visited: new Date().toISOString(),
+                    })
                     .select("id")
                     .single();
                   if (recSession?.id) setRecordingSessionId(recSession.id);
                 }
               }}
-              onChaptersReady={(ch, tr) => {
+              onChaptersReady={async (ch, tr) => {
                 setChapters(ch);
                 setTranscripts(tr);
+                // Save first chapter title as recording session title
+                if (ch.length > 0 && recordingSessionId) {
+                  await supabase
+                    .from("recording_sessions")
+                    .update({ title: ch[0].title, last_visited: new Date().toISOString() })
+                    .eq("id", recordingSessionId);
+                }
               }}
             />
           )}
-          {isChat && <ChatView initialQuery={initialQuery} uploadedFile={uploadedFile} />}
         </div>
 
-        <RightSidebar
-          open={sidebarOpen} onToggle={() => setSidebarOpen((o) => !o)}
-          mode={mode} isChat={isChat}
-          activeTool={activeTool} onToolClick={handleToolClick} onBack={() => setActiveTool(null)}
-          summary={summary} summaryLoading={summaryLoading} summaryError={summaryError}
-          quizQuestions={quizQuestions} quizLoading={quizLoading} quizError={quizError}
-          flashcards={flashcards} flashcardsLoading={flashcardsLoading} flashcardsError={flashcardsError}
-          chatMessages={chatMessages}
-          chatInput={chatInput} setChatInput={setChatInput} onChatSend={handleChatSend} chatLoading={chatLoading}
-          recordingReady={!!recordingAudioRef.current}
-        />
+        {!isChat && (
+          <RightSidebar
+            open={sidebarOpen} onToggle={() => setSidebarOpen((o) => !o)}
+            mode={mode} isChat={isChat}
+            activeTool={activeTool} onToolClick={handleToolClick} onBack={() => setActiveTool(null)}
+            summary={summary} summaryLoading={summaryLoading} summaryError={summaryError}
+            quizQuestions={quizQuestions} quizLoading={quizLoading} quizError={quizError}
+            flashcards={flashcards} flashcardsLoading={flashcardsLoading} flashcardsError={flashcardsError}
+            chatMessages={chatMessages}
+            chatInput={chatInput} setChatInput={setChatInput} onChatSend={handleChatSend} chatLoading={chatLoading}
+            recordingReady={!!recordingAudioRef.current}
+            onFeedback={async (message, type, note) => {
+              const userId = userIdRef.current;
+              const sid = isRec ? recordingSessionId : sessionId;
+              if (userId && sid) await persistFeedback(userId, message, type, note, sid, isRec);
+            }}
+            onMenuAction={(action) => {
+              // Route to the correct tool — uses the existing session (YouTube URL
+              // or recording audio) so generation works properly
+              handleToolClick(action as any);
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -3,8 +3,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import ExamModeModal from "@/components/ExamModeModal";
+import { supabase } from "@/lib/supabase";
 
 interface MCQQuestion {
   id: number; question: string;
@@ -136,54 +137,246 @@ function ReadyScreen({ label, onStart }: { label: string; onStart: () => void })
   );
 }
 
-// ─── Results Screen (unchanged from original) ─────────────────────────────────
+// ─── Results Screen ───────────────────────────────────────────────────────────
 function ResultsScreen({ exam, mcqAnswers, fillAnswers, writtenAnswers, timeUsed, timedOut, onRetake, sourceUrl, isRecording }: {
   exam: ExamData; mcqAnswers: Record<number, "A"|"B"|"C"|"D">; fillAnswers: Record<number, string>;
   writtenAnswers: Record<number, string>; timeUsed: number; timedOut: boolean; onRetake: () => void;
   sourceUrl?: string; isRecording?: boolean;
 }) {
-  const mcqCorrect   = exam.mcq.filter((q) => mcqAnswers[q.id] === q.correctAnswer).length;
-  const fillCorrect  = exam.fillInBlank.filter((q) => (fillAnswers[q.id] ?? "").trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()).length;
+  const mcqCorrect       = exam.mcq.filter((q) => mcqAnswers[q.id] === q.correctAnswer).length;
+  const fillCorrect      = exam.fillInBlank.filter((q) => (fillAnswers[q.id] ?? "").trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()).length;
   const writtenAttempted = exam.written.filter((q) => (writtenAnswers[q.id] ?? "").trim().length > 10).length;
-  const objTotal = exam.mcq.length + exam.fillInBlank.length;
-  const objScore = mcqCorrect + fillCorrect;
-  const pct      = Math.round((objScore / objTotal) * 100);
-  const grade    = pct >= 85 ? { label: "Distinction", color: "text-blue-600" } : pct >= 70 ? { label: "Merit", color: "text-green-600" } : pct >= 55 ? { label: "Pass", color: "text-yellow-600" } : { label: "Fail", color: "text-red-600" };
-  const ringColor = pct >= 70 ? "#2563EB" : pct >= 55 ? "#EAB308" : "#EF4444";
-  const radius = 42; const circ = 2 * Math.PI * radius;
-  const [openWritten, setOpenWritten] = useState<number | null>(null);
+  const objTotal  = exam.mcq.length + exam.fillInBlank.length;
+  const objScore  = mcqCorrect + fillCorrect;
+  const pct       = Math.round((objScore / objTotal) * 100);
+  const grade     = pct >= 85 ? { label: "Distinction", color: "text-blue-600",   ring: "#2563EB" }
+                  : pct >= 70 ? { label: "Merit",       color: "text-green-600",  ring: "#16a34a" }
+                  : pct >= 55 ? { label: "Pass",         color: "text-yellow-600", ring: "#EAB308" }
+                  :             { label: "Fail",          color: "text-red-600",    ring: "#EF4444" };
+  const radius = 54; const circ = 2 * Math.PI * radius;
+  const [tab, setTab] = useState<"mcq"|"fill"|"written">("mcq");
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-12">
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          {timedOut && (<div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium mb-4"><ClockIcon cls="w-4 h-4" />Time ran out — answers submitted automatically</div>)}
+    <main className="min-h-screen bg-gray-50 px-4 py-10">
+      <div className="max-w-3xl mx-auto">
+
+        {/* Header */}
+        <div className="text-center mb-6">
+          {timedOut && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium mb-4">
+              <ClockIcon cls="w-4 h-4" />Time ran out — answers submitted automatically
+            </div>
+          )}
           <h1 className="text-3xl font-semibold text-gray-900 mb-1">Exam Results</h1>
           <p className="text-gray-400 text-sm">Time used: <span className="font-medium text-gray-600">{fmt(timeUsed)}</span></p>
         </div>
-        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8 text-center mb-6">
-          <div className="relative w-36 h-36 mx-auto mb-4">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r={radius} stroke="#F3F4F6" strokeWidth="10" fill="none" />
-              <circle cx="50" cy="50" r={radius} stroke={ringColor} strokeWidth="10" fill="none" strokeDasharray={`${circ}`} strokeDashoffset={`${circ * (1 - pct / 100)}`} strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s ease" }} />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-2xl font-bold ${grade.color}`}>{pct}%</span>
-              <span className="text-xs text-gray-400">Score</span>
+
+        {/* Score card */}
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8 mb-5">
+          <div className="flex flex-col sm:flex-row items-center gap-8">
+            {/* Ring */}
+            <div className="relative shrink-0">
+              <svg width="140" height="140" viewBox="0 0 140 140" className="-rotate-90">
+                <circle cx="70" cy="70" r={radius} fill="none" stroke="#f3f4f6" strokeWidth="12" />
+                <circle cx="70" cy="70" r={radius} fill="none" stroke={grade.ring} strokeWidth="12"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(pct/100)*circ} ${circ}`}
+                  style={{ transition: "stroke-dasharray 1s ease" }} />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-3xl font-bold ${grade.color}`}>{pct}%</span>
+                <span className="text-xs text-gray-400 mt-0.5">Score</span>
+              </div>
+            </div>
+            {/* Stats */}
+            <div className="flex-1 w-full">
+              <h2 className={`text-2xl font-semibold ${grade.color} mb-1`}>{grade.label}</h2>
+              <p className="text-sm text-gray-400 mb-5">Objective score: {objScore} / {objTotal}</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                  <p className="text-xl font-bold text-gray-900">{mcqCorrect}/{exam.mcq.length}</p>
+                  <p className="text-xs text-gray-400 mt-1">MCQ</p>
+                </div>
+                <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                  <p className="text-xl font-bold text-gray-900">{fillCorrect}/{exam.fillInBlank.length}</p>
+                  <p className="text-xs text-gray-400 mt-1">Fill-in</p>
+                </div>
+                <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                  <p className="text-xl font-bold text-gray-900">{writtenAttempted}/{exam.written.length}</p>
+                  <p className="text-xs text-gray-400 mt-1">Written</p>
+                </div>
+              </div>
             </div>
           </div>
-          <h2 className={`text-2xl font-semibold ${grade.color} mb-1`}>{grade.label}</h2>
-          <p className="text-gray-400 text-sm">Objective score: {objScore} / {objTotal}</p>
-          <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100">
-            <div><p className="text-xl font-bold text-gray-900">{mcqCorrect}/{exam.mcq.length}</p><p className="text-xs text-gray-400">MCQ</p></div>
-            <div><p className="text-xl font-bold text-gray-900">{fillCorrect}/{exam.fillInBlank.length}</p><p className="text-xs text-gray-400">Fill-in</p></div>
-            <div><p className="text-xl font-bold text-gray-900">{writtenAttempted}/{exam.written.length}</p><p className="text-xs text-gray-400">Written</p></div>
-          </div>
         </div>
-        {/* MCQ, Fill, Written review sections — identical to original */}
+
+        {/* Section tabs */}
+        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-2xl p-1 mb-5">
+          {([
+            {v:"mcq"     as const, l:`MCQ · ${mcqCorrect}/${exam.mcq.length} correct`},
+            {v:"fill"    as const, l:`Fill-in · ${fillCorrect}/${exam.fillInBlank.length} correct`},
+            {v:"written" as const, l:`Written · ${writtenAttempted}/${exam.written.length} attempted`},
+          ]).map(t=>(
+            <button key={t.v} onClick={()=>setTab(t.v)} className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${tab===t.v?"bg-gray-900 text-white":"text-gray-500 hover:text-gray-700"}`}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+
+        {/* MCQ review */}
+        {tab==="mcq" && (
+          <div className="space-y-4 mb-6">
+            {exam.mcq.map((q,i)=>{
+              const sel = mcqAnswers[q.id];
+              const answered = sel !== undefined;
+              return (
+                <div key={q.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-medium text-gray-400">Q{i+1}</span>
+                      <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{q.category}</span>
+                      {answered
+                        ? sel===q.correctAnswer
+                          ? <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">✓ Correct</span>
+                          : <span className="text-[10px] px-2 py-0.5 bg-red-100 text-red-600 rounded-full font-semibold">✗ Wrong</span>
+                        : <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full">Skipped</span>
+                      }
+                    </div>
+                    <p className="text-sm font-medium text-gray-800 leading-relaxed">{q.question}</p>
+                  </div>
+                  <div className="px-5 py-3 space-y-2">
+                    {(["A","B","C","D"] as const).map(key=>{
+                      const isCorrect  = key===q.correctAnswer;
+                      const isSelected = key===sel;
+                      let cls = "border-gray-100 bg-white text-gray-400";
+                      if (isCorrect)        cls = "border-green-400 bg-green-50 text-green-800";
+                      else if (isSelected)  cls = "border-red-400 bg-red-50 text-red-700";
+                      return (
+                        <div key={key} className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 ${cls}`}>
+                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${isCorrect?"bg-green-500 text-white":isSelected?"bg-red-400 text-white":"bg-gray-100 text-gray-400"}`}>{key}</span>
+                          <span className="text-sm flex-1">{q.options[key]}</span>
+                          {isCorrect  && <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>}
+                          {isSelected && !isCorrect && <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {q.explanation && (
+                    <div className="px-5 pb-4">
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                        <p className="text-xs font-semibold text-blue-800 mb-1">Explanation</p>
+                        <p className="text-xs text-blue-700 leading-relaxed">{q.explanation}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Fill-in review */}
+        {tab==="fill" && (
+          <div className="space-y-4 mb-6">
+            {exam.fillInBlank.map((q,i)=>{
+              const given   = (fillAnswers[q.id]??"").trim();
+              const correct = given.toLowerCase()===q.correctAnswer.trim().toLowerCase();
+              const answered = given.length > 0;
+              const parts = q.question.split("[BLANK]");
+              return (
+                <div key={q.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-medium text-gray-400">Q{exam.mcq.length+i+1}</span>
+                      <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{q.category}</span>
+                      {answered
+                        ? correct
+                          ? <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">✓ Correct</span>
+                          : <span className="text-[10px] px-2 py-0.5 bg-red-100 text-red-600 rounded-full font-semibold">✗ Wrong</span>
+                        : <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full">Skipped</span>
+                      }
+                    </div>
+                    <p className="text-sm font-medium text-gray-800 leading-relaxed">
+                      {parts[0]}
+                      <span className={`inline-block mx-1.5 px-3 py-0.5 rounded border-b-2 text-sm font-semibold min-w-[80px] text-center ${correct?"bg-green-50 border-green-400 text-green-700":answered?"bg-red-50 border-red-400 text-red-700":"bg-gray-50 border-gray-300 text-gray-400"}`}>
+                        {given||"___"}
+                      </span>
+                      {parts[1]}
+                    </p>
+                  </div>
+                  <div className="px-5 py-3 space-y-2">
+                    {!correct && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">Correct answer:</span>
+                        <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full">{q.correctAnswer}</span>
+                      </div>
+                    )}
+                    {q.explanation && (
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mt-1">
+                        <p className="text-xs font-semibold text-blue-800 mb-1">Explanation</p>
+                        <p className="text-xs text-blue-700 leading-relaxed">{q.explanation}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Written review */}
+        {tab==="written" && (
+          <div className="space-y-4 mb-6">
+            {exam.written.map((q,i)=>{
+              const given    = writtenAnswers[q.id]??"";
+              const attempted = given.trim().length > 10;
+              return (
+                <div key={q.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-medium text-gray-400">Q{exam.mcq.length+exam.fillInBlank.length+i+1}</span>
+                      <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{q.category}</span>
+                      {attempted
+                        ? <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-semibold">Attempted</span>
+                        : <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full">Skipped</span>
+                      }
+                    </div>
+                    <p className="text-sm font-medium text-gray-800 leading-relaxed">{q.question}</p>
+                  </div>
+                  <div className="px-5 py-4 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Your Answer</p>
+                      <div className={`px-4 py-3 rounded-xl text-sm leading-relaxed border ${attempted?"bg-gray-50 text-gray-700 border-gray-100":"bg-gray-50 text-gray-400 italic border-gray-100"}`}>
+                        {given||"No answer provided"}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Model Answer</p>
+                      <div className="bg-green-50 border border-green-100 px-4 py-3 rounded-xl text-sm text-green-800 leading-relaxed">{q.modelAnswer}</div>
+                    </div>
+                    {q.keyPoints?.length>0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Key Points</p>
+                        <ul className="space-y-1">
+                          {q.keyPoints.map((kp,ki)=>(
+                            <li key={ki} className="flex items-start gap-2 text-xs text-gray-600">
+                              <span className="text-green-500 shrink-0">•</span>{kp}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Actions */}
         <div className="flex gap-3">
-          <button onClick={onRetake} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white font-semibold rounded-xl text-sm cursor-pointer">New Exam</button>
-          <Link href="/dashboard" className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold rounded-xl text-sm text-center transition-all cursor-pointer">Dashboard</Link>
+          <button onClick={onRetake} className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white font-semibold rounded-2xl text-sm cursor-pointer">New Exam</button>
+          <Link href="/dashboard" className="flex-1 py-3.5 border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold rounded-2xl text-sm text-center transition-all cursor-pointer flex items-center justify-center">Dashboard</Link>
         </div>
       </div>
     </main>
@@ -193,15 +386,19 @@ function ResultsScreen({ exam, mcqAnswers, fillAnswers, writtenAnswers, timeUsed
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ExamModePage() {
   const searchParams = useSearchParams();
-  const youtubeUrl       = searchParams.get("url")    ?? "";
-  const source           = searchParams.get("source") ?? "";
-  const isYoutubeSource  = source === "youtube" && !!youtubeUrl;
+  const youtubeUrl        = searchParams.get("url")        ?? "";
+  const source            = searchParams.get("source")     ?? "";
+  const reviewSessionId   = searchParams.get("session_id") ?? "";
+  const isYoutubeSource   = source === "youtube" && !!youtubeUrl;
   const isRecordingSource = source === "recording";
+  const isReview          = !!reviewSessionId;
 
-  const [phase, setPhase]     = useState<Phase>(isYoutubeSource || isRecordingSource ? "loading" : "modal");
+  const router = useRouter();
+  const [phase, setPhase]     = useState<Phase>(isYoutubeSource || isRecordingSource || isReview ? "loading" : "modal");
   const [exam, setExam]       = useState<ExamData | null>(null);
   const [label, setLabel]     = useState(isYoutubeSource ? youtubeUrl.replace("https://","").replace("www.","").slice(0,60) : isRecordingSource ? "Your recording" : "");
   const [error, setError]     = useState("");
+  const examSessionIdRef      = useRef<string>("");
 
   const [mcqAnswers,     setMcqAnswers]     = useState<Record<number, "A"|"B"|"C"|"D">>({});
   const [fillAnswers,    setFillAnswers]    = useState<Record<number, string>>({});
@@ -216,10 +413,61 @@ export default function ExamModePage() {
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeLeftRef = useRef(TOTAL_SECONDS);
 
-  const submitExam = useCallback(() => {
+  const submitExam = useCallback(async () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    setTimeUsed(TOTAL_SECONDS - timeLeftRef.current);
+    const used = TOTAL_SECONDS - timeLeftRef.current;
+    setTimeUsed(used);
     setPhase("done");
+    // Persist results to DB
+    if (examSessionIdRef.current && exam) {
+      const mcqC  = exam.mcq.filter(q => mcqAnswers[q.id] === q.correctAnswer).length;
+      const fillC = exam.fillInBlank.filter(q => (fillAnswers[q.id]??'').trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()).length;
+      const writA = exam.written.filter(q => (writtenAnswers[q.id]??'').trim().length > 10).length;
+      await supabase.from("exam_sessions").update({
+        status:            "done",
+        mcq_score:         mcqC,
+        fill_score:        fillC,
+        written_attempted: writA,
+        total_mcq:         exam.mcq.length,
+        total_fill:        exam.fillInBlank.length,
+        total_written:     exam.written.length,
+        time_used_secs:    used,
+        timed_out:         timedOut,
+        mcq_answers:       mcqAnswers,
+        fill_answers:      fillAnswers,
+        written_answers:   writtenAnswers,
+        last_visited:      new Date().toISOString(),
+      }).eq("id", examSessionIdRef.current);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exam, mcqAnswers, fillAnswers, writtenAnswers, timedOut]);
+
+  // ── Load existing exam from DB (history/recent revisit) ─────────────────
+  useEffect(() => {
+    if (!isReview) return;
+    (async () => {
+      setPhase("loading");
+      try {
+        await supabase.from("exam_sessions").update({ last_visited: new Date().toISOString() }).eq("id", reviewSessionId);
+        const { data, error } = await supabase.from("exam_sessions").select("*").eq("id", reviewSessionId).single();
+        if (error || !data || !data.exam_data) throw new Error("Exam not found");
+        examSessionIdRef.current = data.id;
+        setLabel(data.source_label || "Exam");
+        setExam(data.exam_data);
+        // If already completed — restore answers and jump to results
+        if (data.status === "done") {
+          setMcqAnswers(data.mcq_answers     ?? {});
+          setFillAnswers(data.fill_answers   ?? {});
+          setWrittenAnswers(data.written_answers ?? {});
+          setTimeUsed(data.time_used_secs    ?? 0);
+          setTimedOut(data.timed_out         ?? false);
+          setPhase("done");
+        } else {
+          setPhase("ready");
+        }
+      } catch (err: any) { setError(err.message || "Failed to load exam."); setPhase("modal"); }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Generate from YouTube URL ─────────────────────────────────────────────
@@ -235,6 +483,18 @@ export default function ExamModePage() {
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
         const data = await res.json();
         setExam(data.exam); setPhase("ready");
+        // Create exam session row for history
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const ytSid = searchParams.get("session_id") ?? undefined;
+          const { data: sess } = await supabase.from("exam_sessions").insert({
+            user_id: user.id, source: "youtube",
+            source_label: data.exam ? youtubeUrl.replace("https://","").replace("www.","").slice(0,60) : label,
+            youtube_session_id: ytSid || null,
+            exam_data: data.exam,
+          }).select("id").single();
+          if (sess?.id) examSessionIdRef.current = sess.id;
+        }
       } catch (err: any) { setError(err.message || "Something went wrong."); setPhase("modal"); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,10 +524,21 @@ export default function ExamModePage() {
         }
         const data = await res.json();
         setExam(data.exam); setPhase("ready");
-        // Clean up sessionStorage after reading
         sessionStorage.removeItem("rec_exam_audio");
         sessionStorage.removeItem("rec_exam_mimeType");
         sessionStorage.removeItem("rec_exam_transcript");
+        // Create exam session row for history
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const recSid = sessionStorage.getItem("rec_exam_session_id") ?? undefined;
+          const { data: sess } = await supabase.from("exam_sessions").insert({
+            user_id: user.id, source: "recording",
+            source_label: "Your recording",
+            recording_session_id: recSid || null,
+            exam_data: data.exam,
+          }).select("id").single();
+          if (sess?.id) examSessionIdRef.current = sess.id;
+        }
       } catch (err: any) { setError(err.message || "Something went wrong."); setPhase("modal"); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -282,6 +553,16 @@ export default function ExamModePage() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
       const data = await res.json();
       setExam(data.exam); setPhase("ready");
+      // Create exam session row for history
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: sess } = await supabase.from("exam_sessions").insert({
+          user_id: user.id, source: "file",
+          source_label: file.name,
+          exam_data: data.exam,
+        }).select("id").single();
+        if (sess?.id) examSessionIdRef.current = sess.id;
+      }
     } catch (err: any) { setError(err.message || "Something went wrong."); setPhase("modal"); }
   };
 

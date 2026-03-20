@@ -361,7 +361,7 @@ function StudyCard({
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-center px-10 py-12 text-center min-h-60">
+        <div className="flex flex-col items-center justify-center px-10 py-12 text-center min-h-[240px]">
           {!flipped ? (
             <>
               <p className="text-xl font-medium text-gray-900 leading-relaxed">{card.term}</p>
@@ -389,7 +389,7 @@ function StudyCard({
         >
           <ChevronLeft />
         </button>
-        <span className="text-sm text-gray-500 font-medium min-w-15 text-center">
+        <span className="text-sm text-gray-500 font-medium min-w-[60px] text-center">
           {current + 1} / {total}
         </span>
         <button
@@ -470,6 +470,8 @@ export default function FlashcardsPage() {
 
       if (sessionErr) throw new Error("Flashcard session not found.");
       if (session.file_name) setFileName(session.file_name);
+      // Bump last_visited so this session appears at top of history/recent
+      await supabase.from("flashcard_sessions").update({ last_visited: new Date().toISOString() }).eq("id", sid);
 
       // Still generating — keep the loading spinner and poll again in 2s
       // We do NOT call setLoading(false) here so the spinner stays visible
@@ -527,7 +529,7 @@ export default function FlashcardsPage() {
 
       await supabase
         .from("flashcard_sessions")
-        .update({ status: "ready", total: generatedCards.length })
+        .update({ status: "ready", total: generatedCards.length, last_visited: new Date().toISOString() })
         .eq("id", sid);
 
       // Clean up sessionStorage after successful save

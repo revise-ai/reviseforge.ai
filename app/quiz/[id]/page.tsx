@@ -144,7 +144,7 @@ function ExplanationPopup({
   );
 }
 
-// ── Results Screen ─────────────────────────────────────────────────────────────
+// ── Results Screen ────────────────────────────────────────────────────────────
 function ResultsScreen({
   questions,
   answers,
@@ -154,72 +154,150 @@ function ResultsScreen({
   answers: Record<number, "A" | "B" | "C" | "D">;
   onRetry: () => void;
 }) {
-  const correct = questions.filter((q) => answers[q.id] === q.correctAnswer).length;
-  const total   = questions.length;
-  const pct     = Math.round((correct / total) * 100);
+  const correct   = questions.filter((q) => answers[q.id] === q.correctAnswer).length;
+  const incorrect = questions.filter((q) => answers[q.id] && answers[q.id] !== q.correctAnswer).length;
+  const skipped   = questions.filter((q) => !answers[q.id]).length;
+  const total     = questions.length;
+  const pct       = Math.round((correct / total) * 100);
 
   const grade =
-    pct >= 90 ? { label: "Excellent",  color: "text-green-600",  bg: "bg-green-50",  border: "border-green-200"  } :
-    pct >= 75 ? { label: "Good",       color: "text-blue-600",   bg: "bg-blue-50",   border: "border-blue-200"   } :
-    pct >= 60 ? { label: "Needs Work", color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200" } :
-               { label: "Try Again",  color: "text-red-600",    bg: "bg-red-50",    border: "border-red-200"    };
+    pct >= 90 ? { label: "Outstanding!", color: "text-green-600",  ring: "#16a34a" } :
+    pct >= 75 ? { label: "Great Work!",  color: "text-blue-600",   ring: "#2563eb" } :
+    pct >= 60 ? { label: "Keep Going!",  color: "text-yellow-600", ring: "#d97706" } :
+    pct >= 40 ? { label: "Don't Give Up!", color: "text-orange-600", ring: "#ea580c" } :
+               { label: "Try Again!",   color: "text-red-600",    ring: "#dc2626" };
+
+  const radius = 54; const circ = 2 * Math.PI * radius;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className={`bg-white rounded-3xl border ${grade.border} shadow-sm p-8 text-center mb-6`}>
-          <div className={`w-20 h-20 rounded-full ${grade.bg} flex items-center justify-center mx-auto mb-4`}>
-            <span className={`text-2xl font-bold ${grade.color}`}>{pct}%</span>
-          </div>
-          <h2 className="text-2xl font-semibold text-gray-800 mb-1">{grade.label}</h2>
-          <p className="text-gray-400 text-sm">{correct} out of {total} questions correct</p>
-          <div className="mt-6 h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-1000 ${
-                pct >= 75 ? "bg-green-500" : pct >= 60 ? "bg-yellow-500" : "bg-red-500"
-              }`}
-              style={{ width: `${pct}%` }}
-            />
+    <div className="min-h-screen bg-gray-50 px-4 py-10">
+      <div className="max-w-3xl mx-auto">
+
+        {/* Score card */}
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8 mb-5">
+          <div className="flex flex-col sm:flex-row items-center gap-8">
+            {/* Ring */}
+            <div className="relative shrink-0">
+              <svg width="140" height="140" viewBox="0 0 140 140" className="-rotate-90">
+                <circle cx="70" cy="70" r={radius} fill="none" stroke="#f3f4f6" strokeWidth="12" />
+                <circle cx="70" cy="70" r={radius} fill="none" stroke={grade.ring} strokeWidth="12"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(pct/100)*circ} ${circ}`}
+                  style={{ transition: "stroke-dasharray 1s ease" }} />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-3xl font-bold ${grade.color}`}>{pct}%</span>
+                <span className="text-xs text-gray-400 mt-0.5">Score</span>
+              </div>
+            </div>
+            {/* Stats */}
+            <div className="flex-1 w-full">
+              <h2 className={`text-2xl font-semibold ${grade.color} mb-1`}>{grade.label}</h2>
+              <p className="text-sm text-gray-400 mb-5">{correct} out of {total} questions correct</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-green-50 rounded-2xl p-4 text-center">
+                  <p className="text-xl font-bold text-green-600">{correct}</p>
+                  <p className="text-xs text-green-500 mt-1">Correct</p>
+                </div>
+                <div className="bg-red-50 rounded-2xl p-4 text-center">
+                  <p className="text-xl font-bold text-red-500">{incorrect}</p>
+                  <p className="text-xs text-red-400 mt-1">Incorrect</p>
+                </div>
+                <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                  <p className="text-xl font-bold text-gray-500">{skipped}</p>
+                  <p className="text-xs text-gray-400 mt-1">Skipped</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-6">
-          <div className="px-5 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">Question Review</h3>
+        {/* Question Review */}
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden mb-5">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-800">Question Review</h3>
+            <span className="text-xs text-gray-400">{total} questions</span>
           </div>
-          <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
+          <div className="divide-y divide-gray-50">
             {questions.map((q, i) => {
-              const isCorrect = answers[q.id] === q.correctAnswer;
+              const sel       = answers[q.id];
+              const answered  = sel !== undefined;
+              const isCorrect = answered && sel === q.correctAnswer;
               return (
-                <div key={q.id} className="flex items-center gap-3 px-5 py-3">
-                  <span className="text-xs text-gray-400 shrink-0 w-5">{i + 1}</span>
-                  <p className="text-xs text-gray-600 truncate flex-1">{q.question}</p>
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isCorrect ? "bg-green-100" : "bg-red-100"}`}>
-                    {isCorrect ? (
-                      <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    )}
+                <div key={q.id} className="px-6 py-4">
+                  {/* Question header */}
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${isCorrect?"bg-green-100":answered?"bg-red-100":"bg-gray-100"}`}>
+                      {isCorrect ? (
+                        <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>
+                      ) : answered ? (
+                        <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>
+                      ) : (
+                        <span className="text-[10px] font-bold text-gray-400">—</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-gray-400">Q{i+1}</span>
+                        <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{q.category}</span>
+                        {!answered && <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full">Skipped</span>}
+                      </div>
+                      <p className="text-sm text-gray-700 leading-relaxed">{q.question}</p>
+                    </div>
                   </div>
+                  {/* Options */}
+                  <div className="pl-9 space-y-1.5">
+                    {(["A","B","C","D"] as const).map(key => {
+                      const isCorr = key===q.correctAnswer;
+                      const isSel  = key===sel;
+                      let cls = "border-gray-100 bg-white text-gray-400";
+                      if (isCorr)       cls = "border-green-400 bg-green-50 text-green-800";
+                      else if (isSel)   cls = "border-red-400 bg-red-50 text-red-700";
+                      return (
+                        <div key={key} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 ${cls}`}>
+                          <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${isCorr?"bg-green-500 text-white":isSel?"bg-red-400 text-white":"bg-gray-100 text-gray-400"}`}>{key}</span>
+                          <span className="text-xs flex-1">{q.options[key]}</span>
+                          {isCorr && <svg className="w-3.5 h-3.5 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>}
+                          {isSel && !isCorr && <svg className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Explanation */}
+                  {q.explanation && (
+                    <div className="pl-9 mt-3">
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                        <p className="text-xs font-semibold text-blue-800 mb-1">Explanation</p>
+                        <p className="text-xs text-blue-700 leading-relaxed">{q.explanation}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        <div className="flex gap-3">
+        {/* Actions */}
+        <div className="flex gap-4">
           <button
             type="button"
             onClick={onRetry}
-            className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl text-sm font-semibold transition cursor-pointer active:scale-95"
+            className="flex-1 py-4 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 rounded-2xl text-sm font-semibold transition cursor-pointer active:scale-95 flex items-center justify-center gap-2"
           >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
             Try Again
           </button>
-          <Link href="/dashboard" className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition text-center active:scale-95">
+          <Link
+            href="/dashboard"
+            className="flex-1 py-4 text-white rounded-2xl text-sm font-semibold transition text-center active:scale-95 flex items-center justify-center gap-2"
+            style={{ backgroundColor: grade.ring }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
             Dashboard
           </Link>
         </div>
@@ -346,7 +424,7 @@ function QuestionCard({
           <ChevronLeft />
         </button>
 
-        <span className="text-sm text-gray-500 font-medium min-w-15 text-center">
+        <span className="text-sm text-gray-500 font-medium min-w-[60px] text-center">
           {current + 1} / {total}
         </span>
 
@@ -448,6 +526,8 @@ export default function QuizPage() {
       if (session.status === "generating")     throw new Error("Quiz is still being generated. Please wait and refresh.");
       if (session.status === "error")          throw new Error("Quiz generation failed. Please go back and try again.");
       if (session.file_name)                   setFileName(session.file_name);
+      // Bump last_visited so this session appears at top of history/recent
+      await supabase.from("quiz_sessions").update({ last_visited: new Date().toISOString() }).eq("id", sid);
 
       const { data, error: dbErr } = await supabase
         .from("quiz_questions")
@@ -458,7 +538,35 @@ export default function QuizPage() {
       if (dbErr)                               throw dbErr;
       if (!data || data.length === 0)          throw new Error("No questions found for this session.");
 
-      setQuestions(mapRows(data));
+      const mappedQs = mapRows(data);
+      setQuestions(mappedQs);
+
+      // ── Restore previously saved answers so user can review their work ────
+      const { data: savedAnswers } = await supabase
+        .from("quiz_answers")
+        .select("question_id, given_answer")
+        .eq("session_id", sid);
+
+      if (savedAnswers && savedAnswers.length > 0) {
+        // Map question DB uuid → given_answer
+        const answerByDbId: Record<string, "A"|"B"|"C"|"D"> = {};
+        savedAnswers.forEach((a: any) => { answerByDbId[a.question_id] = a.given_answer; });
+
+        // Map local question id (question_order) → given_answer
+        const restored: Record<number, "A"|"B"|"C"|"D"> = {};
+        mappedQs.forEach(q => {
+          if (q.dbId && answerByDbId[q.dbId]) {
+            restored[q.id] = answerByDbId[q.dbId];
+          }
+        });
+        if (Object.keys(restored).length > 0) {
+          setAnswers(restored);
+          // If all questions were answered before, go straight to results
+          if (Object.keys(restored).length === mappedQs.length && session.status === "finished") {
+            setShowResults(true);
+          }
+        }
+      }
     } catch (err: any) {
       setError(err.message ?? "Failed to load quiz.");
     } finally {
@@ -516,10 +624,10 @@ export default function QuizPage() {
 
       setQuestions(qs.map((q, i) => ({ ...q, dbId: dbIdMap[i + 1] })));
 
-      // Mark session as ready
+      // Mark session as ready and bump last_visited
       await supabase
         .from("quiz_sessions")
-        .update({ status: "ready", total: qs.length })
+        .update({ status: "ready", total: qs.length, last_visited: new Date().toISOString() })
         .eq("id", sid);
 
       // ✅ Only clear sessionStorage after successful generation

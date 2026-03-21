@@ -1,7 +1,7 @@
 // File path: app/dashboard/exam-mode/page.tsx
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import ExamModeModal from "@/components/ExamModeModal";
@@ -721,7 +721,7 @@ function ResultsScreen({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function ExamModePage() {
+function ExamModeContent() {
   const searchParams = useSearchParams();
   const youtubeUrl = searchParams.get("url") ?? "";
   const source = searchParams.get("source") ?? "";
@@ -1434,4 +1434,12 @@ export default function ExamModePage() {
     );
   }
   return null;
+}
+
+export default function ExamModePage() {
+  return (
+    <Suspense fallback={<LoadingScreen label="Initialising exam mode..." />}>
+      <ExamModeContent />
+    </Suspense>
+  );
 }

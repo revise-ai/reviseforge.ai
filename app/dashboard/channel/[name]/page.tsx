@@ -2384,7 +2384,7 @@ export default function ChannelPage({ params }: { params: Promise<{ name: string
     if (!text || sending || !currentUser) return;
 
     // ── @reviseforge AI mention ──────────────────────────────────
-    const aiMentionMatch = text.match(/@reviseforge\s+(.*)/is);
+    const aiMentionMatch = text.match(/@reviseforge\s+([\s\S]*)/i);
     if (aiMentionMatch) {
       const question = aiMentionMatch[1].trim();
       if (!question) { toast("Add a question after @reviseforge", "info"); return; }

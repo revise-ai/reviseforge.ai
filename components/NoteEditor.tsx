@@ -660,6 +660,7 @@ export default function NoteEditor({
       : null;
     const reader = new FileReader();
     reader.onload = (ev) => {
+      if (!editorRef.current) return;
       const src = ev.target?.result as string;
       const wrapper = document.createElement("div");
       wrapper.setAttribute("data-img-wrapper", "true");

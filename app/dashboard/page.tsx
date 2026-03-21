@@ -982,10 +982,10 @@ function RecentCard({
   onRename,
 }: {
   item: RecentItem;
-  onDelete: (id: string, type: "youtube" | "recording") => Promise<void>;
+  onDelete: (id: string, type: RecentItem["type"]) => Promise<void>;
   onRename: (
     id: string,
-    type: "youtube" | "recording",
+    type: RecentItem["type"],
     title: string,
   ) => Promise<void>;
 }) {

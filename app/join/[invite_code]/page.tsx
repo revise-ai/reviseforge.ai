@@ -1,175 +1,240 @@
 "use client";
 
-// app/join/[invite_code]/page.tsx
-
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 interface InviteInfo {
+  id: string;
+  channel_id: string;
   channel_name: string;
-  member_count: number;
   expires_at: string;
   use_count: number;
   max_uses: number | null;
   is_revoked: boolean;
 }
 
-function daysLeft(expiresAt: string) {
-  const diff = new Date(expiresAt).getTime() - Date.now();
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-  if (days <= 0) return "Expired";
-  if (days === 1) return "Expires in 1 day";
-  return `Expires in ${days} days`;
-}
-
 export default function JoinPage({
   params,
 }: {
-  params: { invite_code: string };
+  params: Promise<{ invite_code: string }>;
 }) {
+  const { invite_code } = use(params);
   const router = useRouter();
-  const { invite_code } = params;
 
-  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
-  const [loadingInfo, setLoadingInfo] = useState(true);
+  const [invite, setInvite] = useState<InviteInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [invalid, setInvalid] = useState(false);
+  const [invalidReason, setInvalidReason] = useState("");
   const [joining, setJoining] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [error, setError] = useState("");
   const [joined, setJoined] = useState(false);
+  const [alreadyMember, setAlreadyMember] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
 
-  // ── Load invite info ──────────────────────────────────────
+  function nameToSlug(name: string) {
+    return name.toLowerCase().replace(/\s+/g, "-");
+  }
+
   useEffect(() => {
     (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
+      console.log("🔍 Looking up invite_code:", invite_code);
 
-      // Fetch invite + channel info
-      const { data: invite, error: invErr } = await supabase
+      // 1. Fetch invite — select * so we see all columns regardless of naming
+      const { data: inviteData, error: inviteError } = await supabase
         .from("channel_invites")
-        .select(
-          `
-          expires_at,
-          use_count,
-          max_uses,
-          is_revoked,
-          channels (name, id)
-        `,
-        )
+        .select("*")
         .eq("invite_code", invite_code)
+        .maybeSingle();
+
+      console.log("📦 Invite data:", inviteData);
+      console.log("❌ Invite error:", inviteError);
+
+      if (inviteError || !inviteData) {
+        setInvalidReason("Invite not found in database.");
+        setInvalid(true);
+        setLoading(false);
+        return;
+      }
+
+      // Check revoked
+      if (inviteData.is_revoked) {
+        setInvalidReason("This invite has been revoked.");
+        setInvalid(true);
+        setLoading(false);
+        return;
+      }
+
+      // Check expiry
+      const now = new Date();
+      const expiresAt = new Date(inviteData.expires_at);
+      console.log("⏰ Now:", now.toISOString(), "Expires:", expiresAt.toISOString());
+
+      if (expiresAt < now) {
+        setInvalidReason("This invite has expired.");
+        setInvalid(true);
+        setLoading(false);
+        return;
+      }
+
+      // Check max uses
+      if (
+        inviteData.max_uses !== null &&
+        inviteData.use_count >= inviteData.max_uses
+      ) {
+        setInvalidReason("This invite has reached its maximum uses.");
+        setInvalid(true);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fetch channel name
+      const { data: channelData, error: channelError } = await supabase
+        .from("channels")
+        .select("name")
+        .eq("id", inviteData.channel_id)
         .single();
 
-      if (invErr || !invite) {
-        setError("This invite link is invalid.");
-        setLoadingInfo(false);
-        return;
-      }
+      console.log("📺 Channel data:", channelData, "error:", channelError);
 
-      if (invite.is_revoked) {
-        setError("This invite link has been revoked by the admin.");
-        setLoadingInfo(false);
-        return;
-      }
-
-      if (new Date(invite.expires_at) < new Date()) {
-        setError("This invite link has expired.");
-        setLoadingInfo(false);
-        return;
-      }
-
-      if (invite.max_uses !== null && invite.use_count >= invite.max_uses) {
-        setError("This invite link has reached its maximum number of uses.");
-        setLoadingInfo(false);
-        return;
-      }
-
-      // Get member count
-      const { count } = await supabase
-        .from("channel_members")
-        .select("*", { count: "exact", head: true })
-        .eq("channel_id", (invite.channels as any).id);
-
-      setInviteInfo({
-        channel_name: (invite.channels as any).name,
-        member_count: count ?? 0,
-        expires_at: invite.expires_at,
-        use_count: invite.use_count,
-        max_uses: invite.max_uses,
-        is_revoked: invite.is_revoked,
+      setInvite({
+        id: inviteData.id,
+        channel_id: inviteData.channel_id,
+        channel_name: channelData?.name ?? "Unknown Channel",
+        expires_at: inviteData.expires_at,
+        use_count: inviteData.use_count,
+        max_uses: inviteData.max_uses,
+        is_revoked: inviteData.is_revoked,
       });
 
-      setLoadingInfo(false);
+      // 3. Check if user is logged in
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      // If already logged in, auto-join immediately
-      if (session) {
-        await joinChannel();
+      console.log("👤 Current user:", user?.id ?? "not logged in");
+
+      if (!user) {
+        sessionStorage.setItem("pendingInviteCode", invite_code);
+        const hasVisited = localStorage.getItem("rf_has_visited");
+        if (hasVisited) {
+          router.replace(`/signin?invite=${invite_code}`);
+        } else {
+          localStorage.setItem("rf_has_visited", "true");
+          router.replace(`/signup?invite=${invite_code}`);
+        }
+        return;
       }
+
+      setCurrentUser({ id: user.id });
+
+      // 4. Check if already a member
+      const { data: memberData } = await supabase
+        .from("channel_members")
+        .select("user_id")
+        .eq("channel_id", inviteData.channel_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (memberData) {
+        setAlreadyMember(true);
+      }
+
+      setLoading(false);
     })();
   }, [invite_code]);
 
-  // ── Join ──────────────────────────────────────────────────
-  const joinChannel = async () => {
+  const handleJoin = async () => {
+    if (!invite || !currentUser) return;
     setJoining(true);
-    const { data, error: joinErr } = await supabase.rpc(
-      "join_channel_by_invite",
-      {
-        p_invite_code: invite_code,
-      },
-    );
 
-    if (joinErr || data?.error) {
-      setError(joinErr?.message ?? data?.error ?? "Failed to join.");
+    const { error } = await supabase.from("channel_members").insert({
+      channel_id: invite.channel_id,
+      user_id: currentUser.id,
+      role: "member",
+    });
+
+    if (error && error.code !== "23505") {
+      console.error("Join error:", error);
       setJoining(false);
       return;
     }
 
+    await supabase
+      .from("channel_invites")
+      .update({ use_count: invite.use_count + 1 })
+      .eq("id", invite.id);
+
     setJoined(true);
-    setTimeout(
-      () => router.replace(`/dashboard/channel/${data.channel_id}`),
-      1000,
-    );
+    setJoining(false);
+
+    setTimeout(() => {
+      router.replace(
+        `/dashboard/channel/${nameToSlug(invite.channel_name)}?joined=true`,
+      );
+    }, 1200);
   };
 
-  // ── Not logged in — show branded preview, redirect to signin ──
-  const handleJoinClick = () => {
-    sessionStorage.setItem("pending_invite", invite_code);
-    router.push("/signin");
+  const handleCancel = () => {
+    router.replace("/dashboard");
   };
 
-  // ── Loading ───────────────────────────────────────────────
-  if (loadingInfo) {
+  const handleGoToChannel = () => {
+    if (!invite) return;
+    router.replace(`/dashboard/channel/${nameToSlug(invite.channel_name)}`);
+  };
+
+  // ── Loading ──────────────────────────────────────────────
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#1a1b1e] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-400">Loading invite…</p>
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-500">Checking invite…</p>
         </div>
       </div>
     );
   }
 
-  // ── Joining spinner ───────────────────────────────────────
-  if (joining && !joined) {
+  // ── Invalid ──────────────────────────────────────────────
+  if (invalid || !invite) {
     return (
-      <div className="min-h-screen bg-[#1a1b1e] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-400">Joining channel…</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Success ───────────────────────────────────────────────
-  if (joined) {
-    return (
-      <div className="min-h-screen bg-[#1a1b1e] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center">
+          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
             <svg
-              className="w-8 h-8 text-green-400"
+              className="w-7 h-7 text-red-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">
+            Invalid Invite Link
+          </h2>
+          <p className="text-sm text-gray-500 mb-2">{invalidReason}</p>
+          <p className="text-xs text-gray-400 font-mono break-all">
+            Code: {invite_code}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Already a member ─────────────────────────────────────
+  if (alreadyMember) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center">
+          <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-7 h-7 text-blue-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -182,27 +247,35 @@ export default function JoinPage({
               />
             </svg>
           </div>
-          <div>
-            <p className="text-white font-bold text-lg">
-              You joined #{inviteInfo?.channel_name}!
-            </p>
-            <p className="text-gray-400 text-sm mt-1">
-              Redirecting you to the channel…
-            </p>
-          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">
+            You're already a member!
+          </h2>
+          <p className="text-sm text-gray-500 mb-6">
+            You already belong to{" "}
+            <span className="font-semibold text-gray-700">
+              #{invite.channel_name}
+            </span>
+            .
+          </p>
+          <button
+            onClick={handleGoToChannel}
+            className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+          >
+            Go to Channel
+          </button>
         </div>
       </div>
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────
-  if (error) {
+  // ── Joined success ───────────────────────────────────────
+  if (joined) {
     return (
-      <div className="min-h-screen bg-[#1a1b1e] flex items-center justify-center px-4">
-        <div className="bg-[#2b2d31] rounded-2xl p-8 max-w-sm w-full text-center border border-white/10">
-          <div className="w-14 h-14 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center">
+          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
             <svg
-              className="w-7 h-7 text-red-400"
+              className="w-7 h-7 text-green-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -211,116 +284,99 @@ export default function JoinPage({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                d="M5 13l4 4L19 7"
               />
             </svg>
           </div>
-          <h2 className="text-white font-bold text-lg mb-2">Invite Invalid</h2>
-          <p className="text-gray-400 text-sm mb-6">{error}</p>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
-          >
-            Go to Dashboard
-          </button>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">
+            Joined successfully!
+          </h2>
+          <p className="text-sm text-gray-500">
+            Taking you to{" "}
+            <span className="font-semibold text-gray-700">
+              #{invite.channel_name}
+            </span>
+            …
+          </p>
         </div>
       </div>
     );
   }
 
-  // ── Main branded invite page (Discord-style) ──────────────
+  // ── Join prompt ──────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#1a1b1e] flex items-center justify-center px-4">
-      <div className="bg-[#2b2d31] rounded-2xl w-full max-w-sm border border-white/10 overflow-hidden shadow-2xl">
-        {/* Top banner */}
-        <div className="h-24 bg-gradient-to-br from-blue-600 to-blue-800 relative">
-          <div
-            className="absolute inset-0 opacity-20"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
-              backgroundSize: "30px 30px",
-            }}
-          />
-        </div>
-
-        {/* Channel avatar */}
-        <div className="px-6 pb-6">
-          <div className="flex items-end gap-4 -mt-8 mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-blue-600 border-4 border-[#2b2d31] flex items-center justify-center shrink-0 shadow-lg">
-              <span className="text-white text-xl font-bold">
-                {inviteInfo?.channel_name.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div className="pb-1">
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
-                You've been invited to join
-              </p>
-            </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full">
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center">
+            <div className="w-4 h-4 bg-white rounded" />
           </div>
-
-          {/* Channel name */}
-          <h1 className="text-white text-2xl font-bold mb-1">
-            # {inviteInfo?.channel_name}
-          </h1>
-
-          {/* Stats row */}
-          <div className="flex items-center gap-4 mb-5">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-green-400" />
-              <span className="text-sm text-gray-300">
-                {inviteInfo?.member_count} member
-                {inviteInfo?.member_count !== 1 ? "s" : ""}
-              </span>
-            </div>
-            <div className="w-1 h-1 rounded-full bg-gray-600" />
-            <span className="text-sm text-gray-400">
-              {inviteInfo ? daysLeft(inviteInfo.expires_at) : ""}
-            </span>
-            {inviteInfo?.max_uses && (
-              <>
-                <div className="w-1 h-1 rounded-full bg-gray-600" />
-                <span className="text-sm text-gray-400">
-                  {inviteInfo.use_count}/{inviteInfo.max_uses} uses
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* CTA */}
-          {isLoggedIn ? (
-            <button
-              onClick={joinChannel}
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors"
-            >
-              Accept Invite & Join Channel
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={handleJoinClick}
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors mb-3"
-              >
-                Join Channel
-              </button>
-              <p className="text-xs text-gray-500 text-center">
-                You'll be asked to sign in or create a free account
-              </p>
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-white/10 flex items-center justify-center gap-2">
-          <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
-            <div className="w-2.5 h-2.5 bg-white rounded-sm" />
-          </div>
-          <span className="text-xs text-gray-400">
-            <span className="text-white font-semibold">Study</span>
-            <span className="text-blue-400 font-semibold">Forge</span>
-            <span className="ml-1">· Study smarter together</span>
+          <span className="text-lg font-bold">
+            <span className="text-gray-900">Study</span>
+            <span className="text-blue-600">Forge</span>
           </span>
         </div>
+
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center mb-3">
+            <svg
+              className="w-8 h-8 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+          </div>
+          <p className="text-xs text-gray-400 mb-1">You've been invited to join</p>
+          <h2 className="text-xl font-bold text-gray-900">
+            #{invite.channel_name}
+          </h2>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={handleJoin}
+            disabled={joining}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+          >
+            {joining ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                  />
+                </svg>
+                Join Now
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleCancel}
+            className="w-full py-3 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl text-sm font-medium transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+
+        <p className="text-[11px] text-gray-400 text-center mt-4 leading-relaxed">
+          By joining, you agree to follow the channel's rules and guidelines.
+        </p>
       </div>
     </div>
   );

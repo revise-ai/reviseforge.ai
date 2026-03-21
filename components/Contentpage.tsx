@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 
-type Mode = "youtube" | "microphone" | "browsertab";
+type Mode = "youtube" | "microphone" | "browsertab" | "chat";
 type ActiveTool = "summary" | "quiz" | "flashcards" | "exams" | null;
 
 interface QuizQuestion {

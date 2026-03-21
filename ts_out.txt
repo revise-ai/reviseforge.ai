@@ -1,1 +1,0 @@
-app/dashboard/channel/[name]/page.tsx(2387,61): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -52,7 +52,7 @@ function Toast({
   );
 }
 
-export default function SignupPage() {
+function SignupInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -66,7 +66,6 @@ export default function SignupPage() {
   const showToast = (message: string, type: "error" | "success") => setToast({ message, type });
   const closeToast = () => setToast(null);
 
-  // ── Get invite code from URL param or sessionStorage ──────
   const getInviteCode = () =>
     searchParams.get("invite") ?? sessionStorage.getItem("pendingInviteCode");
 
@@ -79,7 +78,6 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const inviteCode = getInviteCode();
-
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -93,18 +91,12 @@ export default function SignupPage() {
           showToast(error.message, "error");
         }
       } else {
-        // ── Keep invite code alive for after email confirmation ──
-        // Store it so signin page can pick it up after they confirm
         if (inviteCode) {
           sessionStorage.setItem("pendingInviteCode", inviteCode);
-          showToast(
-            "Account created! Confirm your email then sign in — you'll be added to the channel automatically.",
-            "success",
-          );
+          showToast("Account created! Confirm your email then sign in — you'll be added to the channel automatically.", "success");
         } else {
           showToast("Account created! Check your email to confirm, then sign in.", "success");
         }
-        // Redirect to signin, preserving invite in URL if present
         setTimeout(() => {
           if (inviteCode) {
             router.push(`/signin?invite=${inviteCode}`);
@@ -123,7 +115,6 @@ export default function SignupPage() {
   const handleGoogleSignup = async () => {
     setGoogleLoading(true);
     try {
-      // ── Pass invite code through Google OAuth via callback URL ──
       const inviteCode = getInviteCode();
       const callbackUrl = inviteCode
         ? `${window.location.origin}/auth/callback?invite=${inviteCode}`
@@ -271,5 +262,14 @@ export default function SignupPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// ── Wrap in Suspense — required for useSearchParams in Next.js 15 ──
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupInner />
+    </Suspense>
   );
 }

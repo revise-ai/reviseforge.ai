@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -52,7 +52,7 @@ function Toast({
   );
 }
 
-export default function SigninPage() {
+function SigninInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -65,11 +65,9 @@ export default function SigninPage() {
   const showToast = (message: string, type: "error" | "success") => setToast({ message, type });
   const closeToast = () => setToast(null);
 
-  // ── Get invite code from URL param or sessionStorage ──────
   const getInviteCode = () =>
     searchParams.get("invite") ?? sessionStorage.getItem("pendingInviteCode");
 
-  // ── After successful auth, redirect to join page or dashboard ──
   const redirectAfterAuth = () => {
     const inviteCode = getInviteCode();
     if (inviteCode) {
@@ -108,7 +106,6 @@ export default function SigninPage() {
   const handleGoogleSignin = async () => {
     setGoogleLoading(true);
     try {
-      // ── Pass invite code through Google OAuth via callback URL ──
       const inviteCode = getInviteCode();
       const callbackUrl = inviteCode
         ? `${window.location.origin}/auth/callback?invite=${inviteCode}`
@@ -249,5 +246,14 @@ export default function SigninPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// ── Wrap in Suspense — required for useSearchParams in Next.js 15 ──
+export default function SigninPage() {
+  return (
+    <Suspense>
+      <SigninInner />
+    </Suspense>
   );
 }

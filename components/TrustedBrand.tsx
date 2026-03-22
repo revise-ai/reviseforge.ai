@@ -12,20 +12,14 @@ const TrustedBrand = () => {
   return (
     <>
       <style>{`
-                .marquee-inner {
-                    animation: marqueeScroll linear infinite;
-                }
-
-                @keyframes marqueeScroll {
-                    0% {
-                        transform: translateX(0%);
-                    }
-
-                    100% {
-                        transform: translateX(-50%);
-                    }
-                }
-            `}</style>
+        .marquee-inner {
+          animation: marqueeScroll linear infinite;
+        }
+        @keyframes marqueeScroll {
+          0% { transform: translateX(0%); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
 
       <div className="overflow-hidden w-full relative max-w-5xl mx-auto select-none">
         <div className="text-center mt-10 mb-8">
@@ -33,7 +27,8 @@ const TrustedBrand = () => {
             Trusted by students at top universities worldwide
           </p>
         </div>
-        <div className="absolute left-0 top-0 h-full w-20 z-10 pointer-events-none bg-linear-to-r from-white to-transparent" />
+
+        {/* No left/right fade overlays — removed */}
         <div
           className="marquee-inner flex will-change-transform min-w-[200%]"
           style={{ animationDuration: "15s" }}
@@ -50,7 +45,6 @@ const TrustedBrand = () => {
             ))}
           </div>
         </div>
-        <div className="absolute right-0 top-0 h-full w-20 md:w-40 z-10 pointer-events-none bg-linear-to-l from-white to-transparent" />
       </div>
     </>
   );

@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "StudyForge",
+  title: "ReviseForge",
   description:
-    "I platform where students can upload reading materials for their daily use",
+    "Platform where students can upload reading materials for their daily use",
 };
 
 export default function RootLayout({

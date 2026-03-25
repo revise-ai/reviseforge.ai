@@ -702,7 +702,7 @@ function QuestionCard({
           <ChevronLeft />
         </button>
 
-        <span className="text-sm text-gray-500 font-medium min-w-[60px] text-center">
+        <span className="text-sm text-gray-500 font-medium min-w-15 text-center">
           {current + 1} / {total}
         </span>
 

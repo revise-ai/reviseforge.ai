@@ -1,2 +1,151 @@
-hello how are you doing i hope you are fine by God grace and i hope everything is fine and i really missed you and are you reading for me to go out with because what is happeing here i dont really get it and all the best.
-hello, my hpw are you doing and i hopr you are fine by God grace and ehrn are you comming to visit me and you really hated me, YES or No and what id really wrong with you big man can you time me what is going on or go you want to keep it as a serect... 
+<!-- <html>
+<body style="margin:0; padding:0; background-color:#f0f2f5; font-family: Arial, sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f5; padding: 40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+
+          <tr>
+            <td style="padding: 32px 48px; text-align:center; border-bottom: 1px solid #eeeeee;">
+              <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="vertical-align:middle; padding-right:12px;">
+                    <div style="background:#1D4ED8; border-radius:8px; width:36px; height:36px; line-height:36px; text-align:center;">
+                      <span style="color:white; font-size:16px; font-weight:900;">RF</span>
+                    </div>
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <span style="color:#1D4ED8; font-size:24px; font-weight:bold; letter-spacing:0.5px;">ReviseForge</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 48px 48px 32px 48px;">
+              <p style="color:#1a1a2e; font-size:16px; font-weight:bold; margin:0 0 16px 0;">Hello,</p>
+              <p style="color:#555555; font-size:15px; line-height:1.8; margin:0 0 32px 0;">
+                We received a request to reset the password for your <strong>ReviseForge</strong> account.
+                Click the button below to reset your password. This link will expire in <strong>1 hour</strong>.
+              </p>
+
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="{{ .ConfirmationURL }}"
+                      style="display:inline-block; background:#1D4ED8; color:#ffffff;
+                             padding:16px 48px; border-radius:6px; font-size:15px;
+                             font-weight:bold; text-decoration:none; letter-spacing:0.5px;">
+                      Reset Password
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color:#888888; font-size:13px; margin-top:32px; line-height:1.7;">
+                If you have any trouble clicking the button above, please copy and paste the URL below into your web browser.<br/><br/>
+                <a href="{{ .ConfirmationURL }}" style="color:#1D4ED8; word-break:break-all;">
+                  {{ .ConfirmationURL }}
+                </a>
+              </p>
+
+              <p style="color:#888888; font-size:13px; margin-top:24px; line-height:1.7;">
+                If you did not request a password reset, please ignore this email. Your password will not change unless you click the link above.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 24px 48px; text-align:center; border-top: 1px solid #eeeeee;">
+              <p style="color:#aaaaaa; font-size:12px; margin:0; line-height:1.8;">
+                You're receiving this email because a password reset was requested for your
+                <strong style="color:#888;">ReviseForge</strong> account.<br/>
+                If you didn't request this, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html> -->
+
+
+<!-- confirmation 
+<html>
+<body style="margin:0; padding:0; background-color:#f0f2f5; font-family: Arial, sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f5; padding: 40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+
+          <tr>
+            <td style="padding: 32px 48px; text-align:center; border-bottom: 1px solid #eeeeee;">
+              <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="vertical-align:middle; padding-right:12px;">
+                    <div style="background:#1D4ED8; border-radius:8px; width:36px; height:36px; line-height:36px; text-align:center;">
+                      <span style="color:white; font-size:16px; font-weight:900;">RF</span>
+                    </div>
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <span style="color:#1D4ED8; font-size:24px; font-weight:bold; letter-spacing:0.5px;">ReviseForge</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 48px 48px 32px 48px;">
+              <p style="color:#1a1a2e; font-size:16px; font-weight:bold; margin:0 0 16px 0;">Hello,</p>
+              <p style="color:#555555; font-size:15px; line-height:1.8; margin:0 0 32px 0;">
+                Thanks for signing up with <strong>ReviseForge</strong>! Before you get started,
+                we need you to confirm your email address. Please click the button below to complete your signup.
+              </p>
+
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="{{ .ConfirmationURL }}"
+                      style="display:inline-block; background:#1D4ED8; color:#ffffff;
+                             padding:16px 48px; border-radius:6px; font-size:15px;
+                             font-weight:bold; text-decoration:none; letter-spacing:0.5px;">
+                      Confirm Email Address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color:#888888; font-size:13px; margin-top:32px; line-height:1.7;">
+                If you have any trouble clicking the button above, please copy and paste the URL below into your web browser.<br/><br/>
+                <a href="{{ .ConfirmationURL }}" style="color:#1D4ED8; word-break:break-all;">
+                  {{ .ConfirmationURL }}
+                </a>
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 24px 48px; text-align:center; border-top: 1px solid #eeeeee;">
+              <p style="color:#aaaaaa; font-size:12px; margin:0; line-height:1.8;">
+                You're receiving this email because you signed up for an application
+                <strong style="color:#888;">powered by ReviseForge</strong>.<br/>
+                If you didn't sign up, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html> -->

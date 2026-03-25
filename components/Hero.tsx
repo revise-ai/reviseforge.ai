@@ -52,7 +52,7 @@ const Hero = () => {
             <Link href="#" onClick={() => setMobileOpen(false)} className="text-[#050040] hover:text-[#050040]/70">Home</Link>
             <Link href="#" onClick={() => setMobileOpen(false)} className="text-[#050040] hover:text-[#050040]/70">Products</Link>
             <Link href="#" onClick={() => setMobileOpen(false)} className="text-[#050040] hover:text-[#050040]/70">Features</Link>
-            <Link href={"/Pricing"} onClick={() => setMobileOpen(false)} className="text-[#050040] hover:text-[#050040]/70">Pricing</Link>
+            <Link href={"/pricing"} onClick={() => setMobileOpen(false)} className="text-[#050040] hover:text-[#050040]/70">Pricing</Link>
             <Link href="#" onClick={() => setMobileOpen(false)} className="text-[#050040] hover:text-[#050040]/70">Docs</Link>
             <button
               id="close-menu"

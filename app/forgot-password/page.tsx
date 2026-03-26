@@ -83,24 +83,19 @@ function ForgotPasswordInner() {
   const showToast = (message: string, type: "error" | "success") => setToast({ message, type });
   const strength = getStrength(password);
 
-  // Exchange token_hash for a session when landing on reset mode
+  // Session was already established by exchangeCodeForSession in auth/callback
+  // Just verify it exists when landing on reset mode
   useEffect(() => {
     if (!isResetMode) return;
 
-    const token_hash = searchParams.get("token_hash");
-    if (!token_hash) {
-      showToast("Invalid or expired reset link.", "error");
-      return;
-    }
-
-    supabase.auth.verifyOtp({ token_hash, type: "recovery" }).then(({ error }) => {
-      if (error) {
-        showToast("Reset link expired. Please request a new one.", "error");
-      } else {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
         setSessionReady(true);
+      } else {
+        showToast("Invalid or expired reset link. Please request a new one.", "error");
       }
     });
-  }, [isResetMode, searchParams]);
+  }, [isResetMode]);
 
   // Send reset link
   const handleSendLink = async () => {
@@ -147,6 +142,7 @@ function ForgotPasswordInner() {
         showToast(error.message, "error");
       } else {
         showToast("Password reset successfully! Redirecting to sign in...", "success");
+        await supabase.auth.signOut();
         setTimeout(() => router.replace("/signin"), 3000);
       }
     } catch {

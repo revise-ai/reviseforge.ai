@@ -83,19 +83,24 @@ function ForgotPasswordInner() {
   const showToast = (message: string, type: "error" | "success") => setToast({ message, type });
   const strength = getStrength(password);
 
-  // Session was already established by exchangeCodeForSession in auth/callback
-  // Just verify it exists when landing on reset mode
+  // Exchange the code from the URL on the client side (PKCE flow)
   useEffect(() => {
     if (!isResetMode) return;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true);
+    const code = searchParams.get("code");
+    if (!code) {
+      showToast("Invalid or expired reset link. Please request a new one.", "error");
+      return;
+    }
+
+    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      if (error) {
+        showToast("Reset link expired. Please request a new one.", "error");
       } else {
-        showToast("Invalid or expired reset link. Please request a new one.", "error");
+        setSessionReady(true);
       }
     });
-  }, [isResetMode]);
+  }, [isResetMode, searchParams]);
 
   // Send reset link
   const handleSendLink = async () => {
@@ -285,7 +290,6 @@ function ForgotPasswordInner() {
               </p>
             </>
           ) : sent ? (
-            // ── MODE: EMAIL SENT CONFIRMATION ──
             <>
               <h1 className="text-3xl font-semibold text-gray-900 mb-2">Check your email</h1>
               <p className="text-gray-400 text-sm mb-8 text-center">
@@ -301,7 +305,6 @@ function ForgotPasswordInner() {
               </p>
             </>
           ) : (
-            // ── MODE: ENTER EMAIL ──
             <>
               <h1 className="text-3xl font-semibold text-gray-900 mb-2">Forgot password?</h1>
               <p className="text-gray-400 text-sm mb-8 text-center">

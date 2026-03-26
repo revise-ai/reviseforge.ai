@@ -83,24 +83,19 @@ function ForgotPasswordInner() {
   const showToast = (message: string, type: "error" | "success") => setToast({ message, type });
   const strength = getStrength(password);
 
-  // Exchange the code from the URL on the client side (PKCE flow)
+  // Check for session in reset mode (now exchanged on server in /auth/callback)
   useEffect(() => {
     if (!isResetMode) return;
 
-    const code = searchParams.get("code");
-    if (!code) {
-      showToast("Invalid or expired reset link. Please request a new one.", "error");
-      return;
-    }
-
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error) {
-        showToast("Reset link expired. Please request a new one.", "error");
-      } else {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
         setSessionReady(true);
+      } else {
+        // If no session is found, the link might be invalid or the exchange failed on the server
+        showToast("Invalid or expired reset link. Please request a new one.", "error");
       }
     });
-  }, [isResetMode, searchParams]);
+  }, [isResetMode]);
 
   // Send reset link
   const handleSendLink = async () => {

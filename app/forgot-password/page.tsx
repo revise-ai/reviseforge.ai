@@ -76,34 +76,58 @@ function ForgotPasswordInner() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const [sent, setSent] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
 
   const showToast = (message: string, type: "error" | "success") => setToast({ message, type });
   const strength = getStrength(password);
 
-  // Send reset link
- const handleSendLink = async () => {
-  if (!email) return;
-  setLoading(true);
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
-    });
-    if (error) {
-      showToast(error.message, "error");
-    } else {
-      setSent(true);
+  // Exchange token_hash for a session when landing on reset mode
+  useEffect(() => {
+    if (!isResetMode) return;
+
+    const token_hash = searchParams.get("token_hash");
+    if (!token_hash) {
+      showToast("Invalid or expired reset link.", "error");
+      return;
     }
-  } catch {
-    showToast("Something went wrong. Please try again.", "error");
-  } finally {
-    setLoading(false);
-  }
-};
+
+    supabase.auth.verifyOtp({ token_hash, type: "recovery" }).then(({ error }) => {
+      if (error) {
+        showToast("Reset link expired. Please request a new one.", "error");
+      } else {
+        setSessionReady(true);
+      }
+    });
+  }, [isResetMode, searchParams]);
+
+  // Send reset link
+  const handleSendLink = async () => {
+    if (!email) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+      });
+      if (error) {
+        showToast(error.message, "error");
+      } else {
+        setSent(true);
+      }
+    } catch {
+      showToast("Something went wrong. Please try again.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Reset password
   const handleResetPassword = async () => {
+    if (!sessionReady) {
+      showToast("Session not ready. Please use the link from your email.", "error");
+      return;
+    }
     if (password.length < 8) {
       showToast("Password must be at least 8 characters.", "error");
       return;
@@ -241,7 +265,7 @@ function ForgotPasswordInner() {
 
               <button
                 onClick={handleResetPassword}
-                disabled={loading || !password || !confirmPassword}
+                disabled={loading || !password || !confirmPassword || !sessionReady}
                 className="w-full bg-gray-600 hover:bg-gray-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-2xl py-3.5 text-sm font-semibold transition-all active:scale-[0.99] shadow-sm mb-4 cursor-pointer flex items-center justify-center gap-2"
               >
                 {loading ? (

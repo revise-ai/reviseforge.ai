@@ -15,6 +15,7 @@ interface UserRow  { id:string; youtube:number; recordings:number; quizzes:numbe
 interface FeedbackRow { id:string; user_id:string; message_text:string; feedback_type:"up"|"down"; note:string; created_at:string; }
 interface ErrorRow { id:string; type:string; title:string; created_at:string; user_id:string; }
 interface Testimonial { id:string; user_id:string; message:string; rating:number; created_at:string; }
+interface OnboardingRow { id:string; user_id:string; language:string; use_case:string; goal:string; referral_source:string; created_at:string; }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (n:number) => n>=1000000?`${(n/1000000).toFixed(1)}M`:n>=1000?`${(n/1000).toFixed(1)}K`:String(n);
@@ -154,7 +155,7 @@ function NavItem({ label, icon, active, onClick, badge }: {
   );
 }
 
-type Page = "overview"|"users"|"content"|"feedback"|"health"|"testimonials";
+type Page = "overview"|"users"|"content"|"feedback"|"health"|"testimonials"|"surveys";
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
@@ -164,6 +165,7 @@ export default function AdminDashboard() {
   const [feedback, setFeedback]   = useState<FeedbackRow[]>([]);
   const [errors, setErrors]       = useState<ErrorRow[]>([]);
   const [testimonials]            = useState<Testimonial[]>([]);
+  const [onboarding, setOnboarding] = useState<OnboardingRow[]>([]);
   const [loading, setLoading]     = useState(true);
   const [fbFilter, setFbFilter]   = useState<"all"|"up"|"down">("all");
   const [search, setSearch]       = useState("");
@@ -176,7 +178,7 @@ export default function AdminDashboard() {
       const [
         {count:totalUsers},
         {data:ytData},{data:recData},{data:quizData},{data:flashData},{data:examData},
-        {data:fbData},{data:errQuiz},{data:errFlash},
+        {data:fbData},{data:errQuiz},{data:errFlash},{data:onboardingData},
       ] = await Promise.all([
         supabase.from("profiles").select("*",{count:"exact",head:true}),
         supabase.from("youtube_sessions").select("user_id,created_at"),
@@ -187,6 +189,7 @@ export default function AdminDashboard() {
         supabase.from("message_feedback").select("id,user_id,message_text,feedback_type,note,created_at").order("created_at",{ascending:false}).limit(200),
         supabase.from("quiz_sessions").select("id,file_name,status,created_at,user_id").eq("status","error"),
         supabase.from("flashcard_sessions").select("id,file_name,status,created_at,user_id").eq("status","error"),
+        supabase.from("user_onboarding").select("*").order("created_at",{ascending:false}),
       ]);
       const fb=(fbData??[]) as FeedbackRow[];
       const qScores=(quizData??[]).filter((q:any)=>q.score!=null&&q.total>0).map((q:any)=>Math.round((q.score/q.total)*100));
@@ -204,7 +207,7 @@ export default function AdminDashboard() {
         negativeFeedback:fb.filter(f=>f.feedback_type==="down").length,
         errorSessions:errRows.length, avgQuizScore:avg, examCompletionRate:examRate,
       });
-      setFeedback(fb); setErrors(errRows);
+      setFeedback(fb); setErrors(errRows); setOnboarding((onboardingData as OnboardingRow[])??[]);
       const map:Record<string,UserRow>={};
       const add=(arr:any[],field:keyof UserRow)=>(arr??[]).forEach((s:any)=>{
         if(!map[s.user_id])map[s.user_id]={id:s.user_id,youtube:0,recordings:0,quizzes:0,flashcards:0,exams:0};
@@ -284,6 +287,7 @@ export default function AdminDashboard() {
           <NavItem label="Content"       icon={Ic.chart}  active={page==="content"}        onClick={()=>setPage("content")}/>
           <NavItem label="Feedback"      icon={Ic.msg}    active={page==="feedback"}       onClick={()=>setPage("feedback")} badge={stats?.negativeFeedback}/>
           <NavItem label="Health"        icon={Ic.shield} active={page==="health"}         onClick={()=>setPage("health")} badge={stats?.errorSessions}/>
+          <NavItem label="Surveys"       icon={Ic.star}   active={page==="surveys"}        onClick={()=>setPage("surveys")}/>
 
           <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-3 py-2 mt-3">Community</p>
           <NavItem label="Testimonials"  icon={Ic.star}   active={page==="testimonials"}   onClick={()=>setPage("testimonials")}/>
@@ -311,7 +315,7 @@ export default function AdminDashboard() {
         <header className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between shrink-0 shadow-sm">
           <div>
             <h1 className="text-base font-black text-gray-900">
-              {page==="overview"?"Dashboard":page==="users"?"User Management":page==="content"?"Content Analytics":page==="feedback"?"Feedback Center":page==="health"?"System Health":"Testimonials"}
+              {page==="overview"?"Dashboard":page==="users"?"User Management":page==="content"?"Content Analytics":page==="feedback"?"Feedback Center":page==="health"?"System Health":page==="surveys"?"Survey Analytics":"Testimonials"}
             </h1>
             <p className="text-xs text-gray-400 mt-0.5">
               {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}
@@ -693,6 +697,114 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ═══════════════ SURVEYS ═══════════════ */}
+            {page==="surveys" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                  {/* Language Distribution */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                    <h3 className="text-sm font-black text-gray-800 mb-5">Preferred Languages</h3>
+                    <Donut segments={Object.entries(onboarding.reduce((acc, curr) => {
+                      acc[curr.language] = (acc[curr.language] || 0) + 1;
+                      return acc;
+                    }, {} as Record<string, number>))
+                      .sort((a,b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map(([label, value], i) => ({
+                        label, value, color: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][i % 5]
+                      }))
+                    }/>
+                  </div>
+
+                  {/* Use Case Distribution */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                    <h3 className="text-sm font-black text-gray-800 mb-5">Primary Use Case</h3>
+                    <BarChart data={Object.entries(onboarding.reduce((acc, curr) => {
+                      acc[curr.use_case] = (acc[curr.use_case] || 0) + 1;
+                      return acc;
+                    }, {} as Record<string, number>))
+                      .map(([label, value], i) => ({
+                        label, value, color: ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b"][i % 4]
+                      }))
+                    }/>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                   {/* Learning Goals */}
+                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                    <h3 className="text-sm font-black text-gray-800 mb-5">Learning Objectives</h3>
+                    <div className="space-y-4">
+                      {Object.entries(onboarding.reduce((acc, curr) => {
+                        acc[curr.goal] = (acc[curr.goal] || 0) + 1;
+                        return acc;
+                      }, {} as Record<string, number>))
+                      .sort((a,b) => b[1] - a[1])
+                      .map(([label, value]) => (
+                        <div key={label}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-semibold text-gray-600">{label}</span>
+                            <span className="text-xs font-black text-gray-800">{value}</span>
+                          </div>
+                          <div className="h-2 bg-gray-50 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full" style={{width: `${(value/Math.max(onboarding.length,1))*100}%`}} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Referral Sources */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                    <h3 className="text-sm font-black text-gray-800 mb-5">Discovery Sources</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {Object.entries(onboarding.reduce((acc, curr) => {
+                        acc[curr.referral_source] = (acc[curr.referral_source] || 0) + 1;
+                        return acc;
+                      }, {} as Record<string, number>))
+                      .sort((a,b) => b[1] - a[1])
+                      .map(([label, value]) => (
+                        <div key={label} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase truncate">{label}</p>
+                          <p className="text-xl font-black text-gray-800">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-50">
+                    <h3 className="text-sm font-black text-gray-800">Recent Responses</h3>
+                  </div>
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      <tr>
+                        <th className="px-6 py-3">User</th>
+                        <th className="px-6 py-3">Language</th>
+                        <th className="px-6 py-3">Use Case</th>
+                        <th className="px-6 py-3">Goal</th>
+                        <th className="px-6 py-3">Source</th>
+                        <th className="px-6 py-3 text-right">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {onboarding.slice(0, 20).map(row => (
+                        <tr key={row.id} className="text-xs hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 font-mono text-gray-400">{row.user_id.slice(0, 8)}...</td>
+                          <td className="px-6 py-4 text-gray-600">{row.language}</td>
+                          <td className="px-6 py-4"><span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-bold">{row.use_case}</span></td>
+                          <td className="px-6 py-4 text-gray-600">{row.goal}</td>
+                          <td className="px-6 py-4 text-gray-600">{row.referral_source}</td>
+                          <td className="px-6 py-4 text-right text-gray-400">{timeAgo(row.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 

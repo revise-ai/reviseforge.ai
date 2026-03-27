@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FlashcardsForm from "@/components/FlashcardsForm";
 import QuizForm from "@/components/QuizForms";
+import OnboardingModal from "@/components/OnboardingModal";
 import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1377,10 +1378,31 @@ export default function DashboardPage() {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const closeModal = () => setActiveModal(null);
+
+  // ─── Check Onboarding ───────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        const { data, error } = await supabase
+          .from("user_onboarding")
+          .select("id")
+          .eq("user_id", user.id)
+          .single();
+        
+        if (error && error.code === "PGRST116") {
+          setShowOnboarding(true);
+        }
+      }
+    })();
+  }, []);
 
   // ── Load 6 most recent sessions on mount ────────────────────────────────
   useEffect(() => {
@@ -1852,6 +1874,14 @@ export default function DashboardPage() {
       {/* Modals */}
       {activeModal === "quiz" && <QuizForm onClose={closeModal} />}
       {activeModal === "flashcards" && <FlashcardsForm onClose={closeModal} />}
+      
+      {showOnboarding && userId && (
+        <OnboardingModal 
+          show={showOnboarding} 
+          userId={userId} 
+          onComplete={() => setShowOnboarding(false)} 
+        />
+      )}
 
       {activeModal === "youtube" && (
         <YoutubeModal

@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (code) {
-    return NextResponse.redirect(`${origin}/dashboard`, { status: 302 });
+    return NextResponse.redirect(`${origin}/signin?confirmed=true`, { status: 302 });
   }
 
   if (invite) {

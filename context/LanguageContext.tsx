@@ -3,17 +3,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { translations, LanguageCode } from "@/lib/translations";
+import { translateText } from "@/lib/gemini";
 
 interface LanguageContextType {
   language: LanguageCode;
   setLanguage: (lang: LanguageCode) => Promise<void>;
   t: (key: string) => string;
+  aiTranslate: (text: string) => Promise<string>;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<LanguageCode>("English");
+  const [language, setLanguageState] = useState<LanguageCode>("English (United States)");
 
   const fetchLanguage = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -46,12 +48,17 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const t = (key: string): string => {
-    const langTranslations = translations[language] || translations["English"];
-    return langTranslations[key] || translations["English"][key] || key;
+    const langTranslations = translations[language] || translations["English (United States)"];
+    return langTranslations[key] || translations["English (United States)"][key] || key;
+  };
+
+  const aiTranslate = async (text: string): Promise<string> => {
+    if (language === "English (United States)") return text;
+    return await translateText(text, language);
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, aiTranslate }}>
       {children}
     </LanguageContext.Provider>
   );

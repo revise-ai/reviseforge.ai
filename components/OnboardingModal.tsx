@@ -11,39 +11,17 @@ interface OnboardingModalProps {
 }
 
 const LANGUAGES = [
-  { code: "US", name: "English" },
-  { code: "IN", name: "Hindi" },
-  { code: "ZA", name: "Afrikaans" },
-  { code: "AE", name: "Arabic" },
-  { code: "BD", name: "Bengali" },
-  { code: "BG", name: "Bulgarian" },
-  { code: "CZ", name: "Czech" },
-  { code: "DK", name: "Danish" },
-  { code: "DE", name: "German" },
-  { code: "GR", name: "Greek" },
-  { code: "ES", name: "Spanish" },
-  { code: "FI", name: "Finnish" },
-  { code: "FR", name: "French" },
-  { code: "IL", name: "Hebrew" },
-  { code: "HU", name: "Hungarian" },
-  { code: "ID", name: "Indonesian" },
-  { code: "IT", name: "Italian" },
-  { code: "JP", name: "Japanese" },
-  { code: "KR", name: "Korean" },
-  { code: "NL", name: "Dutch" },
-  { code: "NO", name: "Norwegian" },
-  { code: "PL", name: "Polish" },
-  { code: "PT", name: "Portuguese" },
-  { code: "RO", name: "Romanian" },
-  { code: "RU", name: "Russian" },
-  { code: "SK", name: "Slovak" },
-  { code: "SE", name: "Swedish" },
-  { code: "IN", name: "Tamil" },
-  { code: "TH", name: "Thai" },
-  { code: "TR", name: "Turkish" },
-  { code: "UA", name: "Ukrainian" },
-  { code: "VN", name: "Vietnamese" },
-  { code: "CN", name: "Chinese" },
+  { code: "US", name: "English (United States)" },
+  { code: "FR", name: "Français (France)" },
+  { code: "DE", name: "Deutsch (Deutschland)" },
+  { code: "IN", name: "हिन्दी (भारत)" },
+  { code: "ID", name: "Indonesia (Indonesia)" },
+  { code: "IT", name: "Italiano (Italia)" },
+  { code: "JP", name: "日本語 (日本)" },
+  { code: "KR", name: "한국어 (대한민국)" },
+  { code: "BR", name: "Português (Brasil)" },
+  { code: "MX", name: "Español (Latinoamérica)" },
+  { code: "ES", name: "Español (España)" },
 ];
 
 const USE_CASES = ["Work", "Study", "Personal", "Teaching"];
@@ -61,7 +39,7 @@ const SOURCES = [
 
 export default function OnboardingModal({ show, userId, onComplete }: OnboardingModalProps) {
   const [step, setStep] = useState(1);
-  const [lang, setLang] = useState("English");
+  const [lang, setLang] = useState("English (United States)");
   const [useCase, setUseCase] = useState("");
   const [goal, setGoal] = useState("");
   const [source, setSource] = useState("");

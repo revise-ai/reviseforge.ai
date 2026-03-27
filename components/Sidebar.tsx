@@ -4,6 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { translations, LanguageCode } from "@/lib/translations";
+import Image from "next/image";
 import { useLanguage } from "@/context/LanguageContext";
 import { languages } from "@/lib/translations";
 import AddNotePanel from "./AddNotePanel";
@@ -137,9 +139,15 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
       {/* ── Collapsed icon sidebar ── */}
       <aside className="fixed left-0 top-0 bottom-0 w-22.5 bg-white border-r border-gray-200 flex flex-col z-40">
         {/* Logo */}
-        <div className="flex items-center justify-center py-5 shrink-0">
-          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center">
-            <div className="w-6 h-6 bg-white rounded-md" />
+        <div className="flex items-center justify-center py-6 shrink-0">
+          <div className="w-12 h-12 flex items-center justify-center">
+            <Image 
+              src="/assets/reviseforge-icon-only.png" 
+              alt="ReviseForge Logo" 
+              width={40} 
+              height={40}
+              className="object-contain"
+            />
           </div>
         </div>
 

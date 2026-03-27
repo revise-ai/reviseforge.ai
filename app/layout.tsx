@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "ReviseForge",
   description:
     "Platform where students can upload reading materials for their daily use",
+  icons: {
+    icon: "/assets/reviseforge-icon-only.png",
+  },
 };
 
 export default function RootLayout({

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 
 function Toast({
@@ -134,25 +135,27 @@ function SigninInner() {
     <main className="min-h-screen bg-white flex flex-col">
       {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
 
-      <div className="px-6 py-5 flex items-center gap-2">
-        <button className="text-gray-500 hover:text-gray-800 transition-colors">
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-        <div className="flex items-end gap-0.5 ml-1">
-          <span className="w-2 h-5 bg-gray-900 rounded-sm" />
-          <span className="w-2 h-3 bg-gray-900 rounded-sm" />
-          <span className="w-1 h-1.5 bg-gray-900 rounded-full mb-0.5" />
-        </div>
+      <div className="px-6 py-8 flex justify-center">
+        <Image 
+          src="/assets/reviseforge-icon-only.png" 
+          alt="ReviseForge Logo" 
+          width={32} 
+          height={32}
+          className="object-contain"
+          priority
+        />
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 pb-16">
         <div className="w-full max-w-[420px] flex flex-col items-center">
-          <div className="flex items-end gap-0.5 mb-8">
-            <span className="w-3 h-7 bg-gray-900 rounded-sm" />
-            <span className="w-3 h-4 bg-gray-900 rounded-sm" />
-            <span className="w-1.5 h-2 bg-gray-900 rounded-full mb-0.5" />
+          <div className="mb-8">
+            <Image 
+              src="/assets/reviseforge-icon-only.png" 
+              alt="ReviseForge Logo" 
+              width={48} 
+              height={48}
+              className="object-contain"
+            />
           </div>
 
           <h1 className="text-3xl font-semibold text-gray-900 mb-2">Welcome back</h1>

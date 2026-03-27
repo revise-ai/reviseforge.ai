@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -80,6 +81,15 @@ export default function OnboardingModal({ show, userId, onComplete }: Onboarding
   return (
     <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-xl flex flex-col items-center">
+        <div className="w-12 h-12 flex items-center justify-center mx-auto mb-4">
+          <Image 
+            src="/assets/reviseforge-icon-only.png" 
+            alt="ReviseForge Logo" 
+            width={48} 
+            height={48}
+            className="object-contain"
+          />
+        </div>
         {/* Progress Bar */}
         <div className="w-full max-w-xs flex gap-1 mb-12">
           {[1, 2, 3, 4].map((s) => (

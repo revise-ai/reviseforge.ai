@@ -260,7 +260,7 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center"><div className="w-4 h-4 bg-white rounded"/></div>
-                <span className="text-lg font-bold"><span className="text-gray-900">Study</span><span className="text-blue-600">Forge</span></span>
+                <span className="text-lg font-bold"><span className="text-gray-900">Revise</span><span className="text-blue-600">Forge</span></span>
               </div>
               <button onClick={() => setShowChannelsPanel(false)} className="cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>

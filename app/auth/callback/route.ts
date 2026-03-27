@@ -25,9 +25,7 @@ export async function GET(request: NextRequest) {
                 cookieStore.set(name, value, options)
               );
             } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
+              // This can be ignored if you have middleware refreshing user sessions.
             }
           },
         },
@@ -38,18 +36,20 @@ export async function GET(request: NextRequest) {
     
     if (!error) {
       if (type === "recovery") {
-        return NextResponse.redirect(`${origin}/forgot-password?mode=reset&code=${code}`, { status: 302 });
+        return NextResponse.redirect(`${request.nextUrl.origin}/forgot-password?mode=reset&code=${code}`);
       }
 
-      // Default redirect for signups/email confirmations
-      return NextResponse.redirect(`${origin}/dashboard`, { status: 302 });
+      // If there's an invite, ensure we keep it in mind, though session exchange usually suffices
+      // Redirect to the intended 'next' destination (defaults to /dashboard)
+      return NextResponse.redirect(`${request.nextUrl.origin}${next}`);
     }
   }
 
+  // If we have an invite but no code/session yet, go to signin
   if (invite) {
-    return NextResponse.redirect(`${origin}/signin?invite=${invite}`, { status: 302 });
+    return NextResponse.redirect(`${request.nextUrl.origin}/signin?invite=${invite}`);
   }
 
-  // fallback
-  return NextResponse.redirect(`${origin}/signin`, { status: 302 });
+  // Default fallback to signin
+  return NextResponse.redirect(`${request.nextUrl.origin}/signin`);
 }

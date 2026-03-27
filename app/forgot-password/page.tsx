@@ -83,19 +83,35 @@ function ForgotPasswordInner() {
   const showToast = (message: string, type: "error" | "success") => setToast({ message, type });
   const strength = getStrength(password);
 
-  // Check for session in reset mode (now exchanged on server in /auth/callback)
+  // Handle authentication in reset mode
   useEffect(() => {
     if (!isResetMode) return;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const code = searchParams.get("code");
+
+    const handleAuth = async () => {
+      // 1. Check if we already have a session (might be auto-detected)
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setSessionReady(true);
-      } else {
-        // If no session is found, the link might be invalid or the exchange failed on the server
-        showToast("Invalid or expired reset link. Please request a new one.", "error");
+        return;
       }
-    });
-  }, [isResetMode]);
+
+      // 2. If no session but we have a code, try manual exchange
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) {
+          setSessionReady(true);
+          return;
+        }
+      }
+
+      // 3. If no session and no valid code, show error
+      showToast("Invalid or expired reset link. Please request a new one.", "error");
+    };
+
+    handleAuth();
+  }, [isResetMode, searchParams]);
 
   // Send reset link
   const handleSendLink = async () => {

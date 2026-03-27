@@ -221,36 +221,48 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                   {/* Menu items */}
                   <div className="py-1">
                     {/* Language Selection */}
-                    <div className="relative">
+                    <div className="relative group/lang">
                       <button 
-                        onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                        className="cursor-pointer w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onMouseEnter={() => setShowLanguageMenu(true)}
+                        className={`cursor-pointer w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${showLanguageMenu ? 'bg-gray-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                          <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${showLanguageMenu ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-gray-800">{t('sidebar_language')}</p>
-                          <p className="text-xs text-gray-400">{language}</p>
+                          <p className="font-medium text-[t('sidebar_language')]">{t('sidebar_language')}</p>
+                          <p className="text-[11px] opacity-70 truncate">{language}</p>
                         </div>
-                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showLanguageMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        <svg className="w-3.5 h-3.5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                       </button>
 
                       {showLanguageMenu && (
-                        <div className="absolute bottom-full left-0 w-full bg-white border border-gray-100 rounded-xl shadow-xl mb-2 max-h-48 overflow-y-auto z-[60] custom-scrollbar">
-                          {Object.entries(languages).map(([code, details]) => (
-                            <button
-                              key={code}
-                              onClick={() => {
-                                setLanguage(code);
-                                setShowLanguageMenu(false);
-                              }}
-                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${language === code ? 'text-blue-600 font-semibold bg-blue-50' : 'text-gray-600'}`}
-                            >
-                              <span className="text-xs font-mono text-gray-400 w-5">{details.flag}</span>
-                              {code}
-                            </button>
-                          ))}
+                        <div 
+                          onMouseLeave={() => setShowLanguageMenu(false)}
+                          className="absolute left-full top-0 ml-1 w-64 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2 z-[60]"
+                        >
+                          <div className="px-3 py-2 border-b border-gray-50 mb-1">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('sidebar_select_language')}</p>
+                          </div>
+                          <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
+                            {Object.entries(languages).map(([code, details]) => (
+                              <button
+                                key={code}
+                                onClick={() => {
+                                  setLanguage(code as any);
+                                  setShowLanguageMenu(false);
+                                  setShowUserMenu(false);
+                                }}
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors group/item ${language === code ? 'text-blue-600 font-semibold bg-blue-50/50' : 'text-gray-600'}`}
+                              >
+                                <span className="text-base shrink-0">{details.flag}</span>
+                                <span className="flex-1 truncate">{code}</span>
+                                {language === code && (
+                                  <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>

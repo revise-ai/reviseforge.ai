@@ -109,7 +109,7 @@ export default function OnboardingModal({ show, userId, onComplete }: Onboarding
                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest px-1">
                 Preferred Language
               </label>
-              <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto px-1 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[600px] overflow-y-auto px-1 custom-scrollbar">
                 {LANGUAGES.map((l) => (
                   <button
                     key={l.name}

@@ -1121,7 +1121,7 @@ function ExamModeContent() {
         )}
         <ExamModeModal
           show={true}
-          onClose={() => {}}
+          onClose={() => router.push("/dashboard")}
           onReady={(file) => generateExam(file)}
         />
       </>

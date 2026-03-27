@@ -204,7 +204,7 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                 {/* Backdrop */}
                 <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
 
-                <div className="absolute bottom-full left-full ml-2 mb-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                <div className="absolute bottom-full left-full ml-2 mb-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50">
                   {/* User info header */}
                   <div className="px-4 py-4 border-b border-gray-100">
                     <div className="flex items-center gap-3">
@@ -224,6 +224,10 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                     <div className="relative group/lang">
                       <button 
                         onMouseEnter={() => setShowLanguageMenu(true)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowLanguageMenu(!showLanguageMenu);
+                        }}
                         className={`cursor-pointer w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${showLanguageMenu ? 'bg-gray-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
                       >
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${showLanguageMenu ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>

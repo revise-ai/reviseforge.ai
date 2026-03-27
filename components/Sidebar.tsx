@@ -256,7 +256,7 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                           <div className="px-4 py-2 border-b border-gray-50 mb-1">
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none py-1">{t('sidebar_select_language')}</p>
                           </div>
-                          <div className="max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
+                          <div className="max-h-[380px] overflow-y-auto custom-scrollbar pr-1 pb-4">
                             {Object.entries(languages).map(([code, details]) => (
                               <button
                                 key={code}

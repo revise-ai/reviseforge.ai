@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import NoteModal from "./NoteModal";
 
 interface Note {
@@ -69,13 +70,15 @@ export default function AddNotePanel({
         <div className="px-6 py-6 border-b border-gray-100 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                <div className="w-5 h-5 bg-white rounded" />
-              </div>
-              <span className="text-xl font-bold">
-                <span className="text-gray-900">Study</span>
-                <span className="text-blue-600">Forge</span>
-              </span>
+              <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
+                <Image 
+                  src="/assets/reviseforge-logo-full.png" 
+                  alt="ReviseForge Logo" 
+                  width={140} 
+                  height={32}
+                  className="object-contain"
+                />
+              </Link>
             </div>
             <button
               onClick={onClose}

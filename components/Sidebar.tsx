@@ -243,12 +243,12 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                       {showLanguageMenu && (
                         <div 
                           onMouseLeave={() => setShowLanguageMenu(false)}
-                          className="absolute left-full top-[-112px] ml-1 w-72 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2 z-[60] animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden"
+                          className="absolute left-full top-[-112px] ml-1 w-72 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2 z-[60] animate-in fade-in slide-in-from-left-2 duration-200"
                         >
                           <div className="px-4 py-2 border-b border-gray-50 mb-1">
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none py-1">{t('sidebar_select_language')}</p>
                           </div>
-                          <div className="py-1">
+                          <div className="max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
                             {Object.entries(languages).map(([code, details]) => (
                               <button
                                 key={code}

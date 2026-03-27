@@ -14,8 +14,20 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+const COOKIE_NAME = "reviseforge_locale";
+
+function getCookie(name: string) {
+  if (typeof document === "undefined") return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(";").shift();
+  return null;
+}
+
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<LanguageCode>("English (United States)");
+  const [language, setLanguageState] = useState<LanguageCode>(() => {
+    return (getCookie(COOKIE_NAME) as LanguageCode) || "English (United States)";
+  });
 
   const fetchLanguage = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -38,6 +50,8 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const setLanguage = async (newLang: LanguageCode) => {
     setLanguageState(newLang);
+    document.cookie = `${COOKIE_NAME}=${newLang}; path=/; max-age=${60 * 60 * 24 * 365}`;
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase

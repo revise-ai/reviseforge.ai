@@ -234,7 +234,7 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-[t('sidebar_language')]">{t('sidebar_language')}</p>
+                          <p className="font-medium">{t('sidebar_language')}</p>
                           <p className="text-[11px] opacity-70 truncate">{language}</p>
                         </div>
                         <svg className="w-3.5 h-3.5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
@@ -243,12 +243,12 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                       {showLanguageMenu && (
                         <div 
                           onMouseLeave={() => setShowLanguageMenu(false)}
-                          className="absolute left-full top-0 ml-1 w-64 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2 z-[60]"
+                          className="absolute left-full top-[-80px] ml-1 w-64 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2 z-[60] animate-in fade-in slide-in-from-left-2 duration-200"
                         >
-                          <div className="px-3 py-2 border-b border-gray-50 mb-1">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('sidebar_select_language')}</p>
+                          <div className="px-4 py-2 border-b border-gray-50 mb-1">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none py-1">{t('sidebar_select_language')}</p>
                           </div>
-                          <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
+                          <div className="py-1">
                             {Object.entries(languages).map(([code, details]) => (
                               <button
                                 key={code}
@@ -257,12 +257,12 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                                   setShowLanguageMenu(false);
                                   setShowUserMenu(false);
                                 }}
-                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors group/item ${language === code ? 'text-blue-600 font-semibold bg-blue-50/50' : 'text-gray-600'}`}
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors group/item cursor-pointer ${language === code ? 'text-blue-600 font-semibold bg-blue-50/50' : 'text-gray-600'}`}
                               >
-                                <span className="text-base shrink-0">{details.flag}</span>
-                                <span className="flex-1 truncate">{code}</span>
+                                <span className="text-base shrink-0 select-none">{details.flag}</span>
+                                <span className="flex-1 truncate select-none">{code}</span>
                                 {language === code && (
-                                  <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                  <svg className="w-4 h-4 text-blue-500 animate-in zoom-in duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                 )}
                               </button>
                             ))}

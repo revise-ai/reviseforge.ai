@@ -15,8 +15,6 @@ import QuizForm from "@/components/QuizForms";
 import OnboardingModal from "@/components/OnboardingModal";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/context/LanguageContext";
-import YoutubeModal from "@/components/YoutubeModal";
-import RecordingModal from "@/components/RecordingModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -168,8 +168,8 @@ function SignupInner() {
           <Image 
             src="/assets/reviseforge-logo-full.png" 
             alt="ReviseForge Logo" 
-            width={120} 
-            height={32}
+            width={180} 
+            height={48}
             className="object-contain"
             priority
           />
@@ -179,11 +179,11 @@ function SignupInner() {
       <div className="flex-1 flex flex-col items-center justify-center px-4 pb-16">
         <div className="w-full max-w-[420px] flex flex-col items-center">
           <div className="mb-8">
-            <Image
-              src="/assets/reviseforge-logo-full.png"
-              alt="ReviseForge Logo"
-              width={48}
-              height={48}
+            <Image 
+              src="/assets/reviseforge-logo-full.png" 
+              alt="ReviseForge Logo" 
+              width={80} 
+              height={80}
               className="object-contain"
             />
           </div>

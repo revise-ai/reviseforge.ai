@@ -74,8 +74,8 @@ export default function AddNotePanel({
                 <Image 
                   src="/assets/reviseforge-logo-full.png" 
                   alt="ReviseForge Logo" 
-                  width={140} 
-                  height={32}
+                  width={200} 
+                  height={42}
                   className="object-contain"
                 />
               </Link>

@@ -144,8 +144,8 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
             <Image 
               src="/assets/reviseforge-icon-only.png" 
               alt="ReviseForge Logo" 
-              width={40} 
-              height={40}
+              width={50} 
+              height={50}
               className="object-contain"
             />
           </div>

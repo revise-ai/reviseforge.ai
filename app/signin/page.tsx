@@ -140,8 +140,8 @@ function SigninInner() {
           <Image 
             src="/assets/reviseforge-logo-full.png" 
             alt="ReviseForge Logo" 
-            width={120} 
-            height={32}
+            width={180} 
+            height={48}
             className="object-contain"
             priority
           />
@@ -154,8 +154,8 @@ function SigninInner() {
             <Image
               src="/assets/reviseforge-logo-full.png"
               alt="ReviseForge Logo"
-              width={48}
-              height={48}
+              width={80}
+              height={80}
               className="object-contain"
             />
           </div>

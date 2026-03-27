@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface OnboardingModalProps {
   show: boolean;
@@ -66,21 +67,27 @@ export default function OnboardingModal({ show, userId, onComplete }: Onboarding
   const [source, setSource] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const { setLanguage } = useLanguage();
+
   const totalSteps = 4;
 
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("user_onboarding").insert({
+      // 1. Save to user_onboarding table
+      const { error: onboardingError } = await supabase.from("user_onboarding").insert({
         user_id: userId,
         language: lang,
         use_case: useCase,
         goal: goal,
         referral_source: source,
       });
-      if (error) {
-        console.error("Onboarding error:", error);
+
+      if (onboardingError) {
+        console.error("Onboarding error:", onboardingError);
       } else {
+        // 2. Sync with global LanguageContext (which also updates profiles table)
+        await setLanguage(lang);
         onComplete();
       }
     } catch (err) {

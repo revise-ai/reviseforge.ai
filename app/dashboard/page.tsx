@@ -14,6 +14,9 @@ import FlashcardsForm from "@/components/FlashcardsForm";
 import QuizForm from "@/components/QuizForms";
 import OnboardingModal from "@/components/OnboardingModal";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/context/LanguageContext";
+import YoutubeModal from "@/components/YoutubeModal";
+import RecordingModal from "@/components/RecordingModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1381,6 +1384,7 @@ export default function DashboardPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const closeModal = () => setActiveModal(null);
@@ -1549,8 +1553,8 @@ export default function DashboardPage() {
   const tools = [
     {
       id: "quiz" as ModalType,
-      label: "Start a Quiz",
-      description: "Test your knowledge instantly",
+      label: t('tool_quiz'),
+      description: t('tool_quiz_desc'),
       bg: "bg-yellow-100",
       iconBg: "bg-yellow-100",
       iconColor: "text-yellow-500",
@@ -1572,8 +1576,8 @@ export default function DashboardPage() {
     },
     {
       id: "flashcards" as ModalType,
-      label: "Make Flashcards",
-      description: "Memorize faster with spaced repetition",
+      label: t('tool_flashcards'),
+      description: t('tool_flashcards_desc'),
       bg: "bg-green-100",
       iconBg: "bg-green-100",
       iconColor: "text-green-500",
@@ -1595,8 +1599,8 @@ export default function DashboardPage() {
     },
     {
       id: "recording" as ModalType,
-      label: "Record a Lecture",
-      description: "Upload audio or record live",
+      label: t('tool_recording'),
+      description: t('tool_recording_desc'),
       bg: "bg-sky-100",
       iconBg: "bg-sky-100",
       iconColor: "text-sky-400",
@@ -1618,8 +1622,8 @@ export default function DashboardPage() {
     },
     {
       id: "youtube" as ModalType,
-      label: "Paste a YouTube Link",
-      description: "Turn any video into study material",
+      label: t('tool_youtube'),
+      description: t('tool_youtube_desc'),
       bg: "bg-rose-100",
       iconBg: "bg-rose-100",
       iconColor: "text-rose-500",
@@ -1665,9 +1669,9 @@ export default function DashboardPage() {
           />
         </svg>
         <h1 className="text-3xl font-semibold text-gray-800 text-center">
-          What would you like to study today?
+          {t('dashboard_welcome')}
         </h1>
-        <p className="text-gray-400 mt-2 text-sm">Pick a tool to get started</p>
+        <p className="text-gray-400 mt-2 text-sm">{t('dashboard_subtitle')}</p>
       </div>
 
       {/* Tool Cards */}
@@ -1730,7 +1734,7 @@ export default function DashboardPage() {
           value={youtubeLink}
           onChange={(e) => setYoutubeLink(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit(e as any)}
-          placeholder="Ask anything, or paste a YouTube link..."
+          placeholder={t('placeholder_search')}
           className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-300 outline-none"
         />
         <button
@@ -1771,14 +1775,14 @@ export default function DashboardPage() {
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
-          <h1>Recent</h1>
+          <h1>{t('dashboard_recent')}</h1>
         </div>
         <div>
           <Link
             href="/dashboard/history"
             className="flex items-center gap-2 hover:text-gray-700 transition-colors duration-200"
           >
-            <h1>View all</h1>
+            <h1>{t('dashboard_view_all')}</h1>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="20"

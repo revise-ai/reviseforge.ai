@@ -381,7 +381,7 @@ export default function FeaturesSection() {
               potential
             </h2>
             <p className="text-base text-gray-500 leading-relaxed mb-8">
-              Here's (almost) everything StudyForge offers to help you study
+              Here's (almost) everything ReviseForge offers to help you study
               smarter, retain more, and perform better — all in one place.
             </p>
             <a

@@ -66,12 +66,9 @@ function SigninInner() {
   const closeToast = () => setToast(null);
 
   useEffect(() => {
-    if (searchParams.get("confirmed") === "true") {
-      showToast("Email confirmed! You can now sign in to your account.", "success");
-      // Remove the param from URL without refreshing
-      const url = new URL(window.location.href);
-      url.searchParams.delete("confirmed");
-      window.history.replaceState({}, "", url.toString());
+    const invite = searchParams.get("invite");
+    if (invite) {
+      sessionStorage.setItem("pendingInviteCode", invite);
     }
   }, [searchParams]);
 

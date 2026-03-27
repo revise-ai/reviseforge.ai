@@ -104,7 +104,7 @@ function SignupInner() {
         password,
         options: {
           data: { full_name: fullName },
-          // No emailRedirectTo here — Supabase uses the Site URL + auth/callback
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 

@@ -111,7 +111,7 @@ export default function OnboardingModal({ show, userId, onComplete }: Onboarding
           {step === 1 && "Kickstart your personalized learning experience"}
           {step === 2 && "What describes your primary use case?"}
           {step === 3 && "What is your top learning objective?"}
-          {step === 4 && "Where did you first discover StudyForge?"}
+          {step === 4 && "Where did you first discover ReviseForge?"}
         </h2>
         <p className="text-gray-400 text-sm mb-8 text-center">
           Help us tailor the experience just for you.

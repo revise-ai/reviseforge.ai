@@ -723,7 +723,7 @@ function RightSidebar({
               )}
               <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
               <span className="text-sm font-medium text-gray-700">
-                {isChatMode ? "Chat" : activeTool ? toolTitle : "StudyForge"}
+                {isChatMode ? "Chat" : activeTool ? toolTitle : "ReviseForge"}
               </span>
             </div>
 

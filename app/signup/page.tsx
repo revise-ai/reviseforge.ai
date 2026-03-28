@@ -165,10 +165,10 @@ function SignupInner() {
 
       <div className="px-8 py-8 flex justify-start">
         <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
-          <Image 
-            src="/assets/reviseforge-logo-full.png" 
-            alt="ReviseForge Logo" 
-            width={180} 
+          <Image
+            src="/assets/reviseforge-logo-full.png"
+            alt="ReviseForge Logo"
+            width={180}
             height={48}
             className="object-contain"
             priority
@@ -178,16 +178,6 @@ function SignupInner() {
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 pb-16">
         <div className="w-full max-w-[420px] flex flex-col items-center">
-          <div className="mb-8">
-            <Image 
-              src="/assets/reviseforge-logo-full.png" 
-              alt="ReviseForge Logo" 
-              width={80} 
-              height={80}
-              className="object-contain"
-            />
-          </div>
-
           <h1 className="text-3xl font-semibold text-gray-900 mb-2">Create an account</h1>
           <p className="text-gray-400 text-sm mb-8">Start studying smarter today.</p>
 
@@ -273,8 +263,8 @@ function SignupInner() {
                 ))}
               </div>
               <p className={`text-xs ${strength.label === "Weak" ? "text-red-400" :
-                  strength.label === "Fair" ? "text-yellow-500" :
-                    strength.label === "Good" ? "text-blue-400" : "text-green-500"
+                strength.label === "Fair" ? "text-yellow-500" :
+                  strength.label === "Good" ? "text-blue-400" : "text-green-500"
                 }`}>
                 {strength.label} password
               </p>

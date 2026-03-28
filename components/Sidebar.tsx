@@ -251,7 +251,7 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                       {showLanguageMenu && (
                         <div 
                           onMouseLeave={() => setShowLanguageMenu(false)}
-                          className="absolute left-full top-[-112px] ml-1 w-72 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2 z-[60] animate-in fade-in slide-in-from-left-2 duration-200"
+                          className="absolute left-full bottom-0 ml-1 w-72 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2 z-[60] animate-in fade-in slide-in-from-left-2 duration-200"
                         >
                           <div className="px-4 py-2 border-b border-gray-50 mb-1">
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none py-1">{t('sidebar_select_language')}</p>
@@ -311,9 +311,14 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
           <div className="fixed inset-0 z-30 bg-black/20" onClick={() => setShowChannelsPanel(false)} />
           <div className="fixed left-22.5 top-0 bottom-0 w-90 bg-white border-r border-gray-200 shadow-lg z-40 flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center"><div className="w-4 h-4 bg-white rounded"/></div>
-                <span className="text-lg font-bold"><span className="text-gray-900">Revise</span><span className="text-blue-600">Forge</span></span>
+              <div className="flex items-center">
+                <Image 
+                  src="/assets/reviseforge-logo-full.png" 
+                  alt="ReviseForge Logo" 
+                  width={140} 
+                  height={32}
+                  className="h-8 w-auto object-contain"
+                />
               </div>
               <button onClick={() => setShowChannelsPanel(false)} className="cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>

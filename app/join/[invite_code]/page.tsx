@@ -37,17 +37,12 @@ export default function JoinPage({
 
   useEffect(() => {
     (async () => {
-      console.log("🔍 Looking up invite_code:", invite_code);
-
-      // 1. Fetch invite — select * so we see all columns regardless of naming
+      // 1. Fetch invite
       const { data: inviteData, error: inviteError } = await supabase
         .from("channel_invites")
         .select("*")
         .eq("invite_code", invite_code)
         .maybeSingle();
-
-      console.log("📦 Invite data:", inviteData);
-      console.log("❌ Invite error:", inviteError);
 
       if (inviteError || !inviteData) {
         setInvalidReason("Invite not found in database.");
@@ -67,7 +62,6 @@ export default function JoinPage({
       // Check expiry
       const now = new Date();
       const expiresAt = new Date(inviteData.expires_at);
-      console.log("⏰ Now:", now.toISOString(), "Expires:", expiresAt.toISOString());
 
       if (expiresAt < now) {
         setInvalidReason("This invite has expired.");
@@ -88,13 +82,11 @@ export default function JoinPage({
       }
 
       // 2. Fetch channel name
-      const { data: channelData, error: channelError } = await supabase
+      const { data: channelData } = await supabase
         .from("channels")
         .select("name")
         .eq("id", inviteData.channel_id)
         .single();
-
-      console.log("📺 Channel data:", channelData, "error:", channelError);
 
       setInvite({
         id: inviteData.id,
@@ -110,8 +102,6 @@ export default function JoinPage({
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
-      console.log("👤 Current user:", user?.id ?? "not logged in");
 
       if (!user) {
         sessionStorage.setItem("pendingInviteCode", invite_code);
@@ -154,7 +144,6 @@ export default function JoinPage({
     });
 
     if (error && error.code !== "23505") {
-      console.error("Join error:", error);
       setJoining(false);
       return;
     }

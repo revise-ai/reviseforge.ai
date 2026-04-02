@@ -2,6 +2,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { UtilitySchema, validationError, serverError } from "@/lib/validation";
+import { getServerUser, unauthorizedError } from "@/lib/auth-server";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -69,9 +72,17 @@ ${noteContent}`;
 // ── Route Handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const user = await getServerUser();
+  if (!user) return unauthorizedError();
+
+  const blocked = await applyRateLimit(req, RATE_LIMITS.utility, "gemini-polish");
+  if (blocked) return blocked;
+
   try {
     const body = await req.json();
-    const { mode, noteContent, resourceParts } = body;
+    const result = UtilitySchema.safeParse(body);
+    if (!result.success) return validationError(result.error);
+    const { mode, noteContent, resourceParts } = result.data;
 
     if (!mode) {
       return NextResponse.json({ error: "No mode provided" }, { status: 400 });
@@ -117,15 +128,20 @@ export async function POST(req: NextRequest) {
       },
     } as any);
 
-    const result = response.text ?? "";
-    if (!result) throw new Error("Empty response from Gemini");
+    const resultText = response.text ?? "";
+    if (!resultText) throw new Error("Empty response from Gemini");
 
-    return NextResponse.json({ result });
+    return NextResponse.json({ result: resultText });
   } catch (error: any) {
-    console.error("Gemini polish error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to polish note" },
-      { status: 500 },
-    );
+    console.error(`Gemini polish error [User: ${user.id}]:`, error);
+
+    if (error?.message?.includes("429") || error?.message?.includes("quota")) {
+      return NextResponse.json(
+        { error: "API quota exceeded. Please wait a moment and try again." },
+        { status: 429 },
+      );
+    }
+
+    return serverError();
   }
 }

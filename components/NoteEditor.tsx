@@ -2423,6 +2423,7 @@ export default function NoteEditor({
     "saved" | "saving" | "unsaved"
   >("saved");
   const [secondsSaved, setSecondsSaved] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const [showAIModal, setShowAIModal] = useState(false);
   const [polishStep, setPolishStep] = useState<PolishMode>("choose");
@@ -2615,10 +2616,14 @@ export default function NoteEditor({
   useEffect(() => {
     if (!noteId) return;
     const loadNote = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserId(user.id);
+
       const { data, error } = await supabase
         .from("notes")
         .select("name, content")
         .eq("id", noteId)
+        .eq("user_id", user?.id || "none")
         .single();
       if (!error && data) {
         setNoteName(data.name);
@@ -2647,7 +2652,8 @@ export default function NoteEditor({
             content,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", noteId);
+          .eq("id", noteId)
+          .eq("user_id", userId || "none");
       }
       setSavedStatus("saved");
       setSecondsSaved(0);

@@ -779,6 +779,7 @@ export default function QuizPage() {
   );
   const [showExplanation, setShowExplanation] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   // ── On mount ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -786,32 +787,36 @@ export default function QuizPage() {
     if (hasRun.current) return;
     hasRun.current = true;
 
-    if (!urlSessionId) {
-      setError(
-        "No quiz session found. Please start a new quiz from the dashboard.",
-      );
-      setLoading(false);
-      return;
+    async function init() {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) setUserId(authUser.id);
+
+      if (!urlSessionId) {
+        setError(
+          "No quiz session found. Please start a new quiz from the dashboard.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      const b64File = sessionStorage.getItem("quiz_file");
+      const name = sessionStorage.getItem("quiz_filename");
+
+      if (name) setFileName(name);
+
+      if (b64File && name) {
+        generateAndPersist(b64File, name, urlSessionId, authUser?.id);
+      } else {
+        loadQuestionsFromDB(urlSessionId, authUser?.id);
+      }
     }
 
-    const b64File = sessionStorage.getItem("quiz_file");
-    const name = sessionStorage.getItem("quiz_filename");
-
-    if (name) setFileName(name);
-
-    if (b64File && name) {
-      // Fresh quiz — file data is in sessionStorage
-      // Don't remove it yet; generateAndPersist will clear it on success
-      generateAndPersist(b64File, name, urlSessionId);
-    } else {
-      // Page refreshed or revisited — load from DB
-      loadQuestionsFromDB(urlSessionId);
-    }
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSessionId]);
 
   // ── Load from DB ──────────────────────────────────────────────────────────
-  const loadQuestionsFromDB = async (sid: string) => {
+  const loadQuestionsFromDB = async (sid: string, currentUid?: string) => {
     setLoading(true);
     try {
       const { data: session, error: sessionErr } = await supabase
@@ -834,7 +839,8 @@ export default function QuizPage() {
       await supabase
         .from("quiz_sessions")
         .update({ last_visited: new Date().toISOString() })
-        .eq("id", sid);
+        .eq("id", sid)
+        .eq("user_id", currentUid || "none");
 
       const { data, error: dbErr } = await supabase
         .from("quiz_questions")
@@ -892,6 +898,7 @@ export default function QuizPage() {
     base64File: string,
     name: string,
     sid: string,
+    currentUid?: string,
   ) => {
     setLoading(true);
     setError("");
@@ -916,6 +923,7 @@ export default function QuizPage() {
       // Persist questions to DB
       const rows = qs.map((q, i) => ({
         session_id: sid,
+        user_id: currentUid,
         question_order: i + 1,
         question: q.question,
         option_a: q.options.A,
@@ -951,7 +959,8 @@ export default function QuizPage() {
           total: qs.length,
           last_visited: new Date().toISOString(),
         })
-        .eq("id", sid);
+        .eq("id", sid)
+        .eq("user_id", currentUid || "none");
 
       // ✅ Only clear sessionStorage after successful generation
       clearSessionStorage();
@@ -960,7 +969,8 @@ export default function QuizPage() {
       await supabase
         .from("quiz_sessions")
         .update({ status: "error" })
-        .eq("id", sid);
+        .eq("id", sid)
+        .eq("user_id", currentUid || "none");
     } finally {
       setLoading(false);
     }
@@ -1033,6 +1043,7 @@ export default function QuizPage() {
       await supabase.from("quiz_answers").upsert(
         {
           session_id: urlSessionId,
+          user_id: userId,
           question_id: q.dbId,
           given_answer: opt,
           is_correct: isCorrect,
@@ -1056,7 +1067,8 @@ export default function QuizPage() {
           finished_at: new Date().toISOString(),
           status: "finished",
         })
-        .eq("id", urlSessionId);
+        .eq("id", urlSessionId)
+        .eq("user_id", userId || "none");
     }
     setShowResults(true);
   };

@@ -1,12 +1,24 @@
-// File path: app/api/generate-summary/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { GenerationSchema, validationError, serverError } from "@/lib/validation";
+import { getServerUser, unauthorizedError } from "@/lib/auth-server";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 export async function POST(req: NextRequest) {
+  const body = await req.json();
+  const result = GenerationSchema.safeParse(body);
+  if (!result.success) return validationError(result.error);
+  const { url, userQuery } = result.data;
+
+  const blocked = await applyRateLimit(req, RATE_LIMITS.generation, "generate-summary");
+  if (blocked) return blocked;
+
+  const user = await getServerUser();
+  if (!user) return unauthorizedError();
+
   try {
-    const { url, userQuery } = await req.json();
     if (!url)
       return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
@@ -57,10 +69,15 @@ Base everything strictly on the actual content of this specific video. Do not ad
     const summary = response.text ?? "";
     return NextResponse.json({ summary });
   } catch (error: any) {
-    console.error("Summary generation error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to generate summary" },
-      { status: 500 },
-    );
+    console.error(`Summary generation error [User: ${user.id}]:`, error);
+
+    if (error?.message?.includes("429") || error?.message?.includes("quota")) {
+      return NextResponse.json(
+        { error: "AI quota exceeded. Please wait a moment and try again." },
+        { status: 429 },
+      );
+    }
+
+    return serverError();
   }
 }

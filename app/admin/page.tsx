@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -162,6 +163,7 @@ type Page = "overview"|"users"|"content"|"feedback"|"health"|"testimonials"|"sur
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
+  const router = useRouter();
   const [page, setPage]           = useState<Page>("overview");
   const [stats, setStats]         = useState<Stats|null>(null);
   const [users, setUsers]         = useState<UserRow[]>([]);
@@ -171,9 +173,26 @@ export default function AdminDashboard() {
   const [onboarding, setOnboarding] = useState<OnboardingRow[]>([]);
   const [loading, setLoading]     = useState(true);
   const [fbFilter, setFbFilter]   = useState<"all"|"up"|"down">("all");
-  const [search, setSearch]       = useState("");
+  const [search, setSearch]       = useState("");  useEffect(() => {
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // CRITICAL: Only allow specific admin emails. 
+      // Update this list with your team's emails.
+      const ADMIN_EMAILS = [
+        "admin@reviseforge.ai", // Placeholder: Add your email here
+      ];
 
-  useEffect(()=>{ load(); },[]);
+      if (!user || !ADMIN_EMAILS.includes(user.email ?? "")) {
+        console.error("⛔ Unauthorized admin access attempt:", user?.email);
+        router.push("/dashboard");
+        return;
+      }
+      
+      load();
+    }
+    checkAuth();
+  }, [router]);
 
   async function load() {
     setLoading(true);

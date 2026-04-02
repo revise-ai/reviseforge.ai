@@ -129,13 +129,25 @@
 // File path: app/api/chat-recording/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { ChatSchema, validationError, serverError } from "@/lib/validation";
+import { getServerUser, unauthorizedError } from "@/lib/auth-server";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 export async function POST(req: NextRequest) {
+  const body = await req.json();
+  const result = ChatSchema.safeParse(body);
+  if (!result.success) return validationError(result.error);
+  const { audioBase64, mimeType, transcript, question, history } = result.data;
+
+  const blocked = await applyRateLimit(req, RATE_LIMITS.chat, "chat-recording");
+  if (blocked) return blocked;
+
+  const user = await getServerUser();
+  if (!user) return unauthorizedError();
+
   try {
-    const { audioBase64, mimeType, transcript, question, history } =
-      await req.json();
 
     if (!question)
       return NextResponse.json(
@@ -240,21 +252,12 @@ STUDY ASSISTANT RULES (apply these when answering the student's question):
 
     return NextResponse.json({ answer });
   } catch (error: any) {
-    console.error("Chat recording error:", error);
+    console.error(`Chat recording error [User: ${user.id}]:`, error);
 
     if (error?.message?.includes("429") || error?.message?.includes("quota")) {
       return NextResponse.json(
-        { error: "API quota exceeded. Please wait a moment and try again." },
+        { error: "AI quota exceeded. Please wait a moment and try again." },
         { status: 429 },
-      );
-    }
-
-    if (error?.message?.includes("size") || error?.message?.includes("limit")) {
-      return NextResponse.json(
-        {
-          error: "Recording is too large to process. Try a shorter recording.",
-        },
-        { status: 413 },
       );
     }
 

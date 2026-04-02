@@ -1,18 +1,24 @@
-// app/api/generate-flashcards/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { validateFile, serverError } from "@/lib/validation";
+import { getServerUser, unauthorizedError } from "@/lib/auth-server";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 export async function POST(req: NextRequest) {
+  const formData = await req.formData();
+  const file = formData.get("file") as File;
+  const fileError = validateFile(file);
+  if (fileError) return NextResponse.json({ error: fileError }, { status: 400 });
+
+  const blocked = await applyRateLimit(req, RATE_LIMITS.generation, "generate-flashcards");
+  if (blocked) return blocked;
+
+  const user = await getServerUser();
+  if (!user) return unauthorizedError();
+
   try {
-    const formData = await req.formData();
-    const file = formData.get("file") as File;
-
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
     const arrayBuffer = await file.arrayBuffer();
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
@@ -150,16 +156,22 @@ Return ONLY a valid JSON array — no preamble, no explanation, no markdown fenc
       if (match) {
         flashcards = JSON.parse(match[0]);
       } else {
-        throw new Error("Failed to parse flashcards from Gemini response");
+        console.error(`Flashcard parsing error [User: ${user.id}]: No JSON found in response`);
+        return serverError("Failed to parse flashcards from AI response");
       }
     }
 
     return NextResponse.json({ flashcards });
   } catch (error: any) {
-    console.error("Flashcard generation error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to generate flashcards" },
-      { status: 500 },
-    );
+    console.error(`Flashcard generation error [User: ${user.id}]:`, error);
+
+    if (error?.message?.includes("429") || error?.message?.includes("quota")) {
+      return NextResponse.json(
+        { error: "AI quota exceeded. Please wait a moment and try again." },
+        { status: 429 },
+      );
+    }
+
+    return serverError();
   }
 }

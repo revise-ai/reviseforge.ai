@@ -215,11 +215,13 @@ function LoadingScreen({ fileName }: { fileName: string }) {
 function EditMode({
   cards,
   sessionId,
+  userId,
   onSave,
   onBack,
 }: {
   cards: Flashcard[];
   sessionId: string;
+  userId: string | null;
   onSave: (cards: Flashcard[]) => void;
   onBack: () => void;
 }) {
@@ -269,10 +271,15 @@ function EditMode({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await supabase.from("flashcards").delete().eq("session_id", sessionId);
+      await supabase
+        .from("flashcards")
+        .delete()
+        .eq("session_id", sessionId)
+        .eq("user_id", userId || "none");
 
       const rows = editing.map((c, i) => ({
         session_id: sessionId,
+        user_id: userId,
         card_order: i + 1,
         term: c.term,
         definition: c.definition,
@@ -301,7 +308,8 @@ function EditMode({
       await supabase
         .from("flashcard_sessions")
         .update({ total: updated.length })
-        .eq("id", sessionId);
+        .eq("id", sessionId)
+        .eq("user_id", userId || "none");
 
       onSave(updated);
     } catch (err: any) {
@@ -595,6 +603,7 @@ export default function FlashcardsPage() {
   const [fileName, setFileName] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [starred, setStarred] = useState<Set<number>>(new Set());
+  const [userId, setUserId] = useState<string | null>(null);
   const [mode, setMode] = useState<"study" | "edit">("study");
 
   useEffect(() => {
@@ -620,15 +629,24 @@ export default function FlashcardsPage() {
       // ✅ Set the mutex SYNCHRONOUSLY before going async — so the second
       // Strict Mode mount (which runs almost immediately) sees it
       sessionStorage.setItem("flashcard_generating_for", urlSessionId);
-      generateAndPersist(b64File!, name!, urlSessionId);
+      
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) setUserId(user.id);
+        generateAndPersist(b64File!, name!, urlSessionId, user?.id);
+      })();
     } else {
-      loadCardsFromDB(urlSessionId);
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) setUserId(user.id);
+        loadCardsFromDB(urlSessionId, user?.id);
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSessionId]);
 
   // ── Load from DB ─────────────────────────────────────────────────────────
-  const loadCardsFromDB = async (sid: string) => {
+  const loadCardsFromDB = async (sid: string, currentUid?: string) => {
     setLoading(true);
     try {
       const { data: session, error: sessionErr } = await supabase
@@ -643,12 +661,13 @@ export default function FlashcardsPage() {
       await supabase
         .from("flashcard_sessions")
         .update({ last_visited: new Date().toISOString() })
-        .eq("id", sid);
+        .eq("id", sid)
+        .eq("user_id", currentUid || userId || "none");
 
       // Still generating — keep the loading spinner and poll again in 2s
       // We do NOT call setLoading(false) here so the spinner stays visible
       if (session.status === "generating" || session.status === "processing") {
-        setTimeout(() => loadCardsFromDB(sid), 2000);
+        setTimeout(() => loadCardsFromDB(sid, currentUid), 2000);
         return; // early return — finally still runs but we set loading=true after
       }
 
@@ -680,6 +699,7 @@ export default function FlashcardsPage() {
     base64File: string,
     name: string,
     sid: string,
+    currentUid?: string,
   ) => {
     setLoading(true);
     setError("");
@@ -688,6 +708,7 @@ export default function FlashcardsPage() {
 
       const rows = generatedCards.map((c, i) => ({
         session_id: sid,
+        user_id: currentUid,
         card_order: i + 1,
         term: c.term,
         definition: c.definition,
@@ -722,7 +743,8 @@ export default function FlashcardsPage() {
           total: generatedCards.length,
           last_visited: new Date().toISOString(),
         })
-        .eq("id", sid);
+        .eq("id", sid)
+        .eq("user_id", currentUid || "none");
 
       // Clean up sessionStorage after successful save
       sessionStorage.removeItem("flashcard_file");
@@ -736,7 +758,8 @@ export default function FlashcardsPage() {
       await supabase
         .from("flashcard_sessions")
         .update({ status: "error" })
-        .eq("id", sid);
+        .eq("id", sid)
+        .eq("user_id", currentUid || "none");
     } finally {
       setLoading(false);
     }
@@ -864,6 +887,7 @@ export default function FlashcardsPage() {
       <EditMode
         cards={cards}
         sessionId={urlSessionId}
+        userId={userId}
         onSave={(updated) => {
           setCards(updated);
           setMode("study");

@@ -1,13 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { AuthCallbackSchema, validationError } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
-  const type = searchParams.get("type");
-  const invite = searchParams.get("invite");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const params = Object.fromEntries(searchParams.entries());
+  const result = AuthCallbackSchema.safeParse(params);
+  if (!result.success) return validationError(result.error);
+  const { code, type, invite, next } = result.data;
+
+  const blocked = await applyRateLimit(request, RATE_LIMITS.auth, "auth-callback");
+  if (blocked) return blocked;
 
   if (code) {
     const cookieStore = await cookies();

@@ -121,7 +121,8 @@ async function getOrCreateYoutubeSession(url: string): Promise<string> {
       await supabase
         .from("youtube_sessions")
         .update({ last_visited: new Date().toISOString() })
-        .eq("id", existing.id);
+        .eq("id", existing.id)
+        .eq("user_id", user.id);
       return existing.id;
     }
 
@@ -1839,7 +1840,11 @@ export default function DashboardPage() {
                     flashcard: "flashcard_sessions",
                     exam: "exam_sessions",
                   };
-                  await supabase.from(t[type]).delete().eq("id", id);
+                  await supabase
+                    .from(t[type])
+                    .delete()
+                    .eq("id", id)
+                    .eq("user_id", userId || "none");
                   setRecentItems((prev) => prev.filter((i) => i.id !== id));
                 }}
                 onRename={async (id, type, newTitle) => {
@@ -1860,7 +1865,8 @@ export default function DashboardPage() {
                   await supabase
                     .from(t[type])
                     .update({ [f[type]]: newTitle })
-                    .eq("id", id);
+                    .eq("id", id)
+                    .eq("user_id", userId || "none");
                   setRecentItems((prev) =>
                     prev.map((i) =>
                       i.id === id ? { ...i, title: newTitle } : i,

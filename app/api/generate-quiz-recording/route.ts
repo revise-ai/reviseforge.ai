@@ -1,6 +1,8 @@
-// File path: app/api/generate-quiz-recording/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { GenerationSchema, validationError, serverError } from "@/lib/validation";
+import { getServerUser, unauthorizedError } from "@/lib/auth-server";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -46,8 +48,18 @@ function extractJSON(raw: string): any {
 }
 
 export async function POST(req: NextRequest) {
+  const body = await req.json();
+  const result = GenerationSchema.safeParse(body);
+  if (!result.success) return validationError(result.error);
+  const { audioBase64, mimeType, transcript } = result.data;
+
+  const blocked = await applyRateLimit(req, RATE_LIMITS.generation, "generate-quiz-recording");
+  if (blocked) return blocked;
+
+  const user = await getServerUser();
+  if (!user) return unauthorizedError();
+
   try {
-    const { audioBase64, mimeType, transcript } = await req.json();
 
     if (!audioBase64 && !transcript) {
       return NextResponse.json(
@@ -176,11 +188,11 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
 
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error("Quiz recording generation error:", error);
+    console.error(`Quiz recording generation error [User: ${user.id}]:`, error);
 
     if (error?.message?.includes("429") || error?.message?.includes("quota")) {
       return NextResponse.json(
-        { error: "API quota exceeded. Please wait a moment and try again." },
+        { error: "AI quota exceeded. Please wait a moment and try again." },
         { status: 429 },
       );
     }

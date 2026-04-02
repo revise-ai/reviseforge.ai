@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { UtilitySchema, validationError, serverError } from "@/lib/validation";
+import { getServerUser, unauthorizedError } from "@/lib/auth-server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -34,8 +37,18 @@ OUTPUT:
 `.trim();
 
 export async function POST(req: NextRequest) {
+  const body = await req.json();
+  const result = UtilitySchema.safeParse(body);
+  if (!result.success) return validationError(result.error);
+  const { audio, mimeType } = result.data;
+
+  const blocked = await applyRateLimit(req, RATE_LIMITS.utility, "voice-transcribe");
+  if (blocked) return blocked;
+
+  const user = await getServerUser();
+  if (!user) return unauthorizedError();
+
   try {
-    const { audio, mimeType } = await req.json();
 
     if (!audio) {
       return NextResponse.json({ error: "No audio provided" }, { status: 400 });
@@ -83,11 +96,16 @@ export async function POST(req: NextRequest) {
       data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[No speech detected]";
 
     return NextResponse.json({ transcript });
-  } catch (error) {
-    console.error("Transcription error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error(`Transcription error [User: ${user.id}]:`, error);
+
+    if (error?.message?.includes("429") || error?.message?.includes("quota")) {
+      return NextResponse.json(
+        { error: "API quota exceeded. Please wait a moment and try again." },
+        { status: 429 },
+      );
+    }
+
+    return serverError();
   }
 }

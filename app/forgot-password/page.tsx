@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-browser";
 
 function Toast({
   message,
@@ -66,6 +66,7 @@ function getStrength(password: string): { score: number; label: string; color: s
 }
 
 function ForgotPasswordInner() {
+  const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isResetMode = searchParams.get("mode") === "reset";

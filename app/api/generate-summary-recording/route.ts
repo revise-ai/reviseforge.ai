@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
   if (!user) return unauthorizedError();
 
   try {
-
     if (!audioBase64 && !transcript) {
       return NextResponse.json(
         {
@@ -31,38 +30,38 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = userQuery
-      ? `The student has recorded a lecture and has asked the following question: "${userQuery}"
+      ? `You are ReviseForge AI — a world-class academic tutor and master transcription analyst. The student has recorded a lecture and has asked: "${userQuery}".
 
-Listen to the full recording and answer their question thoroughly.
+### REVISEFORGE EXCELLENCE FRAMEWORK:
+1. **Source Fidelity**: Analyze the recording deeply. Answer based exclusively on its content. Reference **timestamps** (e.g., "At 04:30...") where appropriate.
+2. **Formatting Standards (CRITICAL)**:
+   - Use **Markdown headers** (###) for organization.
+   - Use **LaTeX** for ALL mathematical, scientific, and technical notations ($...$ for inline, $$...$$ for block).
+   - **No Meta-Commentary**.
+3. **Structure & Logic**:
+   - Provide a **Step-by-Step** breakdown for processes or complex arguments.
+   - Summarize with a **Key Takeaway** section.
+4. **Tone**: Expert, professional, and clear.
 
-If they reference a timestamp (for example "at 2:30" or "around 5 minutes in"), focus on what the speaker says at or near that moment in the recording.
-If they reference a topic or section name, explain in detail what is covered in that part.
-If they ask a conceptual question, explain the answer using the specific content, examples, and language from the recording.
+Sign off as ReviseForge AI.`
+      : `You are ReviseForge AI — a world-class academic tutor and master educator. Your mission is to produce an elite, structured, and pedagogical study summary from this recorded lecture.
 
-Write your answer in clear, plain prose. Use a heading if the answer has multiple distinct parts. Be specific — reference actual moments, examples, and explanations from the recording rather than speaking in generalities. Do not use asterisks or hashtags.`
-      : `Listen to this entire recorded lecture and produce a thorough study summary. Write everything in clear, flowing prose. Do not use asterisks, hashtags, or bullet symbols anywhere.
+### REVISEFORGE EXCELLENCE FRAMEWORK (RECORDING SUMMARY STRUCTURE):
+1. **### Overview**: A high-level description of the recording's core objective, the speaker's mission, and the target audience.
+2. **### Key Concepts (LaTeX Mandated)**: Identify 5-8 critical ideas. Explain each using specific speaker terminology. Use **LaTeX** for every scientific or technical notation.
+3. **### Core Pedagogical Breakdown**: A deep-dive into the main facts, theories, or arguments presented in the recording.
+4. **### Step-by-Step Mechanism**: If the speaker describes a process or sequence, break it down into logical, numbered actions.
+5. **### Synthesis & Context**: How these concepts relate to the broader subject area or real-world application.
+6. **### Key Takeaways**: 3-5 high-impact, actionable points to remember from the lecture.
+7. **Notable Metaphors & Quotes**: Highlight specific analogies, cases, or memorable statements used by the speaker to aid memory. Include approximate timestamps.
 
-Overview
+### FORMATTING RULES:
+- **Headers**: Use ### for all sections.
+- **Emphasis**: Use **BOLD** for critical terms.
+- **Math/Science**: Use **$ ... $** for inline and **$$ ... $$** for block LaTeX.
+- **No Meta-Commentary**: Start immediately with the Overview.
 
-Write 3 to 4 sentences describing what the recording covers, who it is intended for, and its main purpose or argument.
-
-Key Concepts
-
-Identify and explain the 5 to 8 most important concepts, ideas, terms, or frameworks covered in the recording. For each one, write 2 to 3 sentences of explanation grounded in what the speaker actually says — not general knowledge.
-
-Main Points
-
-Write a flowing paragraph or series of short paragraphs covering the core facts, arguments, steps, or information presented across the recording. Cover the full content from start to finish.
-
-Key Takeaways
-
-Write 3 to 5 things a student must remember after listening to this recording. State each one as a clear, specific sentence.
-
-Notable Examples and Quotes
-
-Describe specific examples, demonstrations, case studies, analogies, or memorable statements the speaker uses, with approximate timestamps where possible. Explain why each example matters.
-
-Base everything strictly on the actual content of this specific recording. Do not add outside knowledge. Do not use any markdown formatting symbols.`;
+Sign off as ReviseForge AI.`;
 
     let contents: any[];
 
@@ -115,15 +114,6 @@ Base everything strictly on the actual content of this specific recording. Do no
       return NextResponse.json(
         { error: "AI quota exceeded. Please wait a moment and try again." },
         { status: 429 },
-      );
-    }
-
-    if (error?.message?.includes("size") || error?.message?.includes("limit")) {
-      return NextResponse.json(
-        {
-          error: "Recording is too large to process. Try a shorter recording.",
-        },
-        { status: 413 },
       );
     }
 

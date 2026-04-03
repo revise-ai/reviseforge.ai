@@ -22,45 +22,40 @@ export async function POST(req: NextRequest) {
     if (!url)
       return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
-    const prompt = `Watch this entire YouTube video from start to finish before doing anything else.
+    const prompt = `You are ReviseForge AI — a world-class academic tutor and master educator. Your mission is to watch this entire YouTube video and extract professional, pedagogical chapters and a clean transcript.
 
-You must extract two things: accurate chapters and a word-for-word transcript broken into segments.
+### MISSION A: PEDAGOGICAL CHAPTERING
+Identify 5 to 10 natural topic breaks. Each chapter must:
+- Have a timestamp in MM:SS format.
+- Have an **Elite Title**: Professional and descriptive (e.g., "The Mechanism of Cellular Respiration" instead of "Part 1").
+- Have a **Pedagogical Description**: 2-3 sentences explaining exactly what is covered. Use **LaTeX** for every mathematical or scientific notation ($...$ for inline, $$...$$ for block).
+- Focus on subject matter shifts, not greetings or transitions.
 
-CHAPTERS:
-Identify 5 to 10 natural topic breaks — moments where the speaker genuinely shifts to a new idea, concept, or section. Each chapter must:
-- Have a timestamp in MM:SS format that exactly matches when the new topic begins
-- Have a title that names the specific topic covered (not vague titles like "Introduction" or "Part 1")
-- Have a description of 2 to 3 sentences explaining precisely what the speaker covers in that section — based only on what is actually said
+### MISSION B: CLEAN TRANSCRIPT
+Produce a verbatim transcript segment every 20 to 30 seconds.
+- Match MM:SS timestamps.
+- Clean language: Correct technical spellings but stay true to the speaker's words.
 
-Do not invent chapters. Do not create chapters for transitions, greetings, or filler. Only create a chapter when there is a genuine shift in subject matter.
-
-TRANSCRIPT:
-Produce a rolling transcript of the spoken audio. Create one entry every 20 to 30 seconds. Each entry must:
-- Have a timestamp in MM:SS format
-- Contain the actual spoken words from the video at that moment — as close to verbatim as possible
-- Cover the full video from beginning to end with no gaps
-
-Do not summarise or paraphrase the transcript entries. Write what was actually said.
-
-Return only a valid JSON object. No text before or after. No markdown code fences. No explanation. Use this exact structure:
-
+### OUTPUT FORMAT (JSON ONLY):
 {
-  "title": "The full title of the video",
-  "duration": "Total video duration as MM:SS",
+  "title": "Professional title of the video",
+  "duration": "Duration in MM:SS",
   "chapters": [
     {
       "time": "00:00",
-      "title": "Specific descriptive chapter title",
-      "text": "2 to 3 sentences describing exactly what is covered in this section based on what the speaker says"
+      "title": "Elite Chapter Title",
+      "text": "Pedagogical description with LaTeX for technical terms."
     }
   ],
   "transcripts": [
     {
       "time": "00:00",
-      "text": "The actual spoken words from the video at this timestamp"
+      "text": "Verbatim spoken words."
     }
   ]
-}`;
+}
+
+Ensure the output is ONLY valid JSON. No meta-commentary or markdown fences.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

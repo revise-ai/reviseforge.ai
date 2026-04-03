@@ -6,14 +6,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-type SessionType = "youtube" | "recording" | "quiz" | "flashcard" | "exam";
+type SessionType = "youtube" | "recording" | "quiz" | "flashcard" | "exam" | "chat";
 type FilterType =
   | "all"
   | "youtube"
   | "recording"
   | "quiz"
   | "flashcard"
-  | "exam";
+  | "exam"
+  | "chat";
 interface ActivityBadge {
   label: string;
   color: string;
@@ -597,7 +598,7 @@ export default function HistoryPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [ytRes, recRes, sumRes, quizRes, flashRes, chapRes] =
+      const [ytRes, recRes, sumRes, quizRes, flashRes, chapRes, chatRes] =
         await Promise.all([
           supabase
             .from("youtube_sessions")
@@ -625,6 +626,11 @@ export default function HistoryPage() {
             .from("content_chapters")
             .select("session_id,recording_session_id")
             .eq("user_id", user.id),
+          supabase
+            .from("chat_sessions")
+            .select("id, title, created_at, last_visited")
+            .eq("user_id", user.id)
+            .order("last_visited", { ascending: false }),
         ]);
 
       const sYt = new Set(
@@ -842,8 +848,25 @@ export default function HistoryPage() {
         };
       });
 
+      // ── Chat sessions ───────────────────────────────────────────────────
+      const ch: HistoryItem[] = (chatRes.data ?? []).map((s: any) => ({
+        id: s.id,
+        type: "chat" as SessionType,
+        title: s.title || "Chat Session",
+        subtitle: "chat",
+        last_visited: s.last_visited || s.created_at,
+        created_at: s.created_at,
+        badges: [
+          {
+            label: "Chat",
+            color: "bg-blue-50 text-blue-600",
+          },
+        ],
+        href: `/content/${s.id}?mode=chat&session_id=${s.id}`,
+      }));
+
       setItems(
-        [...yt, ...re, ...qz, ...fl, ...ex].sort(
+        [...yt, ...re, ...qz, ...fl, ...ex, ...ch].sort(
           (a, b) =>
             new Date(b.last_visited).getTime() -
             new Date(a.last_visited).getTime(),
@@ -861,6 +884,7 @@ export default function HistoryPage() {
       quiz: "quiz_sessions",
       flashcard: "flashcard_sessions",
       exam: "exam_sessions",
+      chat: "chat_sessions",
     };
     await supabase.from(t[type]).delete().eq("id", id);
     setItems((prev) => prev.filter((i) => i.id !== id));
@@ -873,6 +897,7 @@ export default function HistoryPage() {
       quiz: "quiz_sessions",
       flashcard: "flashcard_sessions",
       exam: "exam_sessions",
+      chat: "chat_sessions",
     };
     const fieldMap: Record<SessionType, string> = {
       youtube: "video_title",
@@ -880,6 +905,7 @@ export default function HistoryPage() {
       quiz: "file_name",
       flashcard: "file_name",
       exam: "source_label",
+      chat: "title",
     };
     await supabase
       .from(tableMap[type])
@@ -956,6 +982,7 @@ export default function HistoryPage() {
               { v: "quiz", l: "Quizzes" },
               { v: "flashcard", l: "Flashcards" },
               { v: "exam", l: "Exams" },
+              { v: "chat", l: "Chats" },
             ] as { v: FilterType; l: string }[]
           ).map((f) => (
             <button

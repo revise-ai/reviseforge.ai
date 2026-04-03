@@ -23,105 +23,39 @@ export async function POST(req: NextRequest) {
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
 
-    const prompt = `You are ReviseForge AI — the world's most advanced flashcard generation engine. Your mission is to help students truly master the subject matter in this document, not just recognize surface details.
+    const prompt = `You are ReviseForge AI — a world-class academic tutor and master mnemonic specialist. Your mission is to produce a high-density, pedagogical set of flashcards from this document.
 
-CRITICAL RULE — STRICTLY FORBIDDEN QUESTIONS:
-NEVER create flashcards about any of the following — these are useless for studying:
-- The title, name, or topic of the document or lecture
-- The name, title, or role of the lecturer, author, professor, or instructor
-- The course code, course name, university, school, or institution
-- The date the lecture was given, the semester, or the academic year
-- The page numbers, slide numbers, section headings, or document structure
-- Any administrative or logistical metadata about the document itself
-- Questions like "What is this lecture about?", "Who teaches this course?", "What is the course title?"
+### CRITICAL BANS (NEVER ASK):
+- Document metadata (title, author, institution, speaker, dates).
+- Trivial structural recall (page numbers, section headings).
+- Generic general knowledge.
 
-These questions test nothing. A student who has never read the document could guess them from the filename. They are banned.
+### REVISEFORGE EXCELLENCE FRAMEWORK (FLASHCARD DESIGN):
+Every card must facilitate active recall and deep encoding:
+1. **Term/Question**: Formulate specific, exam-worthy questions or terms.
+2. **Definition/Answer**: Provide a comprehensive standalone explanation.
+3. **LaTeX Mandated**: Use LaTeX for ALL mathematical expressions, chemical formulas, and technical variables ($...$ for inline, $$...$$ for block).
+4. **Chemical Structures**: If visualizing a chemical structure/molecule, output the SMILES string enclosed in a \`\`\`smiles code block inside the JSON string (escaping quotes if necessary).
+5. **Markdown Headers**: Use ### inside definitions to structure complex answers.
+6. **Elite Hint**: Provide a mnemonic, analogy, or conceptual "key" that aids recall without giving away the answer.
 
-WHAT YOU MUST FOCUS ON INSTEAD — the actual knowledge:
-Every flashcard must test something a student needs to understand, remember, or be able to apply from the CONTENT of the document. Ask yourself before every card: "Would a student who studied hard need to know this for an exam?" If yes, create the card. If it is just metadata or administrative information, skip it entirely.
+### SUBJECT-SPECIFIC RIGOR:
+- **STEM**: Explain mechanisms at the molecular/physical level. Include reaction conditions and exact units.
+- **Humanities**: Focus on causal relationships, theoretical frameworks, and historical significance.
+- **Medicine/Nursing**: Pathophysiology, clinical presentation, and exact dosage/threshold values.
 
-STEP 1 — DEEP CONTENT ANALYSIS:
-Read the entire document and extract:
-- Every key term, concept, definition, and technical vocabulary word
-- Every theory, model, framework, or principle explained
-- Every process, mechanism, sequence of steps, or workflow
-- Every formula, equation, law, rule, or theorem
-- Every cause-and-effect relationship or explanation of why something happens
-- Every comparison or contrast between two or more ideas
-- Every statistic, measurement, or quantitative fact that carries meaning
-- Every historical event, person, or date that is discussed in context
-- Every diagram, figure, chart, or table and what it demonstrates
-- Every real-world example or case study used to illustrate a concept
-- Every exception, special case, or nuance mentioned
-
-STEP 2 — QUESTION DESIGN:
-Write questions that require genuine understanding:
-- "What is [concept] and why does it matter?" for definitions
-- "How does [process] work?" for mechanisms and sequences
-- "Why does [phenomenon] occur?" for causes and explanations
-- "What is the formula for [calculation] and what does each part represent?" for math and science
-- "What is the difference between [X] and [Y]?" for comparisons
-- "What are the consequences/effects of [event or condition]?" for cause-and-effect
-- "What happens when [condition]?" for applied understanding
-- "How would you calculate/determine [result]?" for application
-- "What does [diagram/figure/model] demonstrate?" for visual content
-- "Under what conditions does [rule or law] apply?" for nuanced understanding
-- "What are the stages/phases/steps of [process]?" for sequences
-
-STEP 3 — ANSWER DESIGN:
-Every answer must be a complete, standalone explanation:
-- Never answer with just a word or short phrase — always explain fully
-- For formulas: state the formula in plain text, define every variable, explain what it calculates, give a worked example if relevant
-- For processes: explain each step and why it happens in that order
-- For comparisons: clearly explain both sides and what makes them different
-- For causes: explain the mechanism, not just label it
-- For diagrams: describe what is shown and explain its significance to the subject
-- Write in clean plain sentences only — no asterisks, no hashtags, no bullet points, no markdown symbols of any kind
-
-STEP 4 — HINT DESIGN:
-Every hint must be a genuine memory aid:
-- Give a mnemonic, analogy, or memory cue
-- Mention a related concept that connects to the answer
-- Reference the context from the document (e.g. "Think about what happens during the second stage of...")
-- Never repeat the question or give away the answer directly
-
-SUBJECT-SPECIFIC DEPTH REQUIREMENTS:
-
-Mathematics and Statistics: Every formula must appear in plain text with all variables defined. Include a worked numerical example in the answer. Explain when and why the formula is used, not just what it is.
-
-Chemistry: Explain what happens at the molecular or atomic level. Include reaction types, conditions, and what the products mean. Molecular formulas in plain text only.
-
-Physics: Include units for every quantity. Explain the physical intuition behind equations. Connect each concept to a real-world observable phenomenon.
-
-Biology: Explain processes at the cellular level AND the organism level. For anatomical content, describe the structure AND its function AND what happens when it fails or is absent.
-
-Population Studies, Demography, Sociology: Focus on the theories, models, rates, trends, determinants, and consequences — not who presented them. Cards should test understanding of concepts like fertility rates, mortality determinants, migration push-pull factors, demographic transition stages, and so on.
-
-History and Politics: Always include the cause, the event, the key actors and their motivations, the immediate outcome, and the long-term significance. Never just list a name and a date.
-
-Geography: Explain spatial patterns, why they exist, and their consequences. Include climate, economic, and human factors.
-
-Economics: Explain the causal mechanism behind every relationship. Use concrete examples. Include both micro and macro implications where relevant.
-
-Literature and Language: Focus on themes, symbolism, character development, narrative structure, and literary devices — not plot summaries.
-
-QUALITY STANDARDS:
-- Minimum 15 cards, no maximum — cover every piece of meaningful knowledge
-- Every card must be something that could appear on an exam
-- No two cards should test the same knowledge
-- Difficulty must vary: recall, comprehension, application, and analysis
-- A student should be able to study exclusively from these cards and pass their exam
-
-Return ONLY a valid JSON array — no preamble, no explanation, no markdown fences, nothing before or after the array:
+### OUTPUT SCHEMA (JSON ONLY):
 [
   {
     "id": 1,
-    "term": "A specific, exam-worthy question about actual subject content",
-    "definition": "A complete, educational explanation in plain sentences — no asterisks, no hashtags, no bullet symbols",
-    "hint": "A memory cue, analogy, or contextual clue that helps recall without giving the answer",
-    "category": "Specific subject area (e.g. Demographic Transition, Cell Biology, Organic Chemistry, Keynesian Economics)"
+    "term": "Specific question or technical term using LaTeX where required.",
+    "definition": "### Concept Overview\nDetailed pedagogical explanation using LaTeX ($ ... $). \n### Practical Application\nHow this concept is used in real scenarios.",
+    "hint": "A powerful mnemonic or analogy.",
+    "category": "Topic Area"
   }
-]`;
+]
+
+Generate a minimum of 15 high-impact cards. Ensure the rigor is absolute.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

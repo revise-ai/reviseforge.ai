@@ -140,6 +140,25 @@ async function getOrCreateYoutubeSession(url: string): Promise<string> {
   }
 }
 
+// Creates a general chat_session row and returns its UUID.
+async function createChatSession(title: string): Promise<string> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return Math.random().toString(36).slice(2, 18);
+
+    const { data: created, error } = await supabase
+      .from("chat_sessions")
+      .insert({ user_id: user.id, title, last_visited: new Date().toISOString() })
+      .select("id")
+      .single();
+
+    if (error || !created) throw error;
+    return created.id;
+  } catch {
+    return Math.random().toString(36).slice(2, 18);
+  }
+}
+
 // ─── Progress Panel ───────────────────────────────────────────────────────────
 
 function ProgressPanel({
@@ -1415,7 +1434,7 @@ export default function DashboardPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [ytRes, recRes, quizRes, flashRes] = await Promise.all([
+      const [ytRes, recRes, quizRes, flashRes, chatRes] = await Promise.all([
         supabase
           .from("youtube_sessions")
           .select("id, url, video_title, last_visited")
@@ -1440,6 +1459,12 @@ export default function DashboardPage() {
           .select("id, file_name, last_visited, created_at")
           .eq("user_id", user.id)
           .eq("status", "ready")
+          .order("last_visited", { ascending: false })
+          .limit(6),
+        supabase
+          .from("chat_sessions")
+          .select("id, title, last_visited, created_at")
+          .eq("user_id", user.id)
           .order("last_visited", { ascending: false })
           .limit(6),
       ]);
@@ -1485,6 +1510,15 @@ export default function DashboardPage() {
         href: `/flashcards/${s.id}`,
       }));
 
+      const chatItems: RecentItem[] = (chatRes.data ?? []).map((s) => ({
+        id: s.id,
+        type: "quiz" as any, // Visual proxy, adjust actual type typing when needed
+        title: s.title || "Chat Session",
+        subtitle: "chat",
+        last_visited: s.last_visited || s.created_at,
+        href: `/content/${s.id}?mode=chat&session_id=${s.id}`,
+      }));
+
       const { data: examRes } = await supabase
         .from("exam_sessions")
         .select("id, source, source_label, last_visited, created_at")
@@ -1506,6 +1540,7 @@ export default function DashboardPage() {
         ...recItems,
         ...quizItems,
         ...flashItems,
+        ...chatItems,
         ...examItems,
       ]
         .sort(
@@ -1534,17 +1569,17 @@ export default function DashboardPage() {
         `/content/${id}?url=${encodeURIComponent(text)}&session_id=${id}`,
       );
     } else {
-      const id = Math.random().toString(36).slice(2, 18);
-      router.push(`/content/${id}?mode=chat&q=${encodeURIComponent(text)}`);
+      const id = await createChatSession(text.slice(0, 50));
+      router.push(`/content/${id}?mode=chat&q=${encodeURIComponent(text)}&session_id=${id}`);
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const id = Math.random().toString(36).slice(2, 18);
+    const id = await createChatSession(`File: ${file.name}`);
     router.push(
-      `/content/${id}?mode=chat&file=${encodeURIComponent(file.name)}`,
+      `/content/${id}?mode=chat&file=${encodeURIComponent(file.name)}&session_id=${id}`,
     );
     e.target.value = "";
   };

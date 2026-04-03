@@ -2123,6 +2123,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
+import MarkdownRenderer from "./MarkdownRenderer";
 
 type Mode = "youtube" | "microphone" | "browsertab" | "chat";
 type ActiveTool = "summary" | "quiz" | "flashcards" | "exams" | null;
@@ -2263,135 +2264,13 @@ function getLabelStyle(label: string) {
 }
 
 function AIMessage({ text }: { text: string }) {
-  // ── Plain prose: theory / general / casual answers ──
-  if (!isStructuredCalc(text)) {
-    return (
-      <div className="space-y-2">
-        {text.split("\n").map((line, i) => {
-          const t = line.trim();
-          if (!t || isSeparator(t)) return <div key={i} className="h-1" />;
-          return <p key={i} className="text-sm text-gray-800 leading-relaxed">{t}</p>;
-        })}
-      </div>
-    );
-  }
-
-  // ── Structured calculation renderer ──
-  const sections = parseAIMessage(text);
-  const nodes: React.ReactNode[] = [];
-  let i = 0;
-
-  while (i < sections.length) {
-    const s = sections[i];
-
-    if (s.type === "blank" || s.type === "separator") { i++; continue; }
-
-    if (s.type === "solving") {
-      nodes.push(
-        <p key={i} className="text-sm font-semibold text-gray-900 mb-3">{s.content}</p>
-      );
-      i++; continue;
-    }
-
-    if (s.type === "label") {
-      const labelKey = s.content.replace(":", "").trim();
-      const style = getLabelStyle(labelKey);
-
-      // Gather child lines (indent / equation) until the next label / separator
-      const children: MsgSection[] = [];
-      let j = i + 1;
-      while (
-        j < sections.length &&
-        (sections[j].type === "indent" || sections[j].type === "equation" || sections[j].type === "blank")
-      ) {
-        if (sections[j].type !== "blank") children.push(sections[j]);
-        j++;
-      }
-
-      nodes.push(
-        <div key={i} className={`rounded-xl border ${style.border} ${style.bg} px-4 py-3 mb-2.5`}>
-          {/* Label header */}
-          <div className="flex items-center gap-2 mb-2.5">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
-            <span className={`text-[11px] font-bold uppercase tracking-widest ${style.text}`}>
-              {labelKey}
-            </span>
-          </div>
-          {/* Child content */}
-          <div className="space-y-1.5">
-            {children.map((c, ci) =>
-              c.type === "equation" ? (
-                <div
-                  key={ci}
-                  className="font-mono text-sm bg-white/80 rounded-lg px-3 py-2 border border-white text-gray-800 shadow-sm"
-                >
-                  {c.content}
-                </div>
-              ) : (
-                <p key={ci} className={`text-sm leading-relaxed ${style.text}`}>{c.content}</p>
-              )
-            )}
-          </div>
-        </div>
-      );
-
-      i = j; continue;
-    }
-
-    if (s.type === "equation") {
-      nodes.push(
-        <div
-          key={i}
-          className="font-mono text-sm bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 mb-2 text-gray-800"
-        >
-          {s.content}
-        </div>
-      );
-      i++; continue;
-    }
-
-    if (s.type === "indent") {
-      nodes.push(
-        <p key={i} className="text-sm text-gray-700 leading-relaxed pl-3 border-l-2 border-gray-200 mb-1">
-          {s.content}
-        </p>
-      );
-      i++; continue;
-    }
-
-    nodes.push(
-      <p key={i} className="text-sm text-gray-800 leading-relaxed mb-2">{s.content}</p>
-    );
-    i++;
-  }
-
-  return <div className="space-y-0.5 w-full">{nodes}</div>;
+  return <MarkdownRenderer content={text} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 function RenderMd({ text }: { text: string }) {
-  return (
-    <div className="space-y-1.5 text-sm text-gray-700 leading-relaxed">
-      {text.split("\n").map((line, i) => {
-        if (line.startsWith("## "))
-          return (
-            <h3 key={i} className="text-sm font-semibold text-gray-900 mt-5 mb-1 first:mt-0">
-              {line.replace("## ", "")}
-            </h3>
-          );
-        if (line.startsWith("- ") || line.startsWith("• "))
-          return (
-            <div key={i} className="flex items-start gap-2">
-              <span className="text-gray-400 shrink-0 mt-0.5">•</span>
-              <span>{line.replace(/^[-•] /, "")}</span>
-            </div>
-          );
-        if (line.trim() === "") return <div key={i} className="h-1" />;
-        return <p key={i}>{line}</p>;
-      })}
-    </div>
-  );
+  return <MarkdownRenderer content={text} />;
 }
 
 function Spinner({ label }: { label: string }) {
@@ -3571,9 +3450,11 @@ function RecordingView({
 function ChatView({
   initialQuery,
   uploadedFile,
+  sessionId,
 }: {
   initialQuery: string;
   uploadedFile: string;
+  sessionId: string;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>(() => {
@@ -3601,11 +3482,25 @@ function ChatView({
   }, [messages]);
 
   useEffect(() => {
-    if (initialQuery && messages.length === 1) {
-      sendToAI(initialQuery);
-    }
+    (async () => {
+      if (sessionId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const past = await loadChatMessages(sessionId, false);
+          if (past.length > 0) {
+            setMessages(past);
+            return;
+          }
+        }
+      }
+      
+      // Only fire initial query if there was no past history found
+      if (initialQuery && messages.length <= 1) {
+        sendToAI(initialQuery);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessionId, initialQuery]);
 
   const sendToAI = async (question: string) => {
     setLoading(true);
@@ -3619,6 +3514,16 @@ function ChatView({
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "ai", text: data.answer }]);
+      
+      if (sessionId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await persistChatMessage(sessionId, user.id, "user", question, false);
+          await persistChatMessage(sessionId, user.id, "ai", data.answer, false);
+          // Also update last visited
+          await supabase.from("chat_sessions").update({ last_visited: new Date().toISOString() }).eq("id", sessionId);
+        }
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -4306,7 +4211,7 @@ export default function Contentpages() {
       <div className="flex h-screen bg-white overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden ml-[90px] min-w-0">
-          <ChatView initialQuery={initialQuery} uploadedFile={uploadedFile} />
+          <ChatView initialQuery={initialQuery} uploadedFile={uploadedFile} sessionId={sessionId} />
         </div>
       </div>
     );

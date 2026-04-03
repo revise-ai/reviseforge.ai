@@ -43,6 +43,7 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
   const [userName, setUserName] = useState(propName ?? "");
   const [userEmail, setUserEmail] = useState(propEmail ?? "");
   const [userInitials, setUserInitials] = useState("");
+  const [dailyStreak, setDailyStreak] = useState(0);
 
   // ── Load real user from Supabase auth ────────────────────
   useEffect(() => {
@@ -53,17 +54,48 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
       // Try profile table first for full_name
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name, initials")
+        .select("full_name, initials, daily_streak, last_active_at")
         .eq("id", user.id)
         .single();
 
       const name = profile?.full_name ?? user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User";
       const email = user.email ?? "";
       const initials = profile?.initials ?? getInitials(name);
+      
+      let streak = profile?.daily_streak ?? 0;
+      let lastActive = profile?.last_active_at ? new Date(profile.last_active_at) : null;
+      
+      // Update streak if necessary
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (lastActive) {
+        const lastActiveDate = new Date(lastActive);
+        lastActiveDate.setHours(0,0,0,0);
+        const diffTime = Math.abs(today.getTime() - lastActiveDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        
+        if (diffDays === 1) {
+          streak += 1;
+        } else if (diffDays > 1) {
+          streak = 1; // reset streak
+        }
+      } else {
+        streak = 1;
+      }
+
+      // If it's a new day or first time, update DB
+      if (!lastActive || lastActive.getDate() !== new Date().getDate()) {
+        supabase.from("profiles").update({ 
+          daily_streak: streak, 
+          last_active_at: new Date().toISOString() 
+        }).eq("id", user.id).then();
+      }
 
       setUserName(name);
       setUserEmail(email);
       setUserInitials(initials);
+      setDailyStreak(streak);
     })();
   }, []);
 
@@ -191,6 +223,14 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span className="text-[10px] font-medium leading-tight">{t('sidebar_info')}</span>
           </Link>
+        </div>
+
+        {/* ── Daily Streak ── */}
+        <div className="px-3 shrink-0">
+          <div className="flex flex-col items-center justify-center gap-0.5 py-2 hover:bg-orange-50 rounded-xl transition-colors cursor-pointer group">
+            <span className="text-lg leading-none group-hover:scale-110 transition-transform">🔥</span>
+            <span className="text-[11px] font-bold text-orange-500">{dailyStreak}</span>
+          </div>
         </div>
 
         {/* ── User avatar + menu ── */}

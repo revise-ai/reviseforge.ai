@@ -5,6 +5,9 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
+import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { calculateSM2, Rating } from "@/lib/spaced-repetition";
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Flashcard {
   id: number;
@@ -13,6 +16,10 @@ interface Flashcard {
   definition: string;
   hint: string;
   category: string;
+  next_review_at?: string;
+  last_interval?: number;
+  ease_factor?: number;
+  consecutive_correct?: number;
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -466,6 +473,7 @@ function StudyCard({
   onPrev,
   onNext,
   onEdit,
+  onRate,
 }: {
   card: Flashcard;
   current: number;
@@ -475,6 +483,7 @@ function StudyCard({
   onPrev: () => void;
   onNext: () => void;
   onEdit: () => void;
+  onRate: (rating: Rating) => void;
 }) {
   const [showHint, setShowHint] = useState(false);
   const [flipped, setFlipped] = useState(false);
@@ -533,19 +542,19 @@ function StudyCard({
         <div className="flex flex-col items-center justify-center px-10 py-12 text-center min-h-[240px]">
           {!flipped ? (
             <>
-              <p className="text-xl font-medium text-gray-900 leading-relaxed">
-                {card.term}
-              </p>
+              <div className="text-xl font-medium text-gray-900 leading-relaxed w-full">
+                <MarkdownRenderer content={card.term} />
+              </div>
               {showHint && card.hint && (
-                <p className="mt-6 text-sm text-gray-500 italic">
-                  Hint: {card.hint}
-                </p>
+                <div className="mt-6 text-sm text-gray-500 italic w-full">
+                  Hint: <MarkdownRenderer content={card.hint} />
+                </div>
               )}
             </>
           ) : (
-            <p className="text-lg text-gray-700 leading-relaxed">
-              {card.definition}
-            </p>
+            <div className="text-lg text-gray-700 leading-relaxed w-full text-left">
+              <MarkdownRenderer content={card.definition} />
+            </div>
           )}
         </div>
 
@@ -558,24 +567,57 @@ function StudyCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-6 mt-8">
-        <button
-          onClick={onPrev}
-          disabled={current === 0}
-          className="w-12 h-12 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shadow-sm"
-        >
-          <ChevronLeft />
-        </button>
-        <span className="text-sm text-gray-500 font-medium min-w-[60px] text-center">
-          {current + 1} / {total}
-        </span>
-        <button
-          onClick={onNext}
-          disabled={current === total - 1}
-          className="w-12 h-12 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shadow-sm"
-        >
-          <ChevronRight />
-        </button>
+      <div className="flex flex-col items-center gap-6 mt-8">
+        {!flipped ? (
+          <div className="flex items-center gap-6">
+            <button
+              onClick={onPrev}
+              disabled={current === 0}
+              className="w-12 h-12 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shadow-sm"
+            >
+              <ChevronLeft />
+            </button>
+            <span className="text-sm text-gray-500 font-medium min-w-[60px] text-center">
+              {current + 1} / {total}
+            </span>
+            <button
+              onClick={onNext}
+              disabled={current === total - 1}
+              className="w-12 h-12 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shadow-sm"
+            >
+              <ChevronRight />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-sm text-gray-500 font-medium mb-1">How well did you know this?</span>
+            <div className="flex gap-2 w-full max-w-sm justify-center">
+              <button onClick={(e) => { e.stopPropagation(); onRate(1); }} className="flex-1 py-3 px-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold rounded-xl transition border border-red-200 cursor-pointer">Again</button>
+              <button onClick={(e) => { e.stopPropagation(); onRate(2); }} className="flex-1 py-3 px-2 bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-semibold rounded-xl transition border border-orange-200 cursor-pointer">Hard</button>
+              <button onClick={(e) => { e.stopPropagation(); onRate(3); }} className="flex-1 py-3 px-2 bg-green-50 hover:bg-green-100 text-green-600 text-sm font-semibold rounded-xl transition border border-green-200 cursor-pointer">Good</button>
+              <button onClick={(e) => { e.stopPropagation(); onRate(4); }} className="flex-1 py-3 px-2 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-semibold rounded-xl transition border border-blue-200 cursor-pointer">Easy</button>
+            </div>
+            <div className="flex items-center gap-6 mt-4">
+              <button
+                onClick={onPrev}
+                disabled={current === 0}
+                className="w-10 h-10 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-gray-400 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shadow-sm"
+              >
+                <ChevronLeft />
+              </button>
+              <span className="text-sm text-gray-500 font-medium min-w-[60px] text-center">
+                {current + 1} / {total}
+              </span>
+              <button
+                onClick={onNext}
+                disabled={current === total - 1}
+                className="w-10 h-10 rounded-2xl border border-gray-200 bg-white flex items-center justify-center text-gray-400 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shadow-sm"
+              >
+                <ChevronRight />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-1.5 mt-4 flex-wrap justify-center max-w-xs">
@@ -680,6 +722,7 @@ export default function FlashcardsPage() {
         .from("flashcards")
         .select("*")
         .eq("session_id", sid)
+        .order("next_review_at", { ascending: true, nullsFirst: true })
         .order("card_order", { ascending: true });
 
       if (dbErr) throw dbErr;
@@ -810,6 +853,55 @@ export default function FlashcardsPage() {
     }));
   };
 
+  // ── SR Rating ─────────────────────────────────────────────────────────────
+  const handleRate = async (rating: Rating) => {
+    const card = cards[currentIndex];
+    const sm2 = calculateSM2(
+      rating,
+      card.ease_factor,
+      card.last_interval,
+      card.consecutive_correct
+    );
+
+    // Update locally
+    setCards((prev) =>
+      prev.map((c, i) =>
+        i === currentIndex
+          ? {
+              ...c,
+              next_review_at: sm2.next_review_at,
+              last_interval: sm2.last_interval,
+              ease_factor: sm2.ease_factor,
+              consecutive_correct: sm2.consecutive_correct,
+            }
+          : c
+      )
+    );
+
+    const actualUserId = userId || (await supabase.auth.getUser()).data.user?.id;
+
+    // Update in DB
+    if (card.dbId && actualUserId) {
+      supabase
+        .from("flashcards")
+        .update({
+          next_review_at: sm2.next_review_at,
+          last_interval: sm2.last_interval,
+          ease_factor: sm2.ease_factor,
+          consecutive_correct: sm2.consecutive_correct,
+        })
+        .eq("id", card.dbId)
+        .then(({ error }) => {
+          if (error) console.error("Failed to save SR rating", error);
+        });
+    }
+
+    // Move to next card
+    if (currentIndex < cards.length - 1) {
+      setCurrentIndex((i) => i + 1);
+    }
+  };
+
   // ── Star toggle ───────────────────────────────────────────────────────────
   const toggleStar = async (localId: number) => {
     const card = cards.find((c) => c.id === localId);
@@ -931,6 +1023,7 @@ export default function FlashcardsPage() {
         onPrev={() => setCurrentIndex((i) => Math.max(0, i - 1))}
         onNext={() => setCurrentIndex((i) => Math.min(cards.length - 1, i + 1))}
         onEdit={() => setMode("edit")}
+        onRate={handleRate}
       />
     </div>
   );

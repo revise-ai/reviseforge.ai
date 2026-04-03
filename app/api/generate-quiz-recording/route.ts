@@ -60,7 +60,6 @@ export async function POST(req: NextRequest) {
   if (!user) return unauthorizedError();
 
   try {
-
     if (!audioBase64 && !transcript) {
       return NextResponse.json(
         {
@@ -71,61 +70,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const prompt = `You are ReviseForge AI — the world's most ruthlessly difficult MCQ exam generator. Listen to this entire recorded lecture and generate exactly 15 multiple-choice questions that will genuinely challenge even the most prepared students. These questions must separate students who truly understood the recording from those who merely listened passively.
+    const prompt = `You are ReviseForge AI — a world-class academic tutor and master examination engine. Your mission is to listen to this entire recorded lecture and generate exactly 15 elite-level multiple-choice questions that test deep conceptual mastery.
 
-CRITICAL RULES — STRICTLY FORBIDDEN:
-Never ask about the speaker name, recording date, or any metadata.
-Never create questions that could be answered without actually listening to this specific recording.
-Never repeat or reword the same concept across multiple questions.
-Never use "all of the above" or "none of the above" as options.
-Exactly 15 questions — no more, no less.
+### CRITICAL BANS (NEVER ASK):
+- Recording metadata (speaker name, dates, location).
+- Trivial recall not specific to the core teaching.
+- "All/None of the above" options.
 
-DIFFICULTY REQUIREMENTS — NON-NEGOTIABLE:
-Every question must meet at least one of these criteria:
+### REVISEFORGE EXCELLENCE FRAMEWORK (DIFFICULTY & RIGOR):
+Every question must meet at least ONE of these elite criteria:
+1. **Multi-Step Reasoning**: Connecting multiple points from different moments in the recording.
+2. **Nuance Distinction**: Subtle differences between 4 plausible options.
+3. **Exception Testing**: Edge cases mentioned by the speaker.
+4. **Inverse Reasoning**: Asks what is NOT true or the opposite effect.
+5. **Causal Depth**: Underlying mechanisms ($the "why"$).
+6. **Quantitative Precision**: Exact formula components, thresholds, or statistics mentioned in the audio.
+7. **Application Transfer**: Applying a concept from the recording to a new scenario.
 
-Multi-step reasoning: The student must apply two or more concepts from different parts of the recording together to reach the answer.
-Nuance distinction: Three of the four options are partially correct, but only one is precisely accurate.
-Exception testing: The question tests a rare exception, edge case, or condition where the general rule breaks down.
-Inverse reasoning: The question asks what would NOT happen, what is INCORRECT, or what is the OPPOSITE of what was explained.
-Quantitative precision: The question requires exact knowledge of a number, rate, formula, threshold, or specific statistic mentioned in the recording.
-Causal depth: The question asks about the underlying mechanism or root cause rather than just the observable outcome.
-Comparative analysis: The student must distinguish between two similar concepts that are commonly confused, as explained in the recording.
-Application transfer: A scenario is described and the student must apply a concept from the recording to that new situation.
-Synthesis: The student must combine information from two different sections or moments of the recording.
-Critical evaluation: The student must identify which statement is most accurate, most complete, or best supported by what was said in the recording.
+### FORMATTING STANDARDS (CRITICAL):
+- **LaTeX Mandated**: Use LaTeX for ALL mathematical expressions, chemical formulas, and technical variables ($...$ for inline, $$...$$ for block).
+- **Markdown Headers**: Use ### inside explanations to organize sections.
+- **Strict JSON**: Return ONLY a valid JSON object. No meta-commentary.
 
-DISTRACTOR DESIGN — THIS IS WHAT MAKES QUESTIONS HARD:
-All four options must sound plausible to someone who listened carelessly.
-At least two distractors must use correct terminology from the recording but apply it wrongly.
-At least one distractor must represent a common misconception or oversimplification of the correct answer.
-All four options must be approximately the same length so the correct answer does not stand out visually.
-Never make the correct answer obviously more detailed or precise than the others.
-
-EXPLANATION REQUIREMENTS:
-For every question write a detailed explanation that states clearly why the correct answer is right with specific reasoning from the recording content. Explain why each wrong option is wrong and what mistake a student would have made by choosing it. Reference the underlying principle rather than just the bare fact. Write in plain clear sentences. No markdown formatting symbols, no asterisks, no hashtags.
-
-IMPORTANT: Return ONLY a valid JSON object. No text before or after. No markdown code fences. No explanation outside the JSON. Use double quotes for ALL property names and string values. Do not use trailing commas.
-
+### OUTPUT STRUCTURE (JSON ONLY):
 {
   "questions": [
     {
       "id": 1,
-      "question": "A precise, challenging question written as a complete sentence requiring deep understanding of the recording content",
+      "question": "Precise, challenging question with LaTeX notation where required.",
       "options": {
-        "A": "A plausible option using correct terminology from the recording",
-        "B": "A plausible option using correct terminology from the recording",
-        "C": "A plausible option using correct terminology from the recording",
-        "D": "A plausible option using correct terminology from the recording"
+        "A": "Plausible option with correct terminology",
+        "B": "Plausible option with correct terminology",
+        "C": "Plausible option with correct terminology",
+        "D": "Plausible option with correct terminology"
       },
-      "correctAnswer": "B",
-      "explanation": "Why B is correct with specific reasoning from the recording. Why A is wrong and what mistake leads there. Why C is wrong and what mistake leads there. Why D is wrong and what mistake leads there.",
-      "category": "Specific topic area from the recording",
+      "correctAnswer": "A",
+      "explanation": "### Why it's correct\nReasoning based on the recording using LaTeX ($ ... $). \n### Why distractors are wrong\nExplain the specific misunderstanding for B, C, and D based on what the speaker said.",
+      "category": "Topic area",
       "difficulty": "hard"
     }
   ]
 }
 
-Generate exactly 15 questions. The difficulty must be genuinely high — these questions should make even students who listened carefully think hard.`;
+Generate exactly 15 questions. The rigor must be absolute.`;
 
     let contents: any[];
 
@@ -168,7 +155,6 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
       data = extractJSON(rawText);
     } catch (parseErr: any) {
       console.error("Quiz recording JSON parse failed:", parseErr.message);
-      console.error("Raw response (first 500 chars):", rawText.slice(0, 500));
       return NextResponse.json(
         { error: "Failed to parse quiz response. Please try again." },
         { status: 500 },
@@ -197,18 +183,6 @@ Generate exactly 15 questions. The difficulty must be genuinely high — these q
       );
     }
 
-    if (error?.message?.includes("size") || error?.message?.includes("limit")) {
-      return NextResponse.json(
-        {
-          error: "Recording is too large to process. Try a shorter recording.",
-        },
-        { status: 413 },
-      );
-    }
-
-    return NextResponse.json(
-      { error: error.message || "Failed to generate quiz" },
-      { status: 500 },
-    );
+    return serverError();
   }
 }

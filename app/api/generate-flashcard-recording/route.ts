@@ -60,7 +60,6 @@ export async function POST(req: NextRequest) {
   if (!user) return unauthorizedError();
 
   try {
-
     if (!audioBase64 && !transcript) {
       return NextResponse.json(
         {
@@ -71,72 +70,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const prompt = `You are ReviseForge AI — the world's most advanced flashcard generation engine. Listen to this entire recorded lecture and create flashcards that will help students truly master the subject matter, not just recognise surface details.
+    const prompt = `You are ReviseForge AI — a world-class academic tutor and master mnemonic specialist. Your mission is to listen to this entire recorded lecture and produce a high-density, pedagogical set of flashcards.
 
-CRITICAL RULE — STRICTLY FORBIDDEN CARDS:
-Never create flashcards about any of the following — these are useless for studying:
-The name of the speaker or any person mentioned incidentally.
-Any metadata about the recording such as date, length, or platform.
-Questions like "What is this recording about?" or "Who is speaking?"
-These cards test nothing. A student who never listened to the recording could answer them. They are banned.
+### CRITICAL BANS (NEVER ASK):
+- Recording metadata (speaker name, dates, location).
+- Trivial structural recall or general knowledge.
 
-WHAT YOU MUST FOCUS ON INSTEAD:
-Every flashcard must test something a student needs to understand, remember, or be able to apply from the actual content of the recording. Ask yourself before every card: "Would a student who studied this recording hard need to know this for an exam?" If yes, create the card. If it is just metadata or filler, skip it entirely.
+### REVISEFORGE EXCELLENCE FRAMEWORK (FLASHCARD DESIGN):
+Every card must facilitate active recall and deep encoding:
+1. **Term/Question**: Formulate specific, exam-worthy questions or terms based on the recording.
+2. **Definition/Answer**: Provide a comprehensive standalone explanation.
+3. **LaTeX Mandated**: Use LaTeX for ALL mathematical expressions, chemical formulas, and technical variables ($...$ for inline, $$...$$ for block).
+4. **Markdown Headers**: Use ### inside definitions to structure complex answers.
+5. **Elite Hint**: Provide a powerful mnemonic, analogy, or conceptual "key" referencing how the speaker explained it.
 
-STEP 1 — DEEP CONTENT ANALYSIS:
-Listen to the entire recording and extract every piece of meaningful knowledge:
-Every key term, concept, definition, and technical vocabulary word the speaker introduces.
-Every theory, model, framework, or principle explained.
-Every process, mechanism, sequence of steps, or workflow demonstrated.
-Every formula, equation, law, rule, or theorem stated.
-Every cause-and-effect relationship or explanation of why something happens.
-Every comparison or contrast between two or more ideas.
-Every statistic, measurement, or quantitative fact that carries meaning.
-Every real-world example or case study used to illustrate a concept.
-Every exception, special case, or nuance mentioned.
+### SUBJECT-SPECIFIC RIGOR:
+- **STEM**: Mechanisms at molecular/physical levels. Use exact notation ($\pi$, $\alpha$, $\beta$).
+- **Humanities**: Causal relationships, theoretical frameworks, and historical significance.
+- **Medicine/Nursing**: Pathophysiology, clinical presentation, and precise anatomical relationships.
 
-STEP 2 — QUESTION DESIGN:
-Write questions that require genuine understanding:
-For definitions: "What is [concept] and why does it matter?"
-For mechanisms: "How does [process] work?"
-For causes: "Why does [phenomenon] occur?"
-For formulas: "What is the formula for [calculation] and what does each part represent?"
-For comparisons: "What is the difference between [X] and [Y]?"
-For cause-and-effect: "What are the consequences of [event or condition]?"
-For application: "How would you calculate or determine [result]?"
-For sequences: "What are the stages or steps of [process]?"
-
-STEP 3 — ANSWER DESIGN:
-Every answer must be a complete, standalone explanation written in plain sentences:
-Never answer with just a word or short phrase — always explain fully using the context from the recording.
-For formulas: state the formula in plain text, define every variable, explain what it calculates.
-For processes: explain each step and why it happens in that order.
-For comparisons: explain both sides clearly and what makes them different.
-For causes: explain the mechanism as the speaker described it, not just label it.
-Write in clean plain sentences only. No asterisks, no hashtags, no bullet point symbols, no markdown formatting of any kind.
-
-STEP 4 — HINT DESIGN:
-Every hint must be a genuine memory aid:
-Give a mnemonic, analogy, or memory cue connected to how the speaker explained it.
-Mention a related concept from the recording that connects to the answer.
-Reference the context from the recording to trigger recall.
-Never repeat the question or give away the answer directly.
-
-IMPORTANT: Return ONLY a valid JSON object. No text before or after. No markdown code fences. No explanation outside the JSON. Use double quotes for ALL property names and string values. Do not use trailing commas.
-
+### OUTPUT SCHEMA (JSON ONLY):
 {
   "flashcards": [
     {
       "id": 1,
-      "term": "A specific, exam-worthy question about actual content from the recording",
-      "definition": "A complete, educational explanation in plain sentences — no asterisks, no hashtags, no bullet symbols",
-      "hint": "A memory cue, analogy, or contextual clue that helps recall without giving the answer",
-      "category": "Specific subject area from the recording (e.g. Organic Chemistry, Cell Division, Keynesian Economics)"
+      "term": "Specific question or technical term using LaTeX where required.",
+      "definition": "### Concept Overview\nDetailed pedagogical explanation from the lecture using LaTeX ($ ... $). \n### Why it matters\nSignificance according to the speaker.",
+      "hint": "A powerful mnemonic or analogy from the recording.",
+      "category": "Topic Area"
     }
   ]
 }
 
-Minimum 15 cards, no maximum — cover every piece of meaningful knowledge from the recording. A student should be able to study exclusively from these cards and feel confident going into an exam on this content.`;
+Generate a minimum of 15 high-impact cards. Ensure the rigor is absolute.`;
 
     let contents: any[];
 
@@ -182,7 +148,6 @@ Minimum 15 cards, no maximum — cover every piece of meaningful knowledge from 
         "Flashcards recording JSON parse failed:",
         parseErr.message,
       );
-      console.error("Raw response (first 500 chars):", rawText.slice(0, 500));
       return NextResponse.json(
         { error: "Failed to parse flashcards response. Please try again." },
         { status: 500 },
@@ -211,18 +176,6 @@ Minimum 15 cards, no maximum — cover every piece of meaningful knowledge from 
       );
     }
 
-    if (error?.message?.includes("size") || error?.message?.includes("limit")) {
-      return NextResponse.json(
-        {
-          error: "Recording is too large to process. Try a shorter recording.",
-        },
-        { status: 413 },
-      );
-    }
-
-    return NextResponse.json(
-      { error: error.message || "Failed to generate flashcards" },
-      { status: 500 },
-    );
+    return serverError();
   }
 }

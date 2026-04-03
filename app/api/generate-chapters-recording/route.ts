@@ -146,46 +146,44 @@ export async function POST(req: NextRequest) {
           ? "Because this recording is under 3 minutes, create 2 to 3 chapters maximum — only where genuine topic shifts occur."
           : "Identify 4 to 8 natural topic breaks where the speaker genuinely shifts to a new idea.";
 
-    const prompt = `Listen to this entire recorded audio from start to finish.
+    const prompt = `You are ReviseForge AI — an elite academic tutor and master transcription analyst. Your mission is to listen to this entire recorded audio and extract professional, pedagogical chapters and a clean transcript.
 
 ${durationNote}
 
-You must produce two things: accurate chapters and a verbatim transcript.
-
-CHAPTERS:
+### MISSION A: PEDAGOGICAL CHAPTERING
 ${chapterNote}
 Each chapter must:
-- Have a timestamp in MM:SS format that EXACTLY matches a real moment in the audio
-- Have a title naming the specific topic (not vague like "Introduction" or "Part 1")
-- Have 2 to 3 sentences explaining what the speaker covers in that section
+- Have a timestamp in MM:SS format that EXACTLY matches a real moment in the audio.
+- Have an **Elite Title**: Professional and descriptive (e.g., "The Mechanism of Cellular Respiration" instead of "Part 1").
+- Have a **Pedagogical Description**: 2-3 sentences explaining exactly what is covered in that section. Use **LaTeX** for every mathematical, scientific, or technical notation ($...$ for inline, $$...$$ for block).
+- Focus on genuine topic shifts, not transitions or greetings.
 
-Do NOT invent chapters. Do NOT produce timestamps beyond the recording duration. Only create a chapter when there is a genuine shift in subject matter.
+### MISSION B: CLEAN TRANSCRIPT
+Produce a verbatim transcript segment ${transcriptInterval}.
+- Match MM:SS timestamps.
+- Clean language: Ensure technical terms are spelled correctly but stay true to the speaker's words.
 
-TRANSCRIPT:
-Produce a verbatim transcript of the spoken words. Create one entry ${transcriptInterval}. Each entry must:
-- Have a timestamp in MM:SS format that is within the actual recording duration
-- Contain the actual words spoken at that moment — verbatim, not paraphrased
-- Cover the full recording from 00:00 to the end with no gaps
-
-IMPORTANT: Return ONLY a valid JSON object. No text before or after. No markdown code fences. Use double quotes for ALL keys and string values. No trailing commas.
-
+### OUTPUT FORMAT (JSON ONLY):
+Return ONLY a valid JSON object. Use double quotes for all keys and strings. No Meta-commentary.
 {
-  "title": "A descriptive title summarising the main topic",
+  "title": "Elite Study Guide Title",
   "duration": "${knownDuration ? toMMSS(knownDuration) : "MM:SS"}",
   "chapters": [
     {
       "time": "00:00",
-      "title": "Specific chapter title",
-      "text": "2 to 3 sentences about what is covered here"
+      "title": "Elite Chapter Title",
+      "text": "Pedagogical description with LaTeX for technical terms."
     }
   ],
   "transcripts": [
     {
       "time": "00:00",
-      "text": "The actual words spoken at this timestamp"
+      "text": "The actual words spoken at this timestamp."
     }
   ]
-}`;
+}
+
+Sign off as ReviseForge AI.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

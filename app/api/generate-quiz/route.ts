@@ -23,15 +23,14 @@ export async function POST(req: NextRequest) {
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
 
-    const prompt = `You are ReviseForge AI — a world-class academic tutor and the world's most sophisticated MCQ examination engine. Your mission is to create 30 elite-level multiple-choice questions that test deep conceptual mastery, analytical reasoning, and practical application.
+    const prompt = `You are ReviseForge AI — the world's most elite academic tutor and examination engine. Your mission is to create 30 elite-level multiple-choice questions that test deep conceptual mastery of this document.
 
 ### CRITICAL BANS (NEVER ASK):
-- Document metadata (title, author, institution, lecturer name, dates, page/slide numbers).
-- Trivial recall or general knowledge not specific to this document.
-- Questions with obviously wrong distractors.
+- Document metadata (title, author, institution, page numbers).
+- Trivial recall or general knowledge.
 - "All/None of the above" options.
 
-### REVISEFORGE EXCELLENCE FRAMEWORK (DIFFICULTY & RIGOR):
+### REVISEFORGE EXCELLENCE FRAMEWORK (v2.1):
 Every question must meet at least ONE of these elite criteria:
 1. **Multi-Step Reasoning**: Chaining 2+ concepts ($A \rightarrow B \rightarrow C$).
 2. **Nuance Distinction**: Subtle differences between 4 plausible options.
@@ -42,28 +41,24 @@ Every question must meet at least ONE of these elite criteria:
 7. **Application Transfer**: Applying a concept to a brand new scenario.
 
 ### FORMATTING STANDARDS (CRITICAL):
-- **LaTeX Mandated**: Use LaTeX for ALL mathematical expressions, chemical formulas, and technical variables ($...$ for inline, $$...$$ for block).
+- **LaTeX Mandated**: Use LaTeX for ALL mathematical, scientific, and technical notations ($...$, $$...$$).
+- **Visuals in Explanations**: If explaining a process, use \`\`\`mermaid\`\`\`. If explaining a molecule, use \`\`\`smiles\`\`\`.
 - **Markdown Headers**: Use ### inside explanations to organize sections.
-- **Strict JSON**: Return ONLY a valid JSON array. No preamble, no meta-commentary.
-
-### SUBJECT-SPECIFIC DEPTH:
-- **STEM**: Mechanisms at molecular/cellular/physical levels. Use exact notation ($\text{H}_2\text{O}$, $\sum F = ma$).
-- **Humanities**: Causation and consequence, not just dates. Distinguish between similar theories.
-- **Nursing/Medicine**: Clinical application, contraindications, and pathophysiology.
+- **Strict JSON**: Return ONLY a valid JSON array. No preamble.
 
 ### OUTPUT STRUCTURE (JSON):
 [
   {
     "id": 1,
-    "question": "Precise, challenging question with LaTeX notation where required.",
+    "question": "Precise, challenging question with LaTeX notation ($ ... $).",
     "options": {
-      "A": "Plausible option with correct terminology",
-      "B": "Plausible option with correct terminology",
-      "C": "Plausible option with correct terminology",
-      "D": "Plausible option with correct terminology"
+      "A": "Terminology-rich option",
+      "B": "Terminology-rich option",
+      "C": "Terminology-rich option",
+      "D": "Terminology-rich option"
     },
     "correctAnswer": "A",
-    "explanation": "### Why it's correct\nReasoning based on the document using LaTeX ($ ... $). \n### Why distractors are wrong\nExplain the specific misunderstanding for B, C, and D.",
+    "explanation": "### Why it's correct\nReasoning using LaTeX ($ ... $). \n### Structural Detail\n(Optional) \`\`\`smiles or mermaid\`\`\` logic. \n### Distractor Analysis\nExplain the precise misunderstanding for B, C, and D.",
     "category": "Topic area",
     "difficulty": "hard"
   }

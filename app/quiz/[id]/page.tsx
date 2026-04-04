@@ -3,7 +3,7 @@
 // app/quiz/[id]/page.tsx
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -804,7 +804,11 @@ export default function QuizPage() {
 
       if (name) setFileName(name);
 
-      if (b64File && name) {
+      if (sourceParam === "youtube" && urlParam) {
+        generateYouTubeQuiz(urlParam, urlSessionId, authUser?.id);
+      } else if (sourceParam === "recording") {
+        generateRecordingQuiz(urlSessionId, authUser?.id);
+      } else if (b64File && name) {
         generateAndPersist(b64File, name, urlSessionId, authUser?.id);
       } else {
         loadQuestionsFromDB(urlSessionId, authUser?.id);
@@ -894,6 +898,117 @@ export default function QuizPage() {
   };
 
   // ── Generate via API then persist ─────────────────────────────────────────
+  const generateYouTubeQuiz = async (url: string, sid: string, uid?: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data: existing } = await supabase
+        .from("quiz_sessions")
+        .select("status")
+        .eq("id", sid)
+        .single();
+      if (existing?.status === "ready" || existing?.status === "finished") {
+        await loadQuestionsFromDB(sid, uid);
+        return;
+      }
+
+      const res = await fetch("/api/generate-quiz-youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error("Failed to generate YouTube quiz");
+      const data = await res.json();
+      await persistGeneratedQuiz(data.questions, sid, uid);
+    } catch (err: any) {
+      setError(err.message || "Failed to generate quiz from YouTube.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateRecordingQuiz = async (sid: string, uid?: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data: existing } = await supabase
+        .from("quiz_sessions")
+        .select("status")
+        .eq("id", sid)
+        .single();
+      if (existing?.status === "ready" || existing?.status === "finished") {
+        await loadQuestionsFromDB(sid, uid);
+        return;
+      }
+
+      const audio = sessionStorage.getItem("rec_study_audio");
+      const transcript = sessionStorage.getItem("rec_study_transcript");
+      const mime = sessionStorage.getItem("rec_study_mimeType");
+
+      const res = await fetch("/api/chat-recording", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audio,
+          mimeType: mime,
+          transcript,
+          prompt: "Generate a set of 10 highly academic, challenging multiple-choice questions based on the content of this recording. Follow the ELITE framework (v2.1). Return ONLY a JSON object with a 'questions' array. Each question must have 'question', 'options' (A,B,C,D), 'correctAnswer' (one of A,B,C,D), 'explanation', 'category', and 'difficulty'."
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to generate quiz from recording");
+      const data = await res.json();
+      
+      // Robust JSON extraction from AI response
+      const text = data.response;
+      const jsonStart = text.indexOf("{");
+      const jsonEnd = text.lastIndexOf("}") + 1;
+      const jsonStr = text.substring(jsonStart, jsonEnd);
+      const parsed = JSON.parse(jsonStr);
+      
+      await persistGeneratedQuiz(parsed.questions, sid, uid);
+    } catch (err: any) {
+      setError(err.message || "Failed to generate quiz from recording.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const persistGeneratedQuiz = async (qs: QuizQuestion[], sid: string, uid?: string) => {
+    const rows = qs.map((q, i) => ({
+      session_id: sid,
+      user_id: uid,
+      question_order: i + 1,
+      question: q.question,
+      option_a: q.options.A,
+      option_b: q.options.B,
+      option_c: q.options.C,
+      option_d: q.options.D,
+      correct_answer: q.correctAnswer,
+      explanation: q.explanation,
+      category: q.category,
+      difficulty: q.difficulty,
+    }));
+
+    const { data: inserted, error: insertErr } = await supabase
+      .from("quiz_questions")
+      .insert(rows)
+      .select("id, question_order");
+
+    if (insertErr) throw insertErr;
+
+    const dbIdMap: Record<number, string> = {};
+    (inserted ?? []).forEach((row) => {
+      dbIdMap[row.question_order] = row.id;
+    });
+
+    setQuestions(qs.map((q, i) => ({ ...q, dbId: dbIdMap[i + 1] })));
+    await supabase.from("quiz_sessions").update({
+      status: "ready",
+      total: qs.length,
+      last_visited: new Date().toISOString(),
+    }).eq("id", sid);
+  };
+
   const generateAndPersist = async (
     base64File: string,
     name: string,

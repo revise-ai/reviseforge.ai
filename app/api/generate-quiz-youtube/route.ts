@@ -65,25 +65,26 @@ export async function POST(req: NextRequest) {
     if (!url)
       return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
-    const prompt = `You are ReviseForge AI — a world-class academic tutor and master examination engine. Your mission is to watch this entire YouTube video and generate exactly 15 elite-level multiple-choice questions that test deep conceptual mastery.
+    const prompt = `You are ReviseForge AI — the world's most elite academic tutor and examination engine. Your mission is to watch this entire video and generate exactly 15 elite-level multiple-choice questions that test deep conceptual mastery.
 
 ### CRITICAL BANS (NEVER ASK):
-- Video metadata (title, channel, presenter, date).
-- Trivial recall not specific to the video's core teaching.
+- Video metadata (channel, date, presenter name).
+- Trivial recall or general knowledge.
 - "All/None of the above" options.
 
-### REVISEFORGE EXCELLENCE FRAMEWORK (DIFFICULTY & RIGOR):
+### REVISEFORGE EXCELLENCE FRAMEWORK (v2.1):
 Every question must meet at least ONE of these elite criteria:
 1. **Multi-Step Reasoning**: Connecting multiple points from different moments in the video.
 2. **Nuance Distinction**: Subtle differences between 4 plausible options.
 3. **Exception Testing**: Edge cases mentioned by the speaker.
 4. **Inverse Reasoning**: Asks what is NOT true or the opposite effect.
 5. **Causal Depth**: Underlying mechanisms ($the "why"$).
-6. **Quantitative Precision**: Exact formula components, thresholds, or statistics from the video.
-7. **Application Transfer**: Applying a concept from the video to a new scenario.
+6. **Quantitative Rigor**: Exact formula components or thresholds.
+7. **Application Transfer**: Applying a concept to a brand new scenario.
 
 ### FORMATTING STANDARDS (CRITICAL):
-- **LaTeX Mandated**: Use LaTeX for ALL mathematical expressions, chemical formulas, and technical variables ($...$ for inline, $$...$$ for block).
+- **LaTeX Mandated**: Use LaTeX for ALL mathematical, scientific, and technical notations ($...$, $$...$$).
+- **Visuals in Explanations**: If explaining a process, use \`\`\`mermaid\`\`\`. If explaining a molecule, use \`\`\`smiles\`\`\`.
 - **Markdown Headers**: Use ### inside explanations to organize sections.
 - **Strict JSON**: Return ONLY a valid JSON object. No meta-commentary.
 
@@ -92,16 +93,16 @@ Every question must meet at least ONE of these elite criteria:
   "questions": [
     {
       "id": 1,
-      "question": "Precise, challenging question with LaTeX notation where required.",
+      "question": "Precise, challenging question with LaTeX notation ($ ... $).",
       "options": {
-        "A": "Plausible option with correct terminology",
-        "B": "Plausible option with correct terminology",
-        "C": "Plausible option with correct terminology",
-        "D": "Plausible option with correct terminology"
+        "A": "Plausible terminology-rich option",
+        "B": "Plausible terminology-rich option",
+        "C": "Plausible terminology-rich option",
+        "D": "Plausible terminology-rich option"
       },
       "correctAnswer": "A",
-      "explanation": "### Why it's correct\nReasoning based on the video content using LaTeX ($ ... $). \n### Why distractors are wrong\nExplain the specific misunderstanding for B, C, and D based on what the speaker said.",
-      "category": "Topic area from video",
+      "explanation": "### Why it's correct\nReasoning based on the video content using LaTeX ($ ... $). \n### Structural Detail\n(Optional) \`\`\`smiles or mermaid\`\`\` logic. \n### Distractor Analysis\nExplain the misunderstanding for B, C, and D.",
+      "category": "Topic area",
       "difficulty": "hard"
     }
   ]

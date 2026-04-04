@@ -11,6 +11,16 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className }) => {
+  // Pre-process content to handle [SMILES: ...] pattern if it's not in a code block
+  const processContent = (text: string) => {
+    // This is a simple strategy: we'll split the text by the SMILES pattern
+    // and render them as parts. However, ReactMarkdown is better at parsing structure.
+    // A better way is to use a plugin, but for simplicity and speed, 
+    // we'll rely on the AI using the standard ````smiles block which we already handle.
+    // If we want [SMILES: ...] we can add it as a custom component if we wrap it in a pseudo-tag.
+    return text.replace(/\[SMILES:\s*([^\]]+)\]/g, "```smiles\n$1\n```");
+  };
+
   return (
     <div className={`markdown-content ${className || ""}`}>
       <ReactMarkdown
@@ -36,12 +46,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className 
             }
             
             return inline ? (
-              <code className="bg-gray-100 px-1 rounded text-sm" {...props}>
+              <code className="bg-gray-100 px-1 rounded text-sm font-mono text-blue-600" {...props}>
                 {children}
               </code>
             ) : (
-              <pre className="bg-gray-100 p-3 rounded-lg overflow-x-auto my-2">
-                <code className="text-sm" {...props}>
+              <pre className="bg-gray-100 p-4 rounded-2xl overflow-x-auto my-4 border border-gray-100">
+                <code className="text-sm font-mono" {...props}>
                   {children}
                 </code>
               </pre>
@@ -49,7 +59,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className 
           },
         }}
       >
-        {content}
+        {processContent(content)}
       </ReactMarkdown>
     </div>
   );

@@ -1404,6 +1404,10 @@ export default function DashboardPage() {
   const router = useRouter();
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isListening, setIsListening] = useState(false);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
 
   const closeModal = () => setActiveModal(null);
 
@@ -1434,121 +1438,27 @@ export default function DashboardPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [ytRes, recRes, quizRes, flashRes, chatRes] = await Promise.all([
-        supabase
-          .from("youtube_sessions")
-          .select("id, url, video_title, last_visited")
-          .eq("user_id", user.id)
-          .order("last_visited", { ascending: false })
-          .limit(6),
-        supabase
-          .from("recording_sessions")
-          .select("id, mode, title, last_visited")
-          .eq("user_id", user.id)
-          .order("last_visited", { ascending: false })
-          .limit(6),
-        supabase
-          .from("quiz_sessions")
-          .select("id, file_name, last_visited, created_at")
-          .eq("user_id", user.id)
-          .in("status", ["ready", "finished"])
-          .order("last_visited", { ascending: false })
-          .limit(6),
-        supabase
-          .from("flashcard_sessions")
-          .select("id, file_name, last_visited, created_at")
-          .eq("user_id", user.id)
-          .eq("status", "ready")
-          .order("last_visited", { ascending: false })
-          .limit(6),
-        supabase
-          .from("chat_sessions")
-          .select("id, title, last_visited, created_at")
-          .eq("user_id", user.id)
-          .order("last_visited", { ascending: false })
-          .limit(6),
-      ]);
-
-      const ytItems: RecentItem[] = (ytRes.data ?? []).map((s) => ({
-        id: s.id,
-        type: "youtube",
-        title:
-          s.video_title ||
-          s.url.replace("https://", "").replace("www.", "").slice(0, 50),
-        subtitle: s.url,
-        last_visited: s.last_visited,
-        href: `/content/${s.id}?url=${encodeURIComponent(s.url)}&session_id=${s.id}`,
-        videoId: extractVideoId(s.url) ?? undefined,
-      }));
-
-      const recItems: RecentItem[] = (recRes.data ?? []).map((s) => ({
-        id: s.id,
-        type: "recording",
-        title:
-          s.title ||
-          `Recording — ${s.mode === "browsertab" ? "Browser Tab" : "Microphone"}`,
-        subtitle: s.mode,
-        last_visited: s.last_visited,
-        href: `/content/${s.id}?mode=${s.mode}&recording_session_id=${s.id}`,
-      }));
-
-      const quizItems: RecentItem[] = (quizRes.data ?? []).map((s) => ({
-        id: s.id,
-        type: "quiz",
-        title: s.file_name || "Quiz",
-        subtitle: "quiz",
-        last_visited: s.last_visited || s.created_at,
-        href: `/quiz/${s.id}`,
-      }));
-
-      const flashItems: RecentItem[] = (flashRes.data ?? []).map((s) => ({
-        id: s.id,
-        type: "flashcard",
-        title: s.file_name || "Flashcards",
-        subtitle: "flashcard",
-        last_visited: s.last_visited || s.created_at,
-        href: `/flashcards/${s.id}`,
-      }));
-
-      const chatItems: RecentItem[] = (chatRes.data ?? []).map((s) => ({
-        id: s.id,
-        type: "quiz" as any, // Visual proxy, adjust actual type typing when needed
-        title: s.title || "Chat Session",
-        subtitle: "chat",
-        last_visited: s.last_visited || s.created_at,
-        href: `/content/${s.id}?mode=chat&session_id=${s.id}`,
-      }));
-
-      const { data: examRes } = await supabase
-        .from("exam_sessions")
-        .select("id, source, source_label, last_visited, created_at")
+      const { data: recent, error } = await supabase
+        .from("recent_sessions")
+        .select("*")
         .eq("user_id", user.id)
         .order("last_visited", { ascending: false })
         .limit(6);
 
-      const examItems: RecentItem[] = (examRes ?? []).map((s) => ({
-        id: s.id,
-        type: "exam",
-        title: s.source_label || "Exam",
-        subtitle: s.source,
-        last_visited: s.last_visited || s.created_at,
-        href: `/dashboard/exam-mode?session_id=${s.id}`,
-      }));
+      if (error || !recent) {
+        setRecentLoading(false);
+        return;
+      }
 
-      const all = [
-        ...ytItems,
-        ...recItems,
-        ...quizItems,
-        ...flashItems,
-        ...chatItems,
-        ...examItems,
-      ]
-        .sort(
-          (a, b) =>
-            new Date(b.last_visited).getTime() -
-            new Date(a.last_visited).getTime(),
-        )
-        .slice(0, 6);
+      const all: RecentItem[] = recent.map((s: any) => ({
+        id: s.session_id || s.id,
+        type: s.type as any,
+        title: s.title,
+        subtitle: s.subtitle || s.type,
+        last_visited: s.last_visited,
+        href: s.href,
+        videoId: s.video_id || undefined,
+      }));
 
       setRecentItems(all);
       setRecentLoading(false);
@@ -1582,6 +1492,70 @@ export default function DashboardPage() {
       `/content/${id}?mode=chat&file=${encodeURIComponent(file.name)}&session_id=${id}`,
     );
     e.target.value = "";
+  };
+
+  const stopRecordingAndTranscribe = async () => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return;
+    
+    mediaRecorderRef.current.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      setIsListening(false);
+      setIsProcessingVoice(true);
+
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64Audio = (reader.result as string).split(",")[1];
+        try {
+          const res = await fetch("/api/note-voice-transcribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audio: base64Audio, mimeType: "audio/webm" }),
+          });
+          const data = await res.json();
+          if (data.transcript) {
+            setYoutubeLink((prev) => prev + (prev ? " " : "") + data.transcript);
+          }
+        } catch (err) {
+          console.error("Transcription failed", err);
+        } finally {
+          setIsProcessingVoice(false);
+        }
+      };
+    };
+    mediaRecorderRef.current.stop();
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.onstop = () => {
+        setIsListening(false);
+        audioChunksRef.current = [];
+      };
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const toggleVoice = async () => {
+    if (isListening) {
+      await stopRecordingAndTranscribe();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsListening(true);
+    } catch (err) {
+      console.error("Microphone access denied", err);
+      alert("Please allow microphone access to use dictation.");
+    }
   };
 
   const tools = [
@@ -1734,62 +1708,143 @@ export default function DashboardPage() {
       {/* Input Bar */}
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-2xl flex items-center gap-2 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm"
+        className={`w-full max-w-2xl bg-white border rounded-[32px] shadow-sm hover:border-gray-200 transition-all duration-300 min-h-[60px] justify-center flex flex-col ${isListening ? "border-black ring-4 ring-black/5" : "border-gray-200 focus-within:border-teal-500/30 focus-within:ring-4 focus-within:ring-teal-500/10 focus-within:border-teal-500"}`}
       >
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-          title="Upload file"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.8}
-              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-            />
-          </svg>
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.webm"
-          className="hidden"
-          onChange={handleFileUpload}
-        />
-        <input
-          type="text"
-          value={youtubeLink}
-          onChange={(e) => setYoutubeLink(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSubmit(e as any)}
-          placeholder={t('placeholder_search')}
-          className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-300 outline-none"
-        />
-        <button
-          type="submit"
-          disabled={!youtubeLink.trim()}
-          className="w-8 h-8 cursor-pointer rounded-xl bg-blue-600 disabled:bg-gray-200 flex items-center justify-center transition-colors"
-        >
-          <svg
-            className="w-4 h-4 text-white"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </button>
+        <div className="flex-1 flex flex-col justify-center px-6 py-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          
+          {isProcessingVoice ? (
+            <div className="flex-1 flex items-center justify-center gap-2 text-gray-500 text-[15px] italic py-4">
+              <svg className="w-5 h-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Transcribing message…
+            </div>
+          ) : isListening ? (
+            <div className="flex-1 flex flex-col justify-between gap-6 py-2">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="flex gap-1.5 items-center h-5">
+                  {[0.1, 0.3, 0.2, 0.4, 0.25, 0.45, 0.2, 0.35, 0.15, 0.4].map((d, i) => (
+                    <div key={i} className="w-[3px] bg-black rounded-full animate-[voiceWave_1s_infinite_ease-in-out]" style={{ height: `${20 + Math.random() * 60}%`, animationDelay: `${d}s` }}></div>
+                  ))}
+                </div>
+                <span className="text-[15px] font-medium text-gray-400 tracking-tight">Recording...</span>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button type="button" onClick={cancelRecording} className="p-2 text-gray-400 hover:text-red-500 transition-colors cursor-pointer" title="Cancel">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <button type="button" onClick={stopRecordingAndTranscribe} className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-lg" title="Transcribe">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 flex flex-col min-h-[28px]">
+                <textarea
+                  rows={1}
+                  value={youtubeLink}
+                  onChange={(e) => {
+                    setYoutubeLink(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e as any);
+                    }
+                  }}
+                  placeholder="Ask anything, or paste a YouTube link..."
+                  className="w-full bg-transparent text-[17px] text-gray-800 placeholder-gray-400 outline-none resize-none overflow-hidden py-0.5"
+                  style={{ minHeight: '28px', maxHeight: '200px' }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between mt-1.5">
+                <div className="flex items-center gap-3">
+                  {/* @ Add Context (Rounded Button) */}
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer shrink-0 shadow-sm"
+                    title="Add Context"
+                  >
+                    <span className="text-[15px] font-bold text-gray-400">@</span>
+                    <span className="text-[13px] font-bold uppercase tracking-tight text-gray-400">Add Context</span>
+                  </button>
+
+                  <div className="flex items-center gap-1.5 ml-1">
+                    {/* Upload (Clip) */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1.5"
+                      title="Upload Document"
+                    >
+                      <svg className="w-[22px] h-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                          d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                    </button>
+
+                    {/* Dictate (Mic) */}
+                    <button
+                      type="button"
+                      onClick={toggleVoice}
+                      className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1.5"
+                      title="Dictate"
+                    >
+                      <svg className="w-[22px] h-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Voice / Send Button */}
+                <div className="flex items-center">
+                  {youtubeLink.trim() ? (
+                    <button
+                      type="submit"
+                      className="w-11 h-11 cursor-pointer rounded-full bg-black hover:bg-gray-800 flex items-center justify-center transition-all active:scale-90 shadow-lg"
+                    >
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 19V5m-7 7l7-7 7 7" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = Math.random().toString(36).slice(2, 18);
+                        router.push(`/content/${id}?mode=microphone`);
+                      }}
+                      className="w-11 h-11 cursor-pointer rounded-full bg-black hover:bg-gray-800 flex items-center justify-center transition-all active:scale-95 shadow-md"
+                    >
+                      <div className="flex gap-[2.5px] items-center">
+                        <div className="w-[3px] h-4 bg-white rounded-full animate-[pulse_1s_infinite_0s]"></div>
+                        <div className="w-[3px] h-5.5 bg-white rounded-full animate-[pulse_1s_infinite_0.2s]"></div>
+                        <div className="w-[3px] h-3 bg-white rounded-full animate-[pulse_1s_infinite_0.4s]"></div>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </form>
 
       {/* Recent */}

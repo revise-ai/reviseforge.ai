@@ -591,287 +591,37 @@ export default function HistoryPage() {
   }, []);
 
   async function loadHistory() {
-    setLoading(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [ytRes, recRes, sumRes, quizRes, flashRes, chapRes, chatRes] =
-        await Promise.all([
-          supabase
-            .from("youtube_sessions")
-            .select("id,url,video_title,created_at,last_visited")
-            .eq("user_id", user.id)
-            .order("last_visited", { ascending: false }),
-          supabase
-            .from("recording_sessions")
-            .select("id,mode,title,created_at,last_visited")
-            .eq("user_id", user.id)
-            .order("last_visited", { ascending: false }),
-          supabase
-            .from("content_summaries")
-            .select("session_id,recording_session_id")
-            .eq("user_id", user.id),
-          supabase
-            .from("content_quizzes")
-            .select("session_id,recording_session_id")
-            .eq("user_id", user.id),
-          supabase
-            .from("content_flashcards")
-            .select("session_id,recording_session_id")
-            .eq("user_id", user.id),
-          supabase
-            .from("content_chapters")
-            .select("session_id,recording_session_id")
-            .eq("user_id", user.id),
-          supabase
-            .from("chat_sessions")
-            .select("id, title, created_at, last_visited")
-            .eq("user_id", user.id)
-            .order("last_visited", { ascending: false }),
-        ]);
+      const { data: recent, error } = await supabase
+        .from("recent_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("last_visited", { ascending: false });
 
-      const sYt = new Set(
-        (sumRes.data ?? []).map((r: any) => r.session_id).filter(Boolean),
-      );
-      const sRe = new Set(
-        (sumRes.data ?? [])
-          .map((r: any) => r.recording_session_id)
-          .filter(Boolean),
-      );
-      const qYt = new Set(
-        (quizRes.data ?? []).map((r: any) => r.session_id).filter(Boolean),
-      );
-      const qRe = new Set(
-        (quizRes.data ?? [])
-          .map((r: any) => r.recording_session_id)
-          .filter(Boolean),
-      );
-      const fYt = new Set(
-        (flashRes.data ?? []).map((r: any) => r.session_id).filter(Boolean),
-      );
-      const fRe = new Set(
-        (flashRes.data ?? [])
-          .map((r: any) => r.recording_session_id)
-          .filter(Boolean),
-      );
-      const cYt = new Set(
-        (chapRes.data ?? []).map((r: any) => r.session_id).filter(Boolean),
-      );
-      const cRe = new Set(
-        (chapRes.data ?? [])
-          .map((r: any) => r.recording_session_id)
-          .filter(Boolean),
-      );
+      if (error || !recent) {
+        setItems([]);
+        setLoading(false);
+        return;
+      }
 
-      const yB = (id: string): ActivityBadge[] => {
-        const b: ActivityBadge[] = [];
-        if (cYt.has(id))
-          b.push({ label: "Chapters", color: "bg-gray-100 text-gray-600" });
-        if (sYt.has(id))
-          b.push({ label: "Summary", color: "bg-blue-50 text-blue-600" });
-        if (qYt.has(id))
-          b.push({ label: "Quiz", color: "bg-red-50 text-red-600" });
-        if (fYt.has(id))
-          b.push({
-            label: "Flashcards",
-            color: "bg-orange-50 text-orange-600",
-          });
-        return b;
-      };
-      const rB = (id: string): ActivityBadge[] => {
-        const b: ActivityBadge[] = [];
-        if (cRe.has(id))
-          b.push({ label: "Chapters", color: "bg-gray-100 text-gray-600" });
-        if (sRe.has(id))
-          b.push({ label: "Summary", color: "bg-blue-50 text-blue-600" });
-        if (qRe.has(id))
-          b.push({ label: "Quiz", color: "bg-red-50 text-red-600" });
-        if (fRe.has(id))
-          b.push({
-            label: "Flashcards",
-            color: "bg-orange-50 text-orange-600",
-          });
-        return b;
-      };
-
-      const yt: HistoryItem[] = (ytRes.data ?? []).map((s: any) => ({
-        id: s.id,
-        type: "youtube" as SessionType,
-        title:
-          s.video_title ||
-          s.url.replace("https://", "").replace("www.", "").slice(0, 60),
-        subtitle: s.url,
+      const all: HistoryItem[] = recent.map((s: any) => ({
+        id: s.session_id || s.id,
+        type: s.type as SessionType,
+        title: s.title,
+        subtitle: s.subtitle || s.type,
         last_visited: s.last_visited,
         created_at: s.created_at,
-        badges: yB(s.id),
-        href: `/content/${s.id}?url=${encodeURIComponent(s.url)}&session_id=${s.id}`,
-        videoId: extractVideoId(s.url) ?? undefined,
-      }));
-      const re: HistoryItem[] = (recRes.data ?? []).map((s: any) => ({
-        id: s.id,
-        type: "recording" as SessionType,
-        title:
-          s.title ||
-          `Recording — ${s.mode === "browsertab" ? "Browser Tab" : "Microphone"}`,
-        subtitle: s.mode,
-        last_visited: s.last_visited,
-        created_at: s.created_at,
-        badges: rB(s.id),
-        href: `/content/${s.id}?mode=${s.mode}&recording_session_id=${s.id}`,
+        badges: [], // Placeholder for now
+        href: s.href,
+        videoId: s.video_id || undefined,
       }));
 
-      // ── Quiz sessions ────────────────────────────────────────────────────
-      const { data: quizSessions } = await supabase
-        .from("quiz_sessions")
-        .select("id, file_name, status, total, score, created_at, last_visited")
-        .eq("user_id", user.id)
-        .in("status", ["ready", "finished"])
-        .order("last_visited", { ascending: false });
-
-      const qz: HistoryItem[] = (quizSessions ?? []).map((s: any) => {
-        const pct =
-          s.total && s.score != null
-            ? Math.round((s.score / s.total) * 100)
-            : null;
-        const badges: ActivityBadge[] = [
-          {
-            label: `${s.total ?? 0} questions`,
-            color: "bg-gray-100 text-gray-600",
-          },
-          ...(pct != null
-            ? [
-                {
-                  label: `${pct}%`,
-                  color:
-                    pct >= 70
-                      ? "bg-green-50 text-green-600"
-                      : pct >= 50
-                        ? "bg-yellow-50 text-yellow-600"
-                        : "bg-red-50 text-red-600",
-                },
-              ]
-            : [{ label: "Not finished", color: "bg-gray-100 text-gray-400" }]),
-        ];
-        return {
-          id: s.id,
-          type: "quiz" as SessionType,
-          title: s.file_name || "Quiz",
-          subtitle: "quiz",
-          last_visited: s.last_visited || s.created_at,
-          created_at: s.created_at,
-          badges,
-          href: `/quiz/${s.id}`,
-        };
-      });
-
-      // ── Flashcard sessions ───────────────────────────────────────────────
-      const { data: flashSessions } = await supabase
-        .from("flashcard_sessions")
-        .select("id, file_name, status, total, created_at, last_visited")
-        .eq("user_id", user.id)
-        .eq("status", "ready")
-        .order("last_visited", { ascending: false });
-
-      const fl: HistoryItem[] = (flashSessions ?? []).map((s: any) => ({
-        id: s.id,
-        type: "flashcard" as SessionType,
-        title: s.file_name || "Flashcards",
-        subtitle: "flashcard",
-        last_visited: s.last_visited || s.created_at,
-        created_at: s.created_at,
-        badges: [
-          {
-            label: `${s.total ?? 0} cards`,
-            color: "bg-orange-50 text-orange-600",
-          },
-        ],
-        href: `/flashcards/${s.id}`,
-      }));
-
-      // ── Exam sessions ────────────────────────────────────────────────────
-      const { data: examSessions } = await supabase
-        .from("exam_sessions")
-        .select(
-          "id, source, source_label, status, mcq_score, fill_score, total_mcq, total_fill, total_written, written_attempted, time_used_secs, timed_out, created_at, last_visited",
-        )
-        .eq("user_id", user.id)
-        .order("last_visited", { ascending: false });
-
-      const ex: HistoryItem[] = (examSessions ?? []).map((s: any) => {
-        const objScore = (s.mcq_score ?? 0) + (s.fill_score ?? 0);
-        const objTotal = (s.total_mcq ?? 0) + (s.total_fill ?? 0);
-        const pct =
-          objTotal > 0 ? Math.round((objScore / objTotal) * 100) : null;
-        const isDone = s.status === "done";
-        const badges: ActivityBadge[] = [
-          {
-            label:
-              s.source === "youtube"
-                ? "YouTube"
-                : s.source === "recording"
-                  ? "Recording"
-                  : "File",
-            color: "bg-gray-100 text-gray-600",
-          },
-          ...(isDone && pct != null
-            ? [
-                {
-                  label: `${pct}%`,
-                  color:
-                    pct >= 70
-                      ? "bg-green-50 text-green-600"
-                      : pct >= 55
-                        ? "bg-yellow-50 text-yellow-600"
-                        : "bg-red-50 text-red-600",
-                },
-              ]
-            : []),
-          ...(s.timed_out
-            ? [{ label: "Timed out", color: "bg-red-50 text-red-500" }]
-            : []),
-          ...(!isDone
-            ? [{ label: "Not finished", color: "bg-gray-100 text-gray-400" }]
-            : []),
-        ];
-        return {
-          id: s.id,
-          type: "exam" as SessionType,
-          title: s.source_label || "Exam",
-          subtitle: s.source,
-          last_visited: s.last_visited || s.created_at,
-          created_at: s.created_at,
-          badges,
-          href: `/dashboard/exam-mode?session_id=${s.id}`,
-        };
-      });
-
-      // ── Chat sessions ───────────────────────────────────────────────────
-      const ch: HistoryItem[] = (chatRes.data ?? []).map((s: any) => ({
-        id: s.id,
-        type: "chat" as SessionType,
-        title: s.title || "Chat Session",
-        subtitle: "chat",
-        last_visited: s.last_visited || s.created_at,
-        created_at: s.created_at,
-        badges: [
-          {
-            label: "Chat",
-            color: "bg-blue-50 text-blue-600",
-          },
-        ],
-        href: `/content/${s.id}?mode=chat&session_id=${s.id}`,
-      }));
-
-      setItems(
-        [...yt, ...re, ...qz, ...fl, ...ex, ...ch].sort(
-          (a, b) =>
-            new Date(b.last_visited).getTime() -
-            new Date(a.last_visited).getTime(),
-        ),
-      );
+      setItems(all);
+    } catch (e) {
+      console.error("Error loading history:", e);
     } finally {
       setLoading(false);
     }

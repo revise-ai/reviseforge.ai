@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -637,7 +637,10 @@ function StudyCard({
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function FlashcardsPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const urlSessionId = params?.id as string;
+  const urlParam = searchParams.get("url");
+  const sourceParam = searchParams.get("source");
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -665,11 +668,20 @@ export default function FlashcardsPage() {
 
     if (name) setFileName(name);
 
-    const shouldGenerate = b64File && name && startedFor !== urlSessionId;
-
-    if (shouldGenerate) {
-      // ✅ Set the mutex SYNCHRONOUSLY before going async — so the second
-      // Strict Mode mount (which runs almost immediately) sees it
+    if (sourceParam === "youtube" && urlParam) {
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) setUserId(user.id);
+        generateYouTubeFlashcards(urlParam, urlSessionId, user?.id);
+      })();
+    } else if (sourceParam === "recording") {
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) setUserId(user.id);
+        generateRecordingFlashcards(urlSessionId, user?.id);
+      })();
+    } else if (shouldGenerate) {
+      // ✅ Set the mutex SYNCHRONOUSLY before going async
       sessionStorage.setItem("flashcard_generating_for", urlSessionId);
       
       (async () => {
@@ -738,6 +750,111 @@ export default function FlashcardsPage() {
   };
 
   // ── Generate via API then persist ─────────────────────────────────────────
+  const generateYouTubeFlashcards = async (url: string, sid: string, uid?: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data: existing } = await supabase
+        .from("flashcard_sessions")
+        .select("status")
+        .eq("id", sid)
+        .single();
+      if (existing?.status === "ready") {
+        await loadCardsFromDB(sid, uid);
+        return;
+      }
+
+      const res = await fetch("/api/generate-flashcards-youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error("Failed to generate YouTube flashcards");
+      const data = await res.json();
+      await persistGeneratedFlashcards(data.flashcards, sid, uid);
+    } catch (err: any) {
+      setError(err.message || "Failed to generate flashcards from YouTube.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateRecordingFlashcards = async (sid: string, uid?: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data: existing } = await supabase
+        .from("flashcard_sessions")
+        .select("status")
+        .eq("id", sid)
+        .single();
+      if (existing?.status === "ready") {
+        await loadCardsFromDB(sid, uid);
+        return;
+      }
+
+      const audio = sessionStorage.getItem("rec_study_audio");
+      const transcript = sessionStorage.getItem("rec_study_transcript");
+      const mime = sessionStorage.getItem("rec_study_mimeType");
+
+      const res = await fetch("/api/chat-recording", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audio,
+          mimeType: mime,
+          transcript,
+          prompt: "Generate a set of 15 highly academic flashcards based on the content of this recording. Follow the ELITE framework (v2.1). Return ONLY a JSON object with a 'flashcards' array. Each card must have 'term', 'definition', 'hint', and 'category'."
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to generate flashcards from recording");
+      const data = await res.json();
+      
+      const text = data.response;
+      const jsonStart = text.indexOf("{");
+      const jsonEnd = text.lastIndexOf("}") + 1;
+      const jsonStr = text.substring(jsonStart, jsonEnd);
+      const parsed = JSON.parse(jsonStr);
+      
+      await persistGeneratedFlashcards(parsed.flashcards, sid, uid);
+    } catch (err: any) {
+      setError(err.message || "Failed to generate flashcards from recording.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const persistGeneratedFlashcards = async (fcs: any[], sid: string, uid?: string) => {
+    const rows = fcs.map((c, i) => ({
+      session_id: sid,
+      user_id: uid,
+      card_order: i + 1,
+      term: c.term,
+      definition: c.definition,
+      hint: c.hint || "",
+      category: c.category || "General",
+    }));
+
+    const { data: inserted, error: insertErr } = await supabase
+      .from("flashcards")
+      .insert(rows)
+      .select("id, card_order");
+
+    if (insertErr) throw insertErr;
+
+    const dbIdMap: Record<number, string> = {};
+    (inserted ?? []).forEach((row) => {
+      dbIdMap[row.card_order] = row.id;
+    });
+
+    setCards(fcs.map((c, i) => ({ ...c, id: i + 1, dbId: dbIdMap[i + 1] })));
+    await supabase.from("flashcard_sessions").update({
+      status: "ready",
+      total: fcs.length,
+      last_visited: new Date().toISOString(),
+    }).eq("id", sid);
+  };
+
   const generateAndPersist = async (
     base64File: string,
     name: string,

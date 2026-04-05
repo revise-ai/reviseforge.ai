@@ -60,7 +60,7 @@ export default function AddNotePanel({
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black/20 z-30 cursor-default"
+        className="fixed inset-0 bg-black/20 z-30 cursor-default backdrop-blur-sm"
         onClick={onClose}
       />
 

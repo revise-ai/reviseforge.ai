@@ -100,7 +100,7 @@ function LoadingScreen({ fileName }: { fileName: string }) {
           <span className="font-medium text-gray-600">{fileName}</span>
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          Building 30 difficult MCQs from your document
+          Setting 25 questions from your resources
         </p>
       </div>
       <div className="w-64 h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -624,11 +624,16 @@ function QuestionCard({
 
       <div className="w-full max-w-2xl bg-white rounded-3xl border border-gray-200 shadow-sm">
         <div className="flex items-center justify-between px-6 pt-5 pb-0">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Question {current + 1}
-          </span>
-          <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-medium uppercase tracking-wide">
-            Hard
+          <div className="flex flex-col">
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">
+              Mastery Mode · 25 MCQs
+            </p>
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              Question {current + 1}
+            </span>
+          </div>
+          <span className="text-[10px] self-start mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-medium uppercase tracking-wide">
+            Verified
           </span>
         </div>
 
@@ -764,7 +769,10 @@ function QuestionCard({
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function QuizPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const urlSessionId = params?.id as string;
+  const sourceParam = searchParams.get("source");
+  const urlParam = searchParams.get("url");
 
   // useRef to prevent Strict Mode double-firing the generate call
   const hasRun = useRef(false);
@@ -839,12 +847,8 @@ export default function QuizPage() {
           "Quiz generation failed. Please go back and try again.",
         );
       if (session.file_name) setFileName(session.file_name);
-      // Bump last_visited so this session appears at top of history/recent
-      await supabase
-        .from("quiz_sessions")
-        .update({ last_visited: new Date().toISOString() })
-        .eq("id", sid)
-        .eq("user_id", currentUid || "none");
+      // session update (last_visited removed to match schema)
+
 
       const { data, error: dbErr } = await supabase
         .from("quiz_questions")
@@ -976,7 +980,6 @@ export default function QuizPage() {
   const persistGeneratedQuiz = async (qs: QuizQuestion[], sid: string, uid?: string) => {
     const rows = qs.map((q, i) => ({
       session_id: sid,
-      user_id: uid,
       question_order: i + 1,
       question: q.question,
       option_a: q.options.A,
@@ -1005,7 +1008,6 @@ export default function QuizPage() {
     await supabase.from("quiz_sessions").update({
       status: "ready",
       total: qs.length,
-      last_visited: new Date().toISOString(),
     }).eq("id", sid);
   };
 
@@ -1038,7 +1040,6 @@ export default function QuizPage() {
       // Persist questions to DB
       const rows = qs.map((q, i) => ({
         session_id: sid,
-        user_id: currentUid,
         question_order: i + 1,
         question: q.question,
         option_a: q.options.A,
@@ -1066,13 +1067,12 @@ export default function QuizPage() {
 
       setQuestions(qs.map((q, i) => ({ ...q, dbId: dbIdMap[i + 1] })));
 
-      // Mark session as ready and bump last_visited
+      // Mark session as ready
       await supabase
         .from("quiz_sessions")
         .update({
           status: "ready",
           total: qs.length,
-          last_visited: new Date().toISOString(),
         })
         .eq("id", sid)
         .eq("user_id", currentUid || "none");
@@ -1158,7 +1158,6 @@ export default function QuizPage() {
       await supabase.from("quiz_answers").upsert(
         {
           session_id: urlSessionId,
-          user_id: userId,
           question_id: q.dbId,
           given_answer: opt,
           is_correct: isCorrect,
@@ -1180,7 +1179,7 @@ export default function QuizPage() {
           score: correct,
           total: questions.length,
           finished_at: new Date().toISOString(),
-          status: "finished",
+          status: "ready", // Changed from "finished" to match schema check constraint
         })
         .eq("id", urlSessionId)
         .eq("user_id", userId || "none");

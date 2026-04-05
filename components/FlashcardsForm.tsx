@@ -138,6 +138,20 @@ export default function FlashcardsForm({ onClose }: { onClose?: () => void }) {
       if (sessionError || !session)
         throw new Error(`Failed to create session: ${sessionError?.message}`);
 
+      // 3.5 Register in unified recent_sessions
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await supabase.from("recent_sessions").upsert({
+          user_id: currentUser.id,
+          session_id: session.id,
+          type: 'flashcard',
+          title: firstDone.name,
+          subtitle: 'flashcards',
+          href: `/flashcards/${session.id}`,
+          last_visited: new Date().toISOString()
+        }, { onConflict: 'user_id,session_id' });
+      }
+
       // 4. Store base64 in sessionStorage so the flashcards page can call the
       //    API without a signed URL round-trip, then navigate inside onload
       //    so sessionStorage is guaranteed to be written before the page mounts.
@@ -270,7 +284,7 @@ export default function FlashcardsForm({ onClose }: { onClose?: () => void }) {
       )}
 
       {/* ── Modal ── */}
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-8 pt-8 pb-4">

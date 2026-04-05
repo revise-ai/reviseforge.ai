@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const prompt = `You are ReviseForge AI — a world-class academic tutor and master examination engine. Your mission is to listen to this entire recorded lecture and generate exactly 15 elite-level multiple-choice questions that test deep conceptual mastery.
+    const prompt = `You are ReviseForge AI — a helpful academic tutor. Your mission is to listen to this entire recorded lecture and generate exactly 25 multiple-choice questions that test deep conceptual mastery.
 
 ### CRITICAL BANS (NEVER ASK):
 - Recording metadata (speaker name, dates, location).
@@ -112,7 +112,7 @@ Every question must meet at least ONE of these elite criteria:
   ]
 }
 
-Generate exactly 15 questions. The rigor must be absolute.`;
+Generate exactly 25 questions. The rigor must be absolute.`;
 
     let contents: any[];
 

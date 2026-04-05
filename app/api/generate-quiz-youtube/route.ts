@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     if (!url)
       return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
-    const prompt = `You are ReviseForge AI — the world's most elite academic tutor and examination engine. Your mission is to watch this entire video and generate exactly 15 elite-level multiple-choice questions that test deep conceptual mastery.
+    const prompt = `You are ReviseForge AI — a helpful academic tutor. Your mission is to watch this entire video and generate exactly 25 multiple-choice questions that test deep conceptual mastery.
 
 ### CRITICAL BANS (NEVER ASK):
 - Video metadata (channel, date, presenter name).
@@ -108,7 +108,7 @@ Every question must meet at least ONE of these elite criteria:
   ]
 }
 
-Generate exactly 15 questions. The rigor must be absolute.`;
+Generate exactly 25 questions. The rigor must be absolute.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

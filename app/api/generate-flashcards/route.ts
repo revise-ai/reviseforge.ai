@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateFile, serverError } from "@/lib/validation";
 import { getServerUser, unauthorizedError } from "@/lib/auth-server";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -49,7 +49,7 @@ Every card must facilitate active recall and deep encoding:
   {
     "id": 1,
     "term": "Specific question or technical term using LaTeX where required.",
-    "definition": "### Concept Overview\nDetailed pedagogical explanation using LaTeX ($ ... $). \n### Practical Application\nHow this concept is used in real scenarios.",
+    "definition": "### Concept Overview\nDetailed pedagogical explanation using LaTeX ($ ... $). \\n### Practical Application\nHow this concept is used in real scenarios.",
     "hint": "A powerful mnemonic or analogy.",
     "category": "Topic Area"
   }
@@ -57,25 +57,42 @@ Every card must facilitate active recall and deep encoding:
 
 Generate a minimum of 15 high-impact cards. Ensure the rigor is absolute.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              inlineData: {
-                mimeType,
-                data: base64Data,
-              },
-            },
-            { text: prompt },
-          ],
-        },
-      ],
-    });
+    // --- Exponential Backoff Retry Strategy ---
+    let response;
+    let attempts = 0;
+    const maxAttempts = 3;
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-    const rawText = response.text ?? "";
+    while (attempts < maxAttempts) {
+      try {
+        response = await model.generateContent([
+          {
+            inlineData: {
+              mimeType,
+              data: base64Data,
+            },
+          },
+          { text: prompt },
+        ]);
+        break; // Success! Exit the loop.
+      } catch (err: any) {
+        attempts++;
+        const isQuotaError = err?.message?.includes("429") || err?.message?.includes("quota") || err?.status === 429;
+        
+        if (isQuotaError && attempts < maxAttempts) {
+          const delay = attempts * 3000; // 3s, 6s...
+          console.warn(`Flashcard API Rate Limited. Retrying in ${delay}ms... (Attempt ${attempts}/${maxAttempts})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw err; // If it's not a quota error or we're out of attempts, re-throw.
+      }
+    }
+
+    if (!response) throw new Error("No response from AI after multiple attempts.");
+
+    const rawText = response.response.text();
+    console.log(`[Flashcard API] Raw AI Response for User ${user.id}:`, rawText);
 
     const cleaned = rawText
       .replace(/```json\s*/gi, "")
@@ -85,13 +102,18 @@ Generate a minimum of 15 high-impact cards. Ensure the rigor is absolute.`;
     let flashcards;
     try {
       flashcards = JSON.parse(cleaned);
-    } catch {
+    } catch (parseError) {
       const match = cleaned.match(/\[[\s\S]*\]/);
       if (match) {
-        flashcards = JSON.parse(match[0]);
+        try {
+          flashcards = JSON.parse(match[0]);
+        } catch {
+          console.error(`Flashcard JSON parse failure [User: ${user.id}]:`, parseError);
+          return NextResponse.json({ error: "The AI gave an unparseable JSON format. Please try again." }, { status: 500 });
+        }
       } else {
-        console.error(`Flashcard parsing error [User: ${user.id}]: No JSON found in response`);
-        return serverError("Failed to parse flashcards from AI response");
+        console.error(`Flashcard parsing error [User: ${user.id}]: No JSON array found in response`);
+        return NextResponse.json({ error: "The AI failed to generate a structured flashcard set. Please try again." }, { status: 500 });
       }
     }
 
@@ -99,13 +121,14 @@ Generate a minimum of 15 high-impact cards. Ensure the rigor is absolute.`;
   } catch (error: any) {
     console.error(`Flashcard generation error [User: ${user.id}]:`, error);
 
-    if (error?.message?.includes("429") || error?.message?.includes("quota")) {
+    const isQuota = error?.message?.includes("429") || error?.message?.includes("quota") || error?.status === 429;
+    if (isQuota) {
       return NextResponse.json(
-        { error: "AI quota exceeded. Please wait a moment and try again." },
+        { error: "AI quota exceeded (20 requests/day limit). Please wait until your limit resets." },
         { status: 429 },
       );
     }
 
-    return serverError();
+    return NextResponse.json({ error: error.message || "An unexpected error occurred while generating flashcards." }, { status: 500 });
   }
 }

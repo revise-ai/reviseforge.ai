@@ -348,7 +348,7 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
       {/* ── Channels slide-out panel ── */}
       {showChannelsPanel && (
         <>
-          <div className="fixed inset-0 z-30 bg-black/20" onClick={() => setShowChannelsPanel(false)} />
+          <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={() => setShowChannelsPanel(false)} />
           <div className="fixed left-22.5 top-0 bottom-0 w-90 bg-white border-r border-gray-200 shadow-lg z-40 flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 shrink-0">
               <div className="flex items-center">

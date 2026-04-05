@@ -20,7 +20,7 @@ export default function NoteModal({
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/30 z-60 cursor-default"
+        className="fixed inset-0 bg-black/30 z-60 cursor-default backdrop-blur-sm"
         onClick={onClose}
       />
       <div className="fixed inset-0 flex items-center justify-center z-70 p-4">

@@ -68,14 +68,26 @@ Ensure valid JSON only.`;
     let attempt = 0;
     while (attempt < 5) {
       try {
-        response = await model.generateContent(parts);
+        const genModel = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+        response = await genModel.generateContent(parts);
         break;
       } catch (err: any) {
-        if (err?.message?.includes("503") || err?.message?.includes("500") || err?.status === 503) {
+        const shouldRetry = (
+          err?.message?.includes("503") || 
+          err?.message?.includes("500") || 
+          err?.message?.includes("429") || 
+          err?.message?.includes("quota") || 
+          err?.status === 503 || 
+          err?.status === 429
+        );
+        
+        if (shouldRetry) {
           attempt++;
           if (attempt >= 5) throw err;
-          // Exponential backoff: 2s, 4s, 8s, 16s
-          await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+          // Exponential backoff: 2s, 4s, 8s, 16s...
+          const delay = Math.pow(2, attempt) * 1000;
+          console.warn(`Chapters API error. Retrying in ${delay}ms... (Attempt ${attempt}/5)`);
+          await new Promise(r => setTimeout(r, delay));
         } else {
           throw err;
         }

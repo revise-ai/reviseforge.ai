@@ -112,10 +112,33 @@ Sign off as ReviseForge AI.`;
       ];
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents,
-    });
+    // --- Exponential Backoff Retry Strategy ---
+    let response;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents,
+        });
+        break; // Success! Exit the loop.
+      } catch (err: any) {
+        attempts++;
+        const isQuotaError = err?.message?.includes("429") || err?.message?.includes("quota") || err?.status === 429;
+        
+        if (isQuotaError && attempts < maxAttempts) {
+          const delay = attempts * 3000; // 3s, 6s...
+          console.warn(`Voice Chat API Rate Limited. Retrying in ${delay}ms... (Attempt ${attempts}/${maxAttempts})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw err; // If it's not a quota error or we're out of attempts, re-throw.
+      }
+    }
+
+    if (!response) throw new Error("No response from AI after multiple attempts.");
 
     const answer = response.text ?? "";
 

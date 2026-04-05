@@ -281,8 +281,7 @@ function EditMode({
       await supabase
         .from("flashcards")
         .delete()
-        .eq("session_id", sessionId)
-        .eq("user_id", userId || "none");
+        .eq("session_id", sessionId);
 
       const rows = editing.map((c, i) => ({
         session_id: sessionId,
@@ -660,11 +659,8 @@ export default function FlashcardsPage() {
 
     const b64File = sessionStorage.getItem("flashcard_file");
     const name = sessionStorage.getItem("flashcard_filename");
-    // ✅ Key insight: store which session ID we started generating for.
-    // Strict Mode fires useEffect twice. On the first run we set this key.
-    // On the second run, this key already equals urlSessionId, so we skip
-    // straight to loadCardsFromDB — which by then finds status="ready".
     const startedFor = sessionStorage.getItem("flashcard_generating_for");
+    const shouldGenerate = b64File && startedFor !== urlSessionId;
 
     if (name) setFileName(name);
 
@@ -734,7 +730,6 @@ export default function FlashcardsPage() {
         .from("flashcards")
         .select("*")
         .eq("session_id", sid)
-        .order("next_review_at", { ascending: true, nullsFirst: true })
         .order("card_order", { ascending: true });
 
       if (dbErr) throw dbErr;
@@ -827,7 +822,6 @@ export default function FlashcardsPage() {
   const persistGeneratedFlashcards = async (fcs: any[], sid: string, uid?: string) => {
     const rows = fcs.map((c, i) => ({
       session_id: sid,
-      user_id: uid,
       card_order: i + 1,
       term: c.term,
       definition: c.definition,
@@ -868,7 +862,6 @@ export default function FlashcardsPage() {
 
       const rows = generatedCards.map((c, i) => ({
         session_id: sid,
-        user_id: currentUid,
         card_order: i + 1,
         term: c.term,
         definition: c.definition,
@@ -996,22 +989,8 @@ export default function FlashcardsPage() {
     );
 
     const actualUserId = userId || (await supabase.auth.getUser()).data.user?.id;
+    // Database check removed to match current schema (no next_review_at columns)
 
-    // Update in DB
-    if (card.dbId && actualUserId) {
-      supabase
-        .from("flashcards")
-        .update({
-          next_review_at: sm2.next_review_at,
-          last_interval: sm2.last_interval,
-          ease_factor: sm2.ease_factor,
-          consecutive_correct: sm2.consecutive_correct,
-        })
-        .eq("id", card.dbId)
-        .then(({ error }) => {
-          if (error) console.error("Failed to save SR rating", error);
-        });
-    }
 
     // Move to next card
     if (currentIndex < cards.length - 1) {

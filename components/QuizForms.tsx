@@ -138,6 +138,20 @@ export default function QuizForm({ onClose }: { onClose?: () => void }) {
       if (sessionError || !session)
         throw new Error(`Failed to create session: ${sessionError?.message}`);
 
+      // 3.5 Register in unified recent_sessions
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await supabase.from("recent_sessions").upsert({
+          user_id: currentUser.id,
+          session_id: session.id,
+          type: 'quiz',
+          title: firstDone.name,
+          subtitle: 'quiz',
+          href: `/quiz/${session.id}`,
+          last_visited: new Date().toISOString()
+        }, { onConflict: 'user_id,session_id' });
+      }
+
       // 4. Read the file as base64 and store in sessionStorage, then navigate.
       //    The quiz page reads sessionStorage on mount — it must exist by the
       //    time the page component runs, so we navigate inside the onload cb.
@@ -279,7 +293,7 @@ export default function QuizForm({ onClose }: { onClose?: () => void }) {
 
       {/* Modal */}
       <div
-        className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+        className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose?.();
         }}
@@ -295,7 +309,7 @@ export default function QuizForm({ onClose }: { onClose?: () => void }) {
                 Start a Quiz
               </h2>
               <p className="text-gray-400 text-sm mt-1">
-                Upload your reading material — we'll generate 30 difficult MCQs
+                Upload your reading material — we'll generate 25 MCQs
                 for you
               </p>
             </div>

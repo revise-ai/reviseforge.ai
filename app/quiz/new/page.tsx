@@ -20,7 +20,8 @@ function NewQuizLoader() {
         .insert({
           user_id: user?.id,
           status: "generating",
-          file_name: source === "youtube" ? "YouTube Video" : source === "recording" ? "Recording" : "New Quiz"
+          file_name: source === "youtube" ? "YouTube Video" : source === "recording" ? "Recording" : "New Quiz",
+          storage_path: source === "youtube" ? "synthetic/youtube" : source === "recording" ? "synthetic/recording" : "synthetic/custom"
         })
         .select("id")
         .single();

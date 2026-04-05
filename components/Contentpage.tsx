@@ -2384,12 +2384,13 @@ function ChatView({
 async function updateRecentSession(params: {
   userId: string;
   sessionId: string;
-  type: 'youtube' | 'recording' | 'quiz' | 'flashcard' | 'exam' | 'chat';
+  type: 'youtube' | 'recording' | 'quiz' | 'flashcard' | 'exam' | 'chat' | 'file';
   title: string;
   subtitle?: string;
   href: string;
   videoId?: string;
 }) {
+  console.log("Updating recent session:", params);
   try {
     const { userId, sessionId, type, title, subtitle, href, videoId } = params;
     await supabase.from("recent_sessions").upsert({
@@ -2404,8 +2405,9 @@ async function updateRecentSession(params: {
     }, {
       onConflict: 'user_id,session_id'
     });
+    console.log("Recent session updated successfully");
   } catch (err) {
-    console.error("Failed to update recent session:", err);
+    console.error("Failed to update recent session (Table might be missing, please run fix_history_schema.sql):", err);
   }
 }
 
@@ -2622,7 +2624,36 @@ export default function Contentpage() {
       if (user) {
         userIdRef.current = user.id;
 
-        if (sessionId) {
+        const isFileMode = mode === "file";
+        const recSidParam = new URLSearchParams(window.location.search).get("recording_session_id");
+
+        if (isFileMode && sessionId) {
+          await supabase.from("file_sessions").upsert({
+            id: sessionId,
+            user_id: user.id,
+            file_name: uploadedFile || "Uploaded File",
+            mime_type: fileMimeType || "video/mp4",
+            last_visited: new Date().toISOString()
+          });
+          
+          updateRecentSession({
+            userId: user.id,
+            sessionId: sessionId,
+            type: 'file',
+            title: uploadedFile || "Uploaded File",
+            subtitle: 'file upload',
+            href: `/content/${sessionId}?mode=file&file=${encodeURIComponent(uploadedFile || '')}&session_id=${sessionId}`,
+          });
+          
+          const [chatHistory, cachedChapters] = await Promise.all([
+            loadChatMessages(sessionId, false),
+            loadCachedChaptersAndTranscripts(sessionId, false),
+          ]);
+          if (chatHistory.length) setChatMessages(chatHistory);
+          if (cachedChapters.chapters.length) setChapters(cachedChapters.chapters);
+          if (cachedChapters.transcripts.length) setTranscripts(cachedChapters.transcripts);
+          
+        } else if (sessionId && !recSidParam) {
           await supabase.from("youtube_sessions").update({ last_visited: new Date().toISOString() }).eq("id", sessionId);
           
           // Also update unified recent_sessions table
@@ -2646,14 +2677,10 @@ export default function Contentpage() {
           if (chatHistory.length) setChatMessages(chatHistory);
           if (cachedChapters.chapters.length) setChapters(cachedChapters.chapters);
           if (cachedChapters.transcripts.length) setTranscripts(cachedChapters.transcripts);
-        }
-
-        const recSidParam = new URLSearchParams(window.location.search).get("recording_session_id");
-        if (recSidParam && !sessionId) {
+        } else if (recSidParam) {
           await supabase.from("recording_sessions").update({ last_visited: new Date().toISOString() }).eq("id", recSidParam);
           setRecordingSessionId(recSidParam);
           
-          // Update unified recent_sessions table
           updateRecentSession({
             userId: user.id,
             sessionId: recSidParam,
@@ -2673,11 +2700,22 @@ export default function Contentpage() {
           if (chatHistory.length) setChatMessages(chatHistory);
           if (cachedChapters.chapters.length) setChapters(cachedChapters.chapters);
           if (cachedChapters.transcripts.length) setTranscripts(cachedChapters.transcripts);
+        } else if (mode === "chat" && sessionId) {
+          updateRecentSession({
+            userId: user.id,
+            sessionId: sessionId,
+            type: 'chat',
+            title: initialQuery || "Chat Session",
+            subtitle: 'AI Assistant',
+            href: `/content/${sessionId}?mode=chat&session_id=${sessionId}`,
+          });
+          const chatHistory = await loadChatMessages(sessionId, false);
+          if (chatHistory.length) setChatMessages(chatHistory);
         }
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, mode]);
 
   useEffect(() => {
     if (!recordingSessionId || !userIdRef.current) return;
@@ -2693,7 +2731,7 @@ export default function Contentpage() {
   }, [videoTitle, sessionId]);
 
   useEffect(() => {
-    if (!url || isRecording || isChat) return;
+    if (!url || isRecording || isChat || (chapters.length > 0 && !chaptersLoading)) return;
     (async () => {
       setChaptersLoading(true);
       try {
@@ -3211,25 +3249,37 @@ async function persistChaptersAndTranscripts(
   transcripts: TranscriptItem[],
   isRec = false,
 ) {
+  console.log("Persisting Chapters & Transcripts for session:", sessionId, "isRec:", isRec);
   const col = sessionCol(sessionId, isRec);
-  await Promise.all([
-    sessionFilter(supabase.from("content_chapters").delete(), sessionId, isRec),
-    sessionFilter(supabase.from("content_transcripts").delete(), sessionId, isRec),
-  ]);
-  const chapterRows = chapters.map((c, i) => ({ ...col, user_id: userId, chapter_order: i + 1, time: c.time, title: c.title, text: c.text }));
-  const transcriptRows = transcripts.map((t, i) => ({ ...col, user_id: userId, transcript_order: i + 1, time: t.time, text: t.text }));
-  await Promise.all([
-    chapterRows.length ? supabase.from("content_chapters").insert(chapterRows) : Promise.resolve(),
-    transcriptRows.length ? supabase.from("content_transcripts").insert(transcriptRows) : Promise.resolve(),
-  ]);
+  try {
+    await Promise.all([
+      sessionFilter(supabase.from("content_chapters").delete(), sessionId, isRec),
+      sessionFilter(supabase.from("content_transcripts").delete(), sessionId, isRec),
+    ]);
+    const chapterRows = chapters.map((c, i) => ({ ...col, user_id: userId, chapter_order: i + 1, time: c.time, title: c.title, text: c.text }));
+    const transcriptRows = transcripts.map((t, i) => ({ ...col, user_id: userId, transcript_order: i + 1, time: t.time, text: t.text }));
+    const results = await Promise.all([
+      chapterRows.length ? supabase.from("content_chapters").insert(chapterRows) : Promise.resolve({ error: null }),
+      transcriptRows.length ? supabase.from("content_transcripts").insert(transcriptRows) : Promise.resolve({ error: null }),
+    ]);
+    if (results[0].error) console.error("Error inserting chapters:", JSON.stringify(results[0].error, null, 2));
+    if (results[1].error) console.error("Error inserting transcripts:", JSON.stringify(results[1].error, null, 2));
+    console.log("Persistence complete.");
+  } catch (e) {
+    console.error("Critical error in persistChaptersAndTranscripts:", e);
+  }
 }
 
 async function loadCachedChaptersAndTranscripts(sessionId: string, isRec = false) {
   const col = isRec ? "recording_session_id" : "session_id";
+  console.log("Loading cached chapters & transcripts for:", sessionId, "col:", col);
   const [chaptersRes, transcriptsRes] = await Promise.all([
     supabase.from("content_chapters").select("time, title, text").eq(col, sessionId).order("chapter_order", { ascending: true }),
     supabase.from("content_transcripts").select("time, text").eq(col, sessionId).order("transcript_order", { ascending: true }),
   ]);
+  if (chaptersRes.error) console.error("Load Chapters Error:", chaptersRes.error);
+  if (transcriptsRes.error) console.error("Load Transcripts Error:", transcriptsRes.error);
+
   return {
     chapters: (chaptersRes.data ?? []) as ChapterItem[],
     transcripts: (transcriptsRes.data ?? []) as TranscriptItem[],

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateFile, serverError } from "@/lib/validation";
 import { getServerUser, unauthorizedError } from "@/lib/auth-server";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
 
-    const prompt = `You are ReviseForge AI — the world's most elite academic tutor and examination engine. Your mission is to create 30 elite-level multiple-choice questions that test deep conceptual mastery of this document.
+    const prompt = `You are ReviseForge AI — a helpful academic tutor. Your mission is to create 25 multiple-choice questions that test deep conceptual mastery of this document.
 
 ### CRITICAL BANS (NEVER ASK):
 - Document metadata (title, author, institution, page numbers).
@@ -42,7 +42,7 @@ Every question must meet at least ONE of these elite criteria:
 
 ### FORMATTING STANDARDS (CRITICAL):
 - **LaTeX Mandated**: Use LaTeX for ALL mathematical, scientific, and technical notations ($...$, $$...$$).
-- **Visuals in Explanations**: If explaining a process, use \`\`\`mermaid\`\`\`. If explaining a molecule, use \`\`\`smiles\`\`\`.
+- **Visuals in Explanations**: If explaining a process, use \`\`\`mermaid\`\`\`. If explaining a molecule, use \`\`\`smiles\`\`\$.
 - **Markdown Headers**: Use ### inside explanations to organize sections.
 - **Strict JSON**: Return ONLY a valid JSON array. No preamble.
 
@@ -58,28 +58,47 @@ Every question must meet at least ONE of these elite criteria:
       "D": "Terminology-rich option"
     },
     "correctAnswer": "A",
-    "explanation": "### Why it's correct\nReasoning using LaTeX ($ ... $). \n### Structural Detail\n(Optional) \`\`\`smiles or mermaid\`\`\` logic. \n### Distractor Analysis\nExplain the precise misunderstanding for B, C, and D.",
+    "explanation": "### Why it's correct\nReasoning using LaTeX ($ ... $). \\n### Structural Detail\n(Optional) \`\`\`smiles or mermaid\`\`\` logic. \\n### Distractor Analysis\nExplain the precise misunderstanding for B, C, and D.",
     "category": "Topic area",
     "difficulty": "hard"
   }
 ]
 
-Generate exactly 30 questions. The rigor must be absolute.`;
+Generate exactly 25 questions. The rigor must be absolute.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType, data: base64Data } },
-            { text: prompt },
-          ],
-        },
-      ],
-    });
+    // --- Exponential Backoff Retry Strategy ---
+    let response;
+    let attempts = 0;
+    const maxAttempts = 5; // Increased to 5 for better resilience
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-    const rawText = response.text ?? "";
+    while (attempts < maxAttempts) {
+      try {
+        response = await model.generateContent([
+          { inlineData: { mimeType, data: base64Data } },
+          { text: prompt },
+        ]);
+        break; 
+      } catch (err: any) {
+        attempts++;
+        const isQuotaError = err?.message?.includes("429") || err?.message?.includes("quota") || err?.status === 429;
+        const isServiceUnavailable = err?.status === 503 || err?.message?.includes("503") || err?.message?.includes("Service Unavailable");
+        
+        if ((isQuotaError || isServiceUnavailable) && attempts < maxAttempts) {
+          const delay = Math.pow(2, attempts) * 1000 + Math.random() * 1000; // Exponential backoff with jitter
+          console.warn(`Quiz API ${isQuotaError ? 'Rate Limited' : 'Service Unavailable'}. Retrying in ${Math.round(delay)}ms... (Attempt ${attempts}/${maxAttempts})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!response) throw new Error("No response from AI after multiple attempts.");
+
+    const rawText = response.response.text();
+    console.log(`[Quiz API] Raw AI Response for User ${user.id}:`, rawText);
+
     const cleaned = rawText
       .replace(/```json\s*/gi, "")
       .replace(/```\s*/g, "")
@@ -88,13 +107,18 @@ Generate exactly 30 questions. The rigor must be absolute.`;
     let questions;
     try {
       questions = JSON.parse(cleaned);
-    } catch {
+    } catch (parseError) {
       const match = cleaned.match(/\[[\s\S]*\]/);
       if (match) {
-        questions = JSON.parse(match[0]);
+        try {
+          questions = JSON.parse(match[0]);
+        } catch {
+          console.error(`Quiz JSON parse failure [User: ${user.id}]:`, parseError);
+          return NextResponse.json({ error: "The AI gave an unparseable JSON format. Please try again." }, { status: 500 });
+        }
       } else {
-        console.error(`Quiz parsing error [User: ${user.id}]: No JSON found in response`);
-        return serverError("Failed to parse quiz from AI response");
+        console.error(`Quiz parsing error [User: ${user.id}]: No JSON array found in response`);
+        return NextResponse.json({ error: "The AI failed to generate a structured quiz set. Please try again." }, { status: 500 });
       }
     }
 
@@ -102,13 +126,14 @@ Generate exactly 30 questions. The rigor must be absolute.`;
   } catch (error: any) {
     console.error(`Quiz generation error [User: ${user.id}]:`, error);
 
-    if (error?.message?.includes("429") || error?.message?.includes("quota")) {
+    const isQuota = error?.message?.includes("429") || error?.message?.includes("quota") || error?.status === 429;
+    if (isQuota) {
       return NextResponse.json(
-        { error: "AI quota exceeded. Please wait a moment and try again." },
+        { error: "AI quota exceeded (20 requests/day limit). Please wait until your limit resets." },
         { status: 429 },
       );
     }
 
-    return serverError();
+    return NextResponse.json({ error: error.message || "An unexpected error occurred while generating the quiz." }, { status: 500 });
   }
 }

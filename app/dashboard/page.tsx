@@ -15,6 +15,7 @@ import QuizForm from "@/components/QuizForms";
 import OnboardingModal from "@/components/OnboardingModal";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/context/LanguageContext";
+import AddContextPopup, { ContextChip, type ContextSelection } from "@/components/AddContextPopup";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,6 +150,29 @@ async function createChatSession(title: string): Promise<string> {
     const { data: created, error } = await supabase
       .from("chat_sessions")
       .insert({ user_id: user.id, title, last_visited: new Date().toISOString() })
+      .select("id")
+      .single();
+
+    if (error || !created) throw error;
+    return created.id;
+  } catch {
+    return Math.random().toString(36).slice(2, 18);
+  }
+}
+
+// Creates a session for a generic website link.
+async function createWebSession(url: string, title: string): Promise<string> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return Math.random().toString(36).slice(2, 18);
+
+    const { data: created, error } = await supabase
+      .from("chat_sessions")
+      .insert({
+        user_id: user.id,
+        title: title || "Website Content",
+        last_visited: new Date().toISOString()
+      })
       .select("id")
       .single();
 
@@ -1408,6 +1432,12 @@ export default function DashboardPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [selectedContext, setSelectedContext] = useState<ContextSelection | null>(null);
+  // ── File staging ──────────────────────────────────────────────────────────
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0); // 0 = idle, 1-99 = loading, 100 = done
+  const [uploadToastVisible, setUploadToastVisible] = useState(false);
 
   const closeModal = () => setActiveModal(null);
 
@@ -1438,60 +1468,143 @@ export default function DashboardPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: recent, error } = await supabase
-        .from("recent_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("last_visited", { ascending: false })
-        .limit(6);
+      const queries = await Promise.all([
+        supabase.from("youtube_sessions").select("id, video_title, url, created_at, video_id").eq("user_id", user.id).order('created_at', {ascending: false}).limit(6),
+        supabase.from("recording_sessions").select("id, title, created_at").eq("user_id", user.id).order('created_at', {ascending: false}).limit(6),
+        supabase.from("quiz_sessions").select("id, file_name, created_at").eq("user_id", user.id).order('created_at', {ascending: false}).limit(6),
+        supabase.from("flashcard_sessions").select("id, file_name, created_at").eq("user_id", user.id).order('created_at', {ascending: false}).limit(6),
+        supabase.from("exam_sessions").select("id, source_label, created_at").eq("user_id", user.id).order('created_at', {ascending: false}).limit(6),
+        supabase.from("chat_sessions").select("id, title, created_at").eq("user_id", user.id).order('created_at', {ascending: false}).limit(6),
+      ]);
 
-      if (error || !recent) {
-        setRecentLoading(false);
-        return;
-      }
+      const [yt, rec, qz, fc, ex, ch] = queries;
+      let all: RecentItem[] = [];
 
-      const all: RecentItem[] = recent.map((s: any) => ({
-        id: s.session_id || s.id,
-        type: s.type as any,
-        title: s.title,
-        subtitle: s.subtitle || s.type,
-        last_visited: s.last_visited,
-        href: s.href,
-        videoId: s.video_id || undefined,
-      }));
+      if (yt.data) yt.data.forEach((i: any) => all.push({ id: i.id, type: 'youtube', title: i.video_title || 'YouTube Video', subtitle: 'youtube', last_visited: i.created_at, href: `/content/${i.id}?url=${encodeURIComponent(i.url || '')}&session_id=${i.id}`, videoId: i.video_id }));
+      if (rec.data) rec.data.forEach((i: any) => all.push({ id: i.id, type: 'recording', title: i.title || 'Audio Recording', subtitle: 'recording', last_visited: i.created_at, href: `/content/${i.id}?mode=recording&session_id=${i.id}` }));
+      if (qz.data) qz.data.forEach((i: any) => all.push({ id: i.id, type: 'quiz', title: i.file_name || 'Quiz', subtitle: 'quiz', last_visited: i.created_at, href: `/dashboard/quizzes/${i.id}` }));
+      if (fc.data) fc.data.forEach((i: any) => all.push({ id: i.id, type: 'flashcard', title: i.file_name || 'Flashcard', subtitle: 'flashcard', last_visited: i.created_at, href: `/dashboard/flashcards/${i.id}` }));
+      if (ex.data) ex.data.forEach((i: any) => all.push({ id: i.id, type: 'exam', title: i.source_label || 'Exam', subtitle: 'exam', last_visited: i.created_at, href: `/dashboard/exam-mode/${i.id}` }));
+      if (ch.data) ch.data.forEach((i: any) => all.push({ id: i.id, type: 'chat', title: i.title || 'Chat Session', subtitle: 'chat', last_visited: i.created_at, href: `/content/${i.id}?mode=chat&session_id=${i.id}` }));
 
-      setRecentItems(all);
+      all.sort((a,b) => new Date(b.last_visited).getTime() - new Date(a.last_visited).getTime());
+      
+      setRecentItems(all.slice(0, 6));
       setRecentLoading(false);
     })();
   }, []);
 
-  // ✅ handleSubmit: creates a Supabase session for YouTube URLs, falls back
-  //    to random ID for chat/file queries (no session needed there)
+  // ✅ handleSubmit: handles file staging OR YouTube/chat navigation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // If a file is staged, navigate with it
+    if (pendingFile) {
+      await navigateWithFile(pendingFile, youtubeLink.trim());
+      setPendingFile(null);
+      setYoutubeLink("");
+      return;
+    }
+
     const text = youtubeLink.trim();
     if (!text) return;
     setYoutubeLink("");
 
-    if (text.includes("youtube.com") || text.includes("youtu.be")) {
-      const id = await getOrCreateYoutubeSession(text);
-      router.push(
-        `/content/${id}?url=${encodeURIComponent(text)}&session_id=${id}`,
-      );
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urls = text.match(urlRegex);
+    const firstUrl = urls?.[0];
+    const remainingText = text.replace(urlRegex, "").trim();
+
+    if (firstUrl) {
+      const restricted = ["wa.me", "t.me", "web.whatsapp.com", "telegram.org", "facebook.com", "instagram.com"];
+      if (restricted.some(domain => firstUrl.includes(domain))) {
+        alert("Sorry, we don't support social media links yet.");
+        return;
+      }
+      const id = firstUrl.includes("youtube.com") || firstUrl.includes("youtu.be")
+        ? await getOrCreateYoutubeSession(firstUrl)
+        : await createWebSession(firstUrl, remainingText || "Website Content");
+      const mode = (firstUrl.includes("youtube.com") || firstUrl.includes("youtu.be")) ? "youtube" : "web";
+      let targetPath = `/content/${id}?mode=${mode}&url=${encodeURIComponent(firstUrl)}&session_id=${id}`;
+      if (remainingText) targetPath += `&q=${encodeURIComponent(remainingText)}`;
+      router.push(targetPath);
     } else {
       const id = await createChatSession(text.slice(0, 50));
       router.push(`/content/${id}?mode=chat&q=${encodeURIComponent(text)}&session_id=${id}`);
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const id = await createChatSession(`File: ${file.name}`);
-    router.push(
-      `/content/${id}?mode=chat&file=${encodeURIComponent(file.name)}&session_id=${id}`,
-    );
     e.target.value = "";
+
+    // Stage the file — show chip in input bar, show upload progress toast
+    setPendingFile(file);
+    setUploadProgress(0);
+    setUploadToastVisible(true);
+
+    // Simulate reading progress for UX feedback
+    const reader = new FileReader();
+    reader.onprogress = (ev) => {
+      if (ev.lengthComputable) {
+        setUploadProgress(Math.round((ev.loaded / ev.total) * 90));
+      }
+    };
+    reader.onload = () => {
+      setUploadProgress(100);
+      // Hide toast after 2s
+      setTimeout(() => setUploadToastVisible(false), 2000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Navigate when user submits with a pending file
+  const navigateWithFile = async (file: File, extraQuery: string) => {
+    const isAudio = ["mp3", "wav", "m4a"].some(ext => file.name.toLowerCase().endsWith(`.${ext}`));
+    const isVideo = ["mp4", "mov", "webm", "mkv", "avi", "m4v"].some(ext => file.name.toLowerCase().endsWith(`.${ext}`));
+
+    return new Promise<void>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = (event.target?.result as string).split(",")[1];
+        const mimeType = file.type || (isVideo ? "video/mp4" : isAudio ? "audio/mpeg" : "application/octet-stream");
+        let thumbnail = "";
+
+        if (isVideo) {
+          try {
+            const video = document.createElement("video");
+            video.src = URL.createObjectURL(file);
+            video.load();
+            video.currentTime = 1;
+            await new Promise<void>((res) => {
+              video.onseeked = () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = video.videoWidth || 1280;
+                canvas.height = video.videoHeight || 720;
+                const ctx = canvas.getContext("2d");
+                if (ctx) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                thumbnail = canvas.toDataURL("image/jpeg");
+                URL.revokeObjectURL(video.src);
+                res();
+              };
+              video.onerror = () => res();
+            });
+          } catch (_) {}
+        }
+
+        const { saveMediaToDB } = await import("@/lib/idb");
+        await saveMediaToDB({ base64, mimeType, fileName: file.name, thumbnail });
+
+        const id = await createChatSession(`File: ${file.name}`);
+        let mode = isVideo ? "file" : isAudio ? "recording" : "file";
+        let target = `/content/${id}?mode=${mode}&file=${encodeURIComponent(file.name)}&session_id=${id}`;
+        if (extraQuery) target += `&q=${encodeURIComponent(extraQuery)}`;
+        router.push(target);
+        resolve();
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const stopRecordingAndTranscribe = async () => {
@@ -1661,6 +1774,36 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-start px-4 py-16">
+      {/* Upload Progress Toast */}
+      {uploadToastVisible && (
+        <div className="fixed top-5 right-5 z-[300] w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-in slide-in-from-right-4">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+            {uploadProgress < 100 ? (
+              <svg className="w-4 h-4 animate-spin text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            <span className="text-sm font-semibold text-gray-700">
+              {uploadProgress < 100 ? "Uploading..." : "Ready!"}
+            </span>
+            <span className="text-xs text-gray-400 ml-auto">{uploadProgress}%</span>
+          </div>
+          <div className="px-4 py-2">
+            <p className="text-xs text-gray-500 truncate">{pendingFile?.name}</p>
+            <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%`, backgroundColor: uploadProgress === 100 ? "#22c55e" : "#3b82f6" }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col items-center mb-10">
         <svg
@@ -1715,6 +1858,7 @@ export default function DashboardPage() {
             ref={fileInputRef}
             type="file"
             className="hidden"
+            accept="video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.txt"
             onChange={handleFileUpload}
           />
           
@@ -1752,6 +1896,45 @@ export default function DashboardPage() {
           ) : (
             <>
               <div className="flex-1 flex flex-col min-h-[28px]">
+                {/* Context chip */}
+                {selectedContext && (
+                  <ContextChip
+                    selection={selectedContext}
+                    onRemove={() => setSelectedContext(null)}
+                  />
+                )}
+                {/* Pending file chip */}
+                {pendingFile && (
+                  <div className="flex items-center gap-2 mb-1.5 px-3 py-1.5 bg-gray-100 rounded-xl w-fit max-w-full">
+                    <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {["mp4","mov","webm","mkv","avi","m4v"].some(e => pendingFile.name.toLowerCase().endsWith(`.${e}`)) ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M4 6h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      )}
+                    </svg>
+                    <span className="text-xs text-gray-700 font-medium truncate max-w-[200px]">{pendingFile.name}</span>
+                    {uploadProgress < 100 && (
+                      <div className="w-16 h-1 bg-gray-200 rounded-full overflow-hidden shrink-0">
+                        <div className="h-full bg-blue-500 rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                      </div>
+                    )}
+                    {uploadProgress === 100 && (
+                      <svg className="w-3.5 h-3.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setPendingFile(null); setUploadProgress(0); setUploadToastVisible(false); }}
+                      className="text-gray-400 hover:text-red-400 transition cursor-pointer shrink-0"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 <textarea
                   rows={1}
                   value={youtubeLink}
@@ -1766,7 +1949,7 @@ export default function DashboardPage() {
                       handleSubmit(e as any);
                     }
                   }}
-                  placeholder="Ask anything, or paste a YouTube link..."
+                  placeholder={pendingFile ? "Add a note (optional) then press Send..." : "Ask anything, or paste a YouTube link..."}
                   className="w-full bg-transparent text-[17px] text-gray-800 placeholder-gray-400 outline-none resize-none overflow-hidden py-0.5"
                   style={{ minHeight: '28px', maxHeight: '200px' }}
                 />
@@ -1774,15 +1957,23 @@ export default function DashboardPage() {
 
               <div className="flex items-center justify-between mt-1.5">
                 <div className="flex items-center gap-3">
-                  {/* @ Add Context (Rounded Button) */}
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer shrink-0 shadow-sm"
-                    title="Add Context"
-                  >
-                    <span className="text-[15px] font-bold text-gray-400">@</span>
-                    <span className="text-[13px] font-bold uppercase tracking-tight text-gray-400">Add Context</span>
-                  </button>
+                  {/* @ Add Context (Rounded Button) — with popup */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setContextMenuOpen(o => !o)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer shrink-0 shadow-sm ${contextMenuOpen ? "border-blue-300 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"}`}
+                      title="Add Context"
+                    >
+                      <span className={`text-[13px] font-bold ${contextMenuOpen ? "text-blue-600" : "text-gray-400"}`}>@</span>
+                      <span className={`text-[10px] font-bold uppercase tracking-tight ${contextMenuOpen ? "text-blue-600" : "text-gray-400"}`}>Add Context</span>
+                    </button>
+                    <AddContextPopup
+                      open={contextMenuOpen}
+                      onClose={() => setContextMenuOpen(false)}
+                      onSelect={(item) => setSelectedContext(item)}
+                    />
+                  </div>
 
                   <div className="flex items-center gap-1.5 ml-1">
                     {/* Upload (Clip) */}
@@ -1815,7 +2006,7 @@ export default function DashboardPage() {
 
                 {/* Voice / Send Button */}
                 <div className="flex items-center">
-                  {youtubeLink.trim() ? (
+                  {(youtubeLink.trim() || pendingFile) ? (
                     <button
                       type="submit"
                       className="w-11 h-11 cursor-pointer rounded-full bg-black hover:bg-gray-800 flex items-center justify-center transition-all active:scale-90 shadow-lg"
@@ -1847,35 +2038,36 @@ export default function DashboardPage() {
         </div>
       </form>
 
-      {/* Recent */}
-      <div className="flex items-center justify-between w-full max-w-2xl mb-4 mt-10">
-        <div className="flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-          <h1>{t('dashboard_recent')}</h1>
-        </div>
-        <div>
-          <Link
-            href="/dashboard/history"
-            className="flex items-center gap-2 hover:text-gray-700 transition-colors duration-200"
-          >
-            <h1>{t('dashboard_view_all')}</h1>
+      {/* Recent section - full left-aligned container */}
+      <div className="w-full max-w-4xl mt-8 mb-1">
+        {/* Header row: Recent left, View all right */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span className="text-base font-semibold text-gray-800">{t('dashboard_recent')}</span>
+          </div>
+          <Link
+            href="/dashboard/history"
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors duration-200"
+          >
+            <span>{t('dashboard_view_all')}</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -1889,36 +2081,20 @@ export default function DashboardPage() {
             </svg>
           </Link>
         </div>
-      </div>
 
-      {/* Recent cards grid */}
-      {recentLoading ? (
-        <div className="w-full max-w-2xl flex flex-col items-center justify-center py-10 mb-8 gap-3">
-          <svg
-            className="w-5 h-5 animate-spin text-gray-300"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v8z"
-            />
-          </svg>
-          <p className="text-sm text-gray-400">Loading recent sessions…</p>
-        </div>
-      ) : (
-        recentItems.length > 0 && (
-          <div className="w-full max-w-2xl grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
-            {recentItems.map((item) => (
+        {/* Cards grid */}
+        {recentLoading ? (
+          <div className="flex flex-col items-center justify-center py-10 mb-8 gap-3">
+            <svg className="w-5 h-5 animate-spin text-gray-300" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <p className="text-sm text-gray-400">Loading recent sessions…</p>
+          </div>
+        ) : (
+          recentItems.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+              {recentItems.map((item) => (
               <RecentCard
                 key={item.id}
                 item={item}
@@ -1965,9 +2141,11 @@ export default function DashboardPage() {
                 }}
               />
             ))}
-          </div>
-        )
-      )}
+            </div>
+          )
+        )}
+      </div>
+
 
       {/* Modals */}
       {activeModal === "quiz" && <QuizForm onClose={closeModal} />}

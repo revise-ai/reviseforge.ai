@@ -595,29 +595,26 @@ export default function HistoryPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: recent, error } = await supabase
-        .from("recent_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("last_visited", { ascending: false });
+      const queries = await Promise.all([
+        supabase.from("youtube_sessions").select("id, video_title, url, created_at, video_id").eq("user_id", user.id).order('created_at', {ascending: false}),
+        supabase.from("recording_sessions").select("id, title, created_at").eq("user_id", user.id).order('created_at', {ascending: false}),
+        supabase.from("quiz_sessions").select("id, file_name, created_at").eq("user_id", user.id).order('created_at', {ascending: false}),
+        supabase.from("flashcard_sessions").select("id, file_name, created_at").eq("user_id", user.id).order('created_at', {ascending: false}),
+        supabase.from("exam_sessions").select("id, source_label, created_at").eq("user_id", user.id).order('created_at', {ascending: false}),
+        supabase.from("chat_sessions").select("id, title, created_at").eq("user_id", user.id).order('created_at', {ascending: false}),
+      ]);
 
-      if (error || !recent) {
-        setItems([]);
-        setLoading(false);
-        return;
-      }
+      const [yt, rec, qz, fc, ex, ch] = queries;
+      let all: HistoryItem[] = [];
 
-      const all: HistoryItem[] = recent.map((s: any) => ({
-        id: s.session_id || s.id,
-        type: s.type as SessionType,
-        title: s.title,
-        subtitle: s.subtitle || s.type,
-        last_visited: s.last_visited,
-        created_at: s.created_at,
-        badges: [], // Placeholder for now
-        href: s.href,
-        videoId: s.video_id || undefined,
-      }));
+      if (yt.data) yt.data.forEach((i: any) => all.push({ id: i.id, type: 'youtube', title: i.video_title || 'YouTube Video', subtitle: 'youtube', last_visited: i.created_at, created_at: i.created_at, badges: [], href: `/content/${i.id}?url=${encodeURIComponent(i.url || '')}&session_id=${i.id}`, videoId: i.video_id }));
+      if (rec.data) rec.data.forEach((i: any) => all.push({ id: i.id, type: 'recording', title: i.title || 'Audio Recording', subtitle: 'recording', last_visited: i.created_at, created_at: i.created_at, badges: [], href: `/content/${i.id}?mode=recording&session_id=${i.id}` }));
+      if (qz.data) qz.data.forEach((i: any) => all.push({ id: i.id, type: 'quiz', title: i.file_name || 'Quiz', subtitle: 'quiz', last_visited: i.created_at, created_at: i.created_at, badges: [], href: `/dashboard/quizzes/${i.id}` }));
+      if (fc.data) fc.data.forEach((i: any) => all.push({ id: i.id, type: 'flashcard', title: i.file_name || 'Flashcard', subtitle: 'flashcard', last_visited: i.created_at, created_at: i.created_at, badges: [], href: `/dashboard/flashcards/${i.id}` }));
+      if (ex.data) ex.data.forEach((i: any) => all.push({ id: i.id, type: 'exam', title: i.source_label || 'Exam', subtitle: 'exam', last_visited: i.created_at, created_at: i.created_at, badges: [], href: `/dashboard/exam-mode/${i.id}` }));
+      if (ch.data) ch.data.forEach((i: any) => all.push({ id: i.id, type: 'chat', title: i.title || 'Chat Session', subtitle: 'chat', last_visited: i.created_at, created_at: i.created_at, badges: [], href: `/content/${i.id}?mode=chat&session_id=${i.id}` }));
+
+      all.sort((a,b) => new Date(b.last_visited).getTime() - new Date(a.last_visited).getTime());
 
       setItems(all);
     } catch (e) {

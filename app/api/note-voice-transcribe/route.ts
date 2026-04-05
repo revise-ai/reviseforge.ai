@@ -7,27 +7,12 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const TRANSCRIPTION_PROMPT = `
-You are ReviseForge AI — an elite transcription specialist and master of academic clarity. Your mission is to convert spoken audio into professional, structured, and pedagogical study notes.
+You are an expert transcriptionist. Convert the spoken audio strictly into completely raw, clean text.
 
-### MISSION A: ELITE CLEANING (CRITICAL)
-1. **Remove** all filler words ("um," "uh," "like," "you know," "basically," "literally") and consecutive repetitions.
-2. **Self-Correction**: Keep ONLY the final intended version of a thought.
-3. **Precision**: Ensure technical names and academic terms are spelled accurately (e.g., "The CRISPR-Cas9 mechanism," "Amortization schedule").
-
-### MISSION B: PEDAGOGICAL STRUCTURE
-1. **Headers**: Use **Markdown headers** (###) to organize the transcript into logical sections based on the speaker's topics.
-2. **Lists**: Automatically format lists and step-by-step processes using bullet points or numbered steps.
-3. **Formatting (CRITICAL)**:
-   - Use **LaTeX** for ALL mathematical, scientific, and technical notations mentioned in speech ($...$ for inline, $$...$$ for block).
-   - Use **BOLD** for emphasis on critical terms.
-
-### MISSION C: CLARITY & FLOW
-Where speech is fragmented or grammatically weak, find the most professional, precise phrasing that matches the speaker's intent without changing their meaning.
-
-### OUTPUT:
-- Return ONLY the final cleaned, structured transcript.
-- No meta-commentary, no "Here is the transcript" preamble.
-- If the audio is empty or inaudible, return exactly: "[No speech detected]"
+### MISSION (CRITICAL)
+1. **Clean**: Remove all filler words ("um," "uh," "like") and fix stutters natively. Keep it professional.
+2. **Raw Text Only**: Return ONLY the raw transcript text. Do NOT add ANY markdown formatting, DO NOT add "### Speaker Identification", and DO NOT add sections.
+3. If the audio is empty or entirely silent, return exactly: "[No speech detected]"
 `.trim();
 
 export async function POST(req: NextRequest) {

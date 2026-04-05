@@ -22,7 +22,7 @@ export const RATE_LIMITS = {
   chat: { maxRequests: 20, windowSecs: 60 } as RateLimitConfig,
 
   /** Generation endpoints (quiz, flashcards, exam, summary, chapters) — heavy AI calls */
-  generation: { maxRequests: 10, windowSecs: 60 } as RateLimitConfig,
+  generation: { maxRequests: 30, windowSecs: 60 } as RateLimitConfig,
 
   /** Polish / transcription — moderate AI calls */
   utility: { maxRequests: 15, windowSecs: 60 } as RateLimitConfig,

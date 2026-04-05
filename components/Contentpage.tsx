@@ -7,8 +7,8 @@ import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import MarkdownRenderer from "./MarkdownRenderer";
 
-type Mode = "youtube" | "microphone" | "browsertab" | "chat";
-type ActiveTool = "summary" | "quiz" | "flashcards" | "exams" | "visualizations" | null;
+type Mode = "youtube" | "web" | "microphone" | "browsertab" | "chat" | "file";
+type ActiveTool = "summary" | "quiz" | "flashcards" | "exams" | "visualizations" | "podcast" | null;
 
 interface QuizQuestion {
   id: number;
@@ -73,6 +73,16 @@ const panels = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 9.5v5" />
+      </svg>
+    ),
+  },
+  {
+    id: "podcast" as ActiveTool,
+    label: "Podcast",
+    icon: (
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#8B5CF6" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 10v1a7 7 0 01-14 0v-1M12 18v4" />
       </svg>
     ),
   },
@@ -144,6 +154,8 @@ function getLabelStyle(label: string) {
   const key = label.replace(":", "").trim().toLowerCase();
   return LABEL_STYLES[key] ?? { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", dot: "bg-gray-400" };
 }
+
+import { saveMediaToDB, getMediaFromDB } from "@/lib/idb";
 
 function extractVideoId(url: string) {
   const match = url.match(/(?:v=|\/embed\/|\/watch\?v=|\/v\/|youtu\.be\/|\/shorts\/|live\/)([^#&?]*)/);
@@ -659,6 +671,7 @@ function RightSidebar({
   recordingReady = false,
   onFeedback,
   onMenuAction,
+  onFileUpload,
 }: {
   open: boolean;
   onToggle: () => void;
@@ -684,6 +697,7 @@ function RightSidebar({
   recordingReady?: boolean;
   onFeedback: (message: string, type: "up" | "down", note: string) => void;
   onMenuAction: (action: "quiz" | "flashcards" | "exams") => void;
+  onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const isRecording = mode === "microphone" || mode === "browsertab";
   const [isListening, setIsListening] = useState(false);
@@ -948,10 +962,7 @@ function RightSidebar({
                   ref={fileInputRef}
                   type="file"
                   className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setChatInput(`Uploaded: ${file.name}`);
-                  }}
+                  onChange={onFileUpload}
                 />
                 
                 <div className={`flex flex-col bg-gray-50 border rounded-[32px] px-4 py-2 transition-all duration-300 min-h-[70px] justify-center ${isListening ? "border-black shadow-md ring-2 ring-black/5" : "border-gray-200 focus-within:border-gray-400 focus-within:bg-white"}`}>
@@ -1091,6 +1102,491 @@ function RightSidebar({
   );
 }
 
+function VideoHub({
+  file,
+  chapters,
+  transcripts,
+  processing,
+  base64,
+  mimeType,
+  thumbnail,
+  error,
+  nativeFile,
+}: {
+  file: string;
+  chapters: ChapterItem[];
+  transcripts: TranscriptItem[];
+  processing: boolean;
+  base64?: string;
+  mimeType?: string;
+  thumbnail?: string;
+  error?: string;
+  nativeFile?: File | null;
+}) {
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>(thumbnail || "");
+  const [activeTab, setActiveTab] = useState<"chapters" | "transcripts">("chapters");
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (thumbnail) setThumbnailUrl(thumbnail);
+  }, [thumbnail]);
+
+  useEffect(() => {
+    if (nativeFile) {
+      const url = URL.createObjectURL(nativeFile);
+      setVideoUrl(url);
+      return () => { URL.revokeObjectURL(url); }
+    } else if (base64 && mimeType) {
+      const parsedMime = mimeType || "video/mp4";
+      const base64Data = base64.includes(",") ? base64.split(",")[1] : base64;
+      const dataUri = `data:${parsedMime};base64,${base64Data.replace(/\s/g, "")}`;
+      setVideoUrl(dataUri);
+    }
+  }, [base64, mimeType, nativeFile]);
+  
+  useEffect(() => {
+    if (videoUrl && videoRef.current) {
+      videoRef.current.load();
+    }
+  }, [videoUrl]);
+
+  const captureThumbnail = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        setThumbnailUrl(canvas.toDataURL("image/jpeg"));
+      }
+    } catch (e) {
+      console.error("Thumbnail capture failed", e);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden bg-white">
+      <div className="px-4 pt-4 shrink-0">
+        <div className="rounded-2xl overflow-hidden bg-black shadow-md relative" style={{ aspectRatio: "16/9", maxHeight: "420px" }}>
+          {videoUrl ? (
+            <>
+              {thumbnailUrl && (
+                <img 
+                  src={thumbnailUrl} 
+                  className="absolute inset-0 w-full h-full object-cover opacity-40 blur-md pointer-events-none" 
+                  alt="Preview" 
+                />
+              )}
+              <video 
+                ref={videoRef}
+                className="relative w-full h-full object-contain z-10" 
+                src={videoUrl} 
+                controls 
+                autoPlay 
+                onLoadedMetadata={captureThumbnail}
+                onCanPlay={captureThumbnail}
+              />
+            </>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-gray-900">
+               <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="#4B5563" strokeWidth={1.5}>
+                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+               </svg>
+               <p className="text-sm text-gray-500">Loading chapters & transcript...</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-white shrink-0 mt-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab("chapters")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeTab === "chapters" ? "text-gray-800 bg-gray-50" : "text-gray-400 hover:text-gray-600"}`}
+          >
+            {activeTab === "chapters" && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
+            Chapters
+          </button>
+          <button
+            onClick={() => setActiveTab("transcripts")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeTab === "transcripts" ? "text-gray-800 bg-gray-50" : "text-gray-400 hover:text-gray-600"}`}
+          >
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h10" />
+            </svg>
+            Transcripts
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+           <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            Auto Scroll
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {error ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 py-12 px-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-500 mb-2">
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p className="text-sm font-semibold text-gray-900">Analysis Unavailable</p>
+            <p className="text-xs text-gray-500 max-w-[240px] leading-relaxed">
+              We couldn't generate chapters for this video. Use the Chat tool to ask questions about it instead!
+            </p>
+          </div>
+        ) : processing ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+            <svg className="w-5 h-5 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <p className="text-xs text-slate-500 font-medium tracking-tight">Loading chapters & transcript…</p>
+          </div>
+        ) : activeTab === "chapters" ? (
+          chapters.length > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {chapters.map((item, i) => (
+                <div key={i} className="px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer group">
+                  <p className="text-xs text-slate-500 font-mono mb-1">{item.time}</p>
+                  <p className="text-sm font-bold text-gray-800 mb-1 group-hover:text-black transition-colors">{item.title}</p>
+                  <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-48 gap-2 text-center px-8">
+              <p className="text-xs text-gray-400">Chapters will appear below once the video processing is complete.</p>
+            </div>
+          )
+        ) : transcripts.length > 0 ? (
+          <div className="divide-y divide-gray-50">
+            {transcripts.map((item, i) => (
+              <div key={i} className="px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                <p className="text-[10px] font-bold font-mono text-slate-500 mb-1 tracking-widest">{item.time}</p>
+                <p className="text-sm text-slate-600 leading-relaxed font-medium">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-48">
+            <p className="text-xs text-gray-400">No transcript metadata found for this video.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AudioHub({ 
+  file,
+  chapters,
+  transcripts,
+  processing,
+  base64,
+  mimeType,
+  isRecording = false,
+  nativeFile
+}: { 
+  file: string; 
+  chapters: ChapterItem[]; 
+  transcripts: TranscriptItem[];
+  processing: boolean;
+  base64?: string;
+  mimeType?: string;
+  isRecording?: boolean;
+  nativeFile?: File | null;
+}) {
+  const [activeTab, setActiveTab] = useState<"chapters" | "transcripts">("chapters");
+  const [audioUrl, setAudioUrl] = useState<string>("");
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const bounceAnim = `
+    @keyframes bar-bounce {
+      0%, 100% { transform: scaleY(0.6); opacity: 0.5; }
+      50% { transform: scaleY(1.2); opacity: 1; }
+    }
+  `;
+
+  useEffect(() => {
+    if (nativeFile) {
+      const url = URL.createObjectURL(nativeFile);
+      setAudioUrl(url);
+      return () => { URL.revokeObjectURL(url); }
+    } else if (base64 && mimeType) {
+      const parsedMime = mimeType || "audio/mpeg";
+      const base64Data = base64.includes(",") ? base64.split(",")[1] : base64;
+      const dataUri = `data:${parsedMime};base64,${base64Data.replace(/\s/g, "")}`;
+      setAudioUrl(dataUri);
+    }
+  }, [base64, mimeType, nativeFile]);
+
+  useEffect(() => {
+    if (audioUrl && audioRef.current) {
+      audioRef.current.load();
+    }
+  }, [audioUrl]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(console.error);
+    }
+  };
+
+  const skip = (amount: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = Math.max(0, Math.min(duration, audioRef.current.currentTime + amount));
+  };
+
+  const formatTime = (time: number) => {
+    if (!time || isNaN(time)) return "0:00";
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden bg-white">
+      <style>{bounceAnim}</style>
+      <audio 
+        ref={audioRef}
+        src={audioUrl}
+        onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)}
+        onLoadedMetadata={() => audioRef.current && setDuration(audioRef.current.duration)}
+        onDurationChange={() => audioRef.current && setDuration(audioRef.current.duration)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => setIsPlaying(false)}
+      />
+
+      <div className="px-5 py-4 border-b border-gray-100 bg-white shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 shrink-0">
+            <button onClick={() => { if(audioRef.current) audioRef.current.currentTime = 0; }} className="p-2 text-gray-400 hover:text-gray-600 cursor-pointer">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button 
+              onClick={togglePlay}
+              className="w-9 h-9 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-all cursor-pointer shadow-sm border border-gray-100"
+            >
+              {isPlaying ? (
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" className="ml-0.5">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+            <button onClick={() => skip(10)} className="p-2 text-gray-400 hover:text-gray-600 cursor-pointer">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="rotate-180">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex-1 relative h-10 flex items-center group px-2">
+            <input
+              type="range"
+              min="0"
+              max={duration || 0}
+              value={currentTime}
+              onChange={(e) => { if (audioRef.current) audioRef.current.currentTime = Number(e.target.value); }}
+              className="absolute inset-x-0 w-full h-full opacity-0 z-20 cursor-pointer"
+            />
+            <div className="w-full flex items-center gap-[1.5px] h-6 overflow-hidden pointer-events-none">
+              {[...Array(60)].map((_, i) => {
+                const isActive = (i / 60) * 100 <= progress;
+                return (
+                  <div 
+                    key={i} 
+                    className={`flex-1 rounded-full transition-all duration-300 ${isActive ? "bg-blue-500/80" : "bg-gray-200"}`}
+                    style={{ 
+                      height: `${25 + Math.random() * 55}%`,
+                      animation: (isPlaying && isActive) ? `bar-bounce 1.2s infinite ${i * 45}ms` : 'none'
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 shrink-0 px-2 font-mono">
+            <div className="bg-gray-100 rounded px-1.5 py-0.5 text-[10px] font-bold text-gray-400">1x</div>
+            <div className="flex items-center gap-1 text-[11px] font-bold text-gray-500 min-w-[70px] justify-end">
+              <span>{formatTime(currentTime)}</span>
+              <span className="opacity-30">/</span>
+              <span>{formatTime(duration)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100 bg-white shrink-0">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab("chapters")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeTab === "chapters" ? "text-gray-800 bg-gray-50" : "text-gray-400 hover:text-gray-600"}`}
+          >
+            {activeTab === "chapters" && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
+            Chapters
+          </button>
+          <button
+            onClick={() => setActiveTab("transcripts")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeTab === "transcripts" ? "text-gray-800 bg-gray-50" : "text-gray-400 hover:text-gray-600"}`}
+          >
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h10" />
+            </svg>
+            Transcripts
+          </button>
+        </div>
+        <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          Auto Scroll
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {processing ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+            <svg className="w-5 h-5 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <p className="text-xs text-slate-500 font-medium">Loading chapters & transcript…</p>
+          </div>
+        ) : activeTab === "chapters" ? (
+          chapters.length > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {chapters.map((item, i) => (
+                <div key={i} className="px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <p className="text-xs text-slate-500 font-mono mb-1">{item.time}</p>
+                  <p className="text-sm font-semibold text-gray-800 mb-1">{item.title}</p>
+                  <p className="text-sm text-gray-500 leading-relaxed">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-48">
+              <p className="text-xs text-gray-400">Chapters will appear once the audio is processed</p>
+            </div>
+          )
+        ) : transcripts.length > 0 ? (
+          <div className="divide-y divide-gray-50">
+            {transcripts.map((item, i) => (
+              <div key={i} className="px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                <p className="text-[10px] font-bold font-mono text-slate-500 mb-1 tracking-widest">{item.time}</p>
+                <p className="text-sm text-slate-600 leading-relaxed font-medium">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-48">
+            <p className="text-xs text-gray-400">No transcript available</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FileView({ file, base64, mimeType }: { file: string, base64?: string, mimeType?: string }) {
+  const isPdf = file.toLowerCase().endsWith(".pdf") || mimeType?.includes("pdf");
+  const [pdfUrl, setPdfUrl] = useState<string>("");
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    if (base64 && (isPdf || mimeType?.includes("pdf"))) {
+      try {
+        const cleaned = base64.trim().replace(/\s/g, "");
+        const byteCharacters = atob(cleaned);
+        const byteNumbers = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+        return () => URL.revokeObjectURL(url);
+      } catch (e: any) {
+        console.error("PDF Hydration Failed:", e);
+        setError("Unable to process PDF encoding.");
+      }
+    }
+  }, [base64, mimeType, isPdf]);
+
+  if (!isPdf) {
+    return (
+      <div className="flex flex-col h-full bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-10">
+          <div className="w-full max-w-5xl h-full bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden flex flex-col items-center justify-center">
+             <div className="p-4 rounded-2xl bg-blue-50 mb-4">
+                <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#2563eb" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+             </div>
+             <p className="text-gray-500 font-medium">Viewing non-PDF file: {file}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const finalPdfUrl = pdfUrl || (base64 ? `data:application/pdf;base64,${base64}` : "");
+
+  return (
+    <div className="flex flex-col h-full bg-white overflow-hidden">
+      <div className="flex-1 overflow-auto flex justify-center bg-white min-h-0">
+        {finalPdfUrl ? (
+          <iframe 
+            src={finalPdfUrl} 
+            className="w-full h-full max-w-5xl bg-white shadow-sm border-none"
+            style={{ display: 'block', minHeight: 'calc(100vh - 48px)' }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-6 bg-white">
+            <div className="relative">
+              <div className="absolute -inset-4 bg-blue-100 rounded-full blur-2xl opacity-40"></div>
+              <div className="relative w-20 h-20 bg-white rounded-2xl shadow-lg border border-blue-50 flex items-center justify-center">
+                <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#2563eb" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-gray-900">{error || "Preparing Document..."}</h3>
+              <p className="text-sm text-gray-500 max-w-xs mt-2">ReviseForge is optimizing your academic workstation.</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function YoutubeView({
   url,
   chapters,
@@ -1103,14 +1599,22 @@ function YoutubeView({
   chaptersLoading: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<"chapters" | "transcripts">("chapters");
-  const videoId = url.match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/)?.[1] ?? "";
+  const videoId = extractVideoId(url) ?? "";
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
       <div className="px-4 pt-4 shrink-0">
-        <div className="rounded-2xl overflow-hidden bg-black shadow-md" style={{ aspectRatio: "16/9", maxHeight: "420px" }}>
+        <div className="rounded-2xl overflow-hidden bg-black shadow-md relative" style={{ aspectRatio: "16/9", maxHeight: "420px" }}>
           {videoId ? (
-            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} allowFullScreen />
+            <>
+              <img 
+                src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`} 
+                className="absolute inset-0 w-full h-full object-cover opacity-50 blur-sm"
+                alt="Thumbnail"
+                onError={(e) => (e.currentTarget.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`)}
+              />
+              <iframe className="relative w-full h-full z-10" src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} allowFullScreen />
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="#EF4444">
@@ -1124,9 +1628,9 @@ function YoutubeView({
         <div className="flex items-center gap-1">
           <button
             onClick={() => setActiveTab("chapters")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeTab === "chapters" ? "text-gray-800" : "text-gray-400 hover:text-gray-600"}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeTab === "chapters" ? "text-gray-800 bg-gray-50" : "text-gray-400 hover:text-gray-600"}`}
           >
-            {activeTab === "chapters" && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
+            {activeTab === "chapters" && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
             Chapters
           </button>
           <button
@@ -1906,7 +2410,7 @@ async function updateRecentSession(params: {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-export default function Contentpages() {
+export default function Contentpage() {
   const params = useSearchParams();
   const router = useRouter();
   const mode = (params.get("mode") as Mode) ?? "youtube";
@@ -1942,6 +2446,155 @@ export default function Contentpages() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+
+  // File Hydration State
+  const [fileBase64, setFileBase64] = useState<string>("");
+  const [fileMimeType, setFileMimeType] = useState<string>("");
+  const [fileThumbnail, setFileThumbnail] = useState<string>("");
+  const [generationError, setGenerationError] = useState<string>("");
+  const [nativeFile, setNativeFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).__capturedFile) {
+      setNativeFile((window as any).__capturedFile);
+    }
+    if (mode === "file") {
+      (async () => {
+        const stored = await getMediaFromDB();
+        if (stored) {
+          setFileBase64(stored.base64 || "");
+          setFileMimeType(stored.mimeType || "");
+          setFileThumbnail(stored.thumbnail || "");
+        }
+      })();
+    }
+  }, [mode]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (typeof window !== "undefined") {
+      (window as any).__capturedFile = file;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = (event.target?.result as string).split(",")[1];
+      const mimeType = file.type;
+      
+      setFileBase64(base64);
+      setFileMimeType(mimeType);
+      setChapters([]);
+      setTranscripts([]);
+      setGenerationError("");
+
+      // Generate a quick thumbnail & Extract Audio for Analysis
+      let thumbnail = "";
+      let audioBase64ForAI = "";
+
+      if (mimeType.startsWith("video/")) {
+        try {
+          const video = document.createElement("video");
+          video.src = URL.createObjectURL(file);
+          video.load();
+          video.currentTime = 1;
+          await new Promise<void>((resolve) => {
+            video.onseeked = () => {
+              const canvas = document.createElement("canvas");
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              const ctx = canvas.getContext("2d");
+              if (ctx) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                thumbnail = canvas.toDataURL("image/jpeg");
+              }
+              resolve();
+            };
+          });
+          URL.revokeObjectURL(video.src);
+        } catch (e) {
+          console.warn("Thumbnail extraction failed", e);
+        }
+      }
+      
+      setFileThumbnail(thumbnail);
+      await saveMediaToDB({ base64, mimeType, fileName: file.name, thumbnail });
+      
+      router.push(`/content/${sessionId || 'file-session'}?mode=file&file=${encodeURIComponent(file.name)}&session_id=${sessionId || 'file-session'}`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Trigger Pedagogical Generation for Files
+  useEffect(() => {
+    const shouldTrigger = mode === "file" && fileBase64 && fileMimeType && chapters.length === 0 && !chaptersLoading && !generationError;
+    if (!shouldTrigger) return;
+
+    (async () => {
+      setChaptersLoading(true);
+      setGenerationError("");
+      try {
+        // Step 1: Convert base64 back to binary blob and upload to Gemini File API
+        const base64Data = fileBase64.includes(",") ? fileBase64.split(",")[1] : fileBase64;
+        const cleaned = base64Data.replace(/\s/g, "");
+        const byteChars = atob(cleaned);
+        const byteArr = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteArr[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([byteArr], { type: fileMimeType });
+
+        const fileName = uploadedFile || "video.mp4";
+        const form = new FormData();
+        form.append("file", blob, fileName);
+
+        const uploadRes = await fetch("/api/upload-to-gemini", {
+          method: "POST",
+          body: form,
+        });
+
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json();
+          setGenerationError(err.error || "Video upload to AI failed.");
+          return;
+        }
+
+        const { fileUri, mimeType: uploadedMime } = await uploadRes.json();
+
+        // Step 2: Generate chapters using the Gemini file URI
+        const chapRes = await fetch("/api/generate-chapters", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: fileUri, mimeType: uploadedMime || fileMimeType }),
+        });
+
+        if (chapRes.ok) {
+          const data = await chapRes.json();
+          if (data.chapters && data.chapters.length > 0) {
+            setChapters(data.chapters);
+          } else {
+            setGenerationError("AI returned no chapters. The video may have no speech.");
+          }
+          if (data.transcripts) setTranscripts(data.transcripts);
+
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user && sessionId) {
+            await persistChaptersAndTranscripts(sessionId, user.id, data.chapters || [], data.transcripts || []);
+          }
+        } else {
+          const err = await chapRes.json();
+          setGenerationError(err.error || "Chapter generation failed.");
+        }
+      } catch (e) {
+        console.error("Pedagogical Generation Failed", e);
+        setGenerationError("Analysis failed. Please try again or use Chat for questions.");
+      } finally {
+        setChaptersLoading(false);
+      }
+    })();
+  }, [mode, fileBase64, fileMimeType, uploadedFile, chapters.length, chaptersLoading, sessionId, generationError]);
+
 
   const startListening = () => {
     if (typeof window !== "undefined") {
@@ -2091,9 +2744,8 @@ export default function Contentpages() {
         return;
       }
 
-      if (tool === "visualizations") {
-        // Placeholder for future implementation as requested
-        setActiveTool("visualizations");
+      if (tool === "visualizations" || tool === "podcast") {
+        setActiveTool(tool);
         return;
       }
 
@@ -2338,7 +2990,9 @@ export default function Contentpages() {
       ? initialQuery || uploadedFile || "Chat"
       : url
         ? url.replace("https://", "").replace("www.", "").slice(0, 70)
-        : "Content";
+        : uploadedFile
+          ? uploadedFile
+          : "Content";
 
   if (isChat) {
     return (
@@ -2354,12 +3008,7 @@ export default function Contentpages() {
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       <header className="h-12 flex items-center justify-between px-4 border-b border-gray-200 bg-white shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <button className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-800 cursor-pointer transition-colors shrink-0">
-            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+        <div className="flex items-center gap-3 min-w-0 pl-1">
           <span className="text-sm font-medium text-gray-700 truncate">{videoTitle || title}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -2373,8 +3022,42 @@ export default function Contentpages() {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-hidden min-w-0">
-          {!isRecording && !isChat && (
-            <YoutubeView url={url} chapters={chapters} transcripts={transcripts} chaptersLoading={chaptersLoading} />
+          {!isRecording && !isChat && mode !== "file" && (
+            <YoutubeView url={url} chapters={chapters} transcripts={transcripts} chaptersLoading={chaptersLoading} error={generationError} />
+          )}
+
+          {mode === "file" && (
+            (() => {
+              const fileName = uploadedFile || "Document";
+              const isVideo = fileName.match(/\.(mp4|webm|ogg|mov)$/i) || fileMimeType.includes("video");
+              const isAudio = fileName.match(/\.(mp3|wav|ogg|m4a)$/i) || fileMimeType.includes("audio");
+
+              if (isVideo) {
+                 return <VideoHub 
+                   file={fileName} 
+                   chapters={chapters} 
+                   transcripts={transcripts} 
+                   processing={chaptersLoading} 
+                   base64={fileBase64} 
+                   mimeType={fileMimeType} 
+                   thumbnail={fileThumbnail}
+                   error={generationError}
+                   nativeFile={nativeFile}
+                 />;
+              }
+              if (isAudio) {
+                 return <AudioHub 
+                   file={fileName} 
+                   chapters={chapters} 
+                   transcripts={transcripts} 
+                   processing={chaptersLoading} 
+                   base64={fileBase64} 
+                   mimeType={fileMimeType} 
+                   nativeFile={nativeFile}
+                 />;
+              }
+              return <FileView file={fileName} base64={fileBase64} mimeType={fileMimeType} />;
+            })()
           )}
           {isRecording && (
             <RecordingView
@@ -2429,6 +3112,7 @@ export default function Contentpages() {
             onChatSend={handleChatSend}
             chatLoading={chatLoading}
             recordingReady={!!recordingAudioRef.current}
+            onFileUpload={handleFileUpload}
             onFeedback={async (message, type, note) => {
               const userId = userIdRef.current;
               const sid = isRec ? recordingSessionId : sessionId;

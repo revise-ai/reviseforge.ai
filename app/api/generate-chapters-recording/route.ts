@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
           ? "Because this recording is under 3 minutes, create 2 to 3 chapters maximum — only where genuine topic shifts occur."
           : "Identify 4 to 8 natural topic breaks where the speaker genuinely shifts to a new idea.";
 
-    const prompt = `You are ReviseForge AI — an elite academic tutor and master transcription analyst. Your mission is to listen to this entire recorded audio and extract professional, pedagogical chapters and a clean transcript.
+    const prompt = `You are ReviseForge AI — an elite academic tutor and master transcription analyst. Your mission is to listen to this entire recorded audio and extract professional, pedagogical chapters and a high-fidelity, verbatim transcript.
 
 ${durationNote}
 
@@ -154,17 +154,18 @@ ${durationNote}
 ${chapterNote}
 Each chapter must:
 - Have a timestamp in MM:SS format that EXACTLY matches a real moment in the audio.
-- Have an **Elite Title**: Professional and descriptive (e.g., "The Mechanism of Cellular Respiration" instead of "Part 1").
-- Have a **Pedagogical Description**: 2-3 sentences explaining exactly what is covered in that section. Use **LaTeX** for every mathematical, scientific, or technical notation ($...$ for inline, $$...$$ for block).
-- Focus on genuine topic shifts, not transitions or greetings.
+- Have an **Elite Title**: Professional and descriptive.
+- Have a **Pedagogical Description**: 3-4 sentences explaining exactly what is covered. Use **LaTeX** ONLY for complex mathematical or scientific formulas (e.g., equations, reactions). **NEVER** use LaTeX ($...$) for regular academic terms, concepts, or plain English text.
+- Focus on genuine topic shifts.
 
-### MISSION B: CLEAN TRANSCRIPT
+### MISSION B: HIGH-FIDELITY VERBATIM TRANSCRIPT
 Produce a verbatim transcript segment ${transcriptInterval}.
-- Match MM:SS timestamps.
-- Clean language: Ensure technical terms are spelled correctly but stay true to the speaker's words.
+- **Accuracy is the ABSOLUTE Priority**: Every single word must reflect exactly what is spoken. Never summarize. Never paraphrase. Absolute textual fidelity is required.
+- Identify and correctly spell all technical, scientific, and academic terms.
+- Match MM:SS timestamps exactly.
+- **NO LaTeX in Transcripts**: Transcripts must be plain, readable text.
 
 ### OUTPUT FORMAT (JSON ONLY):
-Return ONLY a valid JSON object. Use double quotes for all keys and strings. No Meta-commentary.
 {
   "title": "Elite Study Guide Title",
   "duration": "${knownDuration ? toMMSS(knownDuration) : "MM:SS"}",
@@ -172,18 +173,18 @@ Return ONLY a valid JSON object. Use double quotes for all keys and strings. No 
     {
       "time": "00:00",
       "title": "Elite Chapter Title",
-      "text": "Pedagogical description with LaTeX for technical terms."
+      "text": "Detailed pedagogical description with LaTeX."
     }
   ],
   "transcripts": [
     {
       "time": "00:00",
-      "text": "The actual words spoken at this timestamp."
+      "text": "Verbatim transcript of this audio segment."
     }
   ]
 }
 
-Sign off as ReviseForge AI.`;
+Ensure the output is ONLY valid JSON. No meta-commentary or markdown fences.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

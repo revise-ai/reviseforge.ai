@@ -47,7 +47,7 @@ export const GenerationSchema = z.object({
   audioBase64: z.string().optional(),
   mimeType: z.string().optional(),
   transcript: z.string().optional().transform((v) => v ? sanitizeString(v, 10000) : v),
-  durationSecs: z.number().optional(),
+  durationSecs: z.number().optional().nullable(),
 });
 
 /** Utility (Polish, Voice Transcribe) */

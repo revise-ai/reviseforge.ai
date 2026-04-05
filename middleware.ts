@@ -77,8 +77,6 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none");
   
   // Content Security Policy
-  // Note: Adjusting script-src is tricky with Next.js (needs hash/nonce or 'unsafe-inline' for development)
-  // For production, 'unsafe-inline' should ideally be replaced with nonce once configured.
   const csp = `
     default-src 'self';
     script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co;
@@ -86,7 +84,9 @@ export async function middleware(request: NextRequest) {
     img-src 'self' blob: data: https://*.supabase.co https://img.youtube.com;
     font-src 'self' https://fonts.gstatic.com;
     connect-src 'self' https://*.supabase.co https://*.google.com https://*.upstash.io;
-    frame-ancestors 'none';
+    frame-src 'self' blob: data: https://www.youtube.com https://youtube.com;
+    child-src 'self' blob: data: https://www.youtube.com https://youtube.com;
+    frame-ancestors 'self';
   `.replace(/\s+/g, " ").trim();
   
   response.headers.set("Content-Security-Policy", csp);

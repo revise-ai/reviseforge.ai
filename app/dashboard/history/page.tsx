@@ -395,7 +395,16 @@ function CardMenu({
     e.stopPropagation();
     if (!btnRef.current) return;
     const rect = btnRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    const menuHeight = 135; // Approximate height of 3 items
+    const spaceBelow = window.innerHeight - rect.bottom;
+    
+    let top = rect.bottom + 4;
+    // If not enough space below, show above the button
+    if (spaceBelow < menuHeight) {
+      top = rect.top - menuHeight - 4;
+    }
+    
+    setPos({ top, right: window.innerWidth - rect.right });
     setOpen((o) => !o);
   };
 
@@ -474,8 +483,8 @@ function CardMenu({
   );
 }
 
-// ── Session card ──────────────────────────────────────────────────────────────
-function SessionCard({
+// ── List-style Session Row ───────────────────────────────────────────────────
+function SessionRow({
   item,
   onShare,
   onRename,
@@ -487,72 +496,88 @@ function SessionCard({
   onDelete: (i: HistoryItem) => void;
 }) {
   const router = useRouter();
-  const isYT = item.type === "youtube";
   const thumb = item.videoId
     ? `https://img.youtube.com/vi/${item.videoId}/mqdefault.jpg`
     : null;
 
+  const handleRowClick = (e: React.MouseEvent) => {
+    // If the click is on a button or link inside the row, don't navigate twice
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a')) {
+      return;
+    }
+    router.push(item.href);
+  };
+
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md hover:border-gray-200 transition-all duration-200 group">
-      <div
-        className="relative w-full bg-gray-100 overflow-hidden cursor-pointer"
-        style={{ aspectRatio: "16/9" }}
-        onClick={() => router.push(item.href)}
-      >
-        {thumb ? (
-          <img
-            src={thumb}
-            alt={item.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div
-            className={`w-full h-full flex items-center justify-center ${isYT ? "bg-red-50" : "bg-blue-50"}`}
-          >
-            {isYT ? (
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="#EF4444">
-                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+    <div 
+      onClick={handleRowClick}
+      className="group flex items-center gap-4 px-6 py-5 hover:bg-gray-50/50 transition-all border-b border-gray-100/60 last:border-0 cursor-pointer"
+    >
+      {/* Name/Identifier section */}
+      <div className="flex items-center gap-5 min-w-0 flex-[2.5]">
+        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-50 shrink-0 border border-gray-100">
+          {thumb ? (
+            <img src={thumb} className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-300" alt="" />
+          ) : (
+            <div className={`w-full h-full flex items-center justify-center rounded-lg ${
+              item.type === "youtube" ? "bg-red-50/50 text-red-400" :
+              item.type === "recording" ? "bg-purple-50/50 text-purple-400" :
+              item.type === "quiz" ? "bg-green-50/50 text-green-400" :
+              item.type === "flashcard" ? "bg-orange-50/50 text-orange-400" :
+              item.type === "chat" ? "bg-sky-50/50 text-sky-400" :
+              "bg-gray-50 text-gray-400"
+            }`}>
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                {item.type === "youtube" ? <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z" /> : 
+                item.type === "recording" ? <path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /> :
+                item.type === "quiz" ? <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /> :
+                item.type === "flashcard" ? <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2" /> :
+                item.type === "chat" ? <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /> :
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />}
               </svg>
-            ) : (
-              <svg
-                width="36"
-                height="36"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="#3B82F6"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                />
-              </svg>
-            )}
-          </div>
-        )}
-        <div className="absolute top-2 left-2">
-          <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isYT ? "bg-red-500 text-white" : "bg-blue-500 text-white"}`}
-          >
-            {isYT ? "YouTube" : "Recording"}
-          </span>
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <h4 className="text-[15px] font-medium text-gray-900 group-hover:text-blue-500 transition-colors truncate">{item.title}</h4>
         </div>
       </div>
 
-      <div className="px-3 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <div
-            className="flex-1 min-w-0 cursor-pointer"
-            onClick={() => router.push(item.href)}
-          >
-            <p className="text-sm font-semibold text-gray-800 leading-snug line-clamp-2">
-              {item.title}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {timeAgo(item.last_visited)}
-            </p>
-          </div>
+      {/* Date section */}
+      <div className="hidden md:flex flex-col flex-1 min-w-0">
+        <p className="text-[13px] font-medium text-gray-600">{new Date(item.last_visited).toLocaleDateString([], { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+        <p className="text-[11px] text-gray-400 font-normal mt-0.5">At {new Date(item.last_visited).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+      </div>
+
+      {/* Type section */}
+      <div className="hidden sm:flex flex-1 min-w-0">
+        <span className={`text-[12px] font-medium px-4 py-1.5 rounded-xl capitalize tracking-tight ${
+          item.type === "youtube" ? "text-red-500" :
+          item.type === "recording" ? "text-purple-500" :
+          item.type === "quiz" ? "text-green-500" :
+          item.type === "flashcard" ? "text-orange-500" :
+          item.type === "exam" ? "text-rose-500" :
+          item.type === "chat" ? "text-sky-500" :
+          "text-indigo-500"
+        }`}>
+          {item.type}
+        </span>
+      </div>
+
+      {/* Actions section */}
+      <div 
+        className="flex items-center gap-4 w-36 justify-end shrink-0"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        <Link 
+          href={item.href}
+          className="px-5 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:text-blue-600 transition-all cursor-pointer shadow-sm"
+        >
+          Details
+        </Link>
+        <div>
           <CardMenu
             item={item}
             onShare={() => onShare(item)}
@@ -560,18 +585,6 @@ function SessionCard({
             onDelete={() => onDelete(item)}
           />
         </div>
-        {item.badges.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {item.badges.map((b, i) => (
-              <span
-                key={i}
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${b.color}`}
-              >
-                {b.label}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -593,55 +606,174 @@ export default function HistoryPage() {
 
   async function loadHistory() {
     try {
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const queries = await Promise.all([
-        supabase.from("youtube_sessions").select("id, video_title, url, created_at, video_id, last_visited").eq("user_id", user.id).order('last_visited', {ascending: false}),
-        supabase.from("recording_sessions").select("id, title, created_at, last_visited").eq("user_id", user.id).order('last_visited', {ascending: false}),
-        supabase.from("quiz_sessions").select("id, file_name, created_at").eq("user_id", user.id).order('created_at', {ascending: false}),
-        supabase.from("flashcard_sessions").select("id, file_name, created_at, last_visited").eq("user_id", user.id).order('last_visited', {ascending: false}),
-        supabase.from("exam_sessions").select("id, source_label, created_at, last_visited").eq("user_id", user.id).order('last_visited', {ascending: false}),
-        supabase.from("chat_sessions").select("id, title, created_at, last_visited").eq("user_id", user.id).order('last_visited', {ascending: false}),
-        supabase.from("file_sessions").select("id, file_name, created_at, last_visited").eq("user_id", user.id).order('last_visited', {ascending: false}),
-      ]);
+      console.log("Fetching unified history from 'recent_sessions'...");
+      const { data, error } = await supabase
+        .from("recent_sessions")
+        .select("id, session_id, type, title, subtitle, href, video_id, last_visited, created_at")
+        .eq("user_id", user.id)
+        .order("last_visited", { ascending: false })
+        .limit(200);
 
-      const [yt, rec, qz, fc, ex, ch, fl] = queries;
-      let all: HistoryItem[] = [];
+      if (error) {
+        console.warn("Unified history table 'recent_sessions' not available or error:", error.message);
+        throw error;
+      }
 
-      if (yt.data) yt.data.forEach((i: any) => all.push({ id: i.id, type: 'youtube', title: i.video_title || 'YouTube Video', subtitle: 'youtube', last_visited: i.last_visited || i.created_at, created_at: i.created_at, badges: [], href: `/content/${i.id}?url=${encodeURIComponent(i.url || '')}&session_id=${i.id}`, videoId: i.video_id }));
-      if (rec.data) rec.data.forEach((i: any) => all.push({ id: i.id, type: 'recording', title: i.title || 'Audio Recording', subtitle: 'recording', last_visited: i.last_visited || i.created_at, created_at: i.created_at, badges: [], href: `/content/${i.id}?mode=recording&session_id=${i.id}` }));
-      if (qz.data) qz.data.forEach((i: any) => all.push({ id: i.id, type: 'quiz', title: i.file_name || 'Quiz', subtitle: 'quiz', last_visited: i.created_at, created_at: i.created_at, badges: [], href: `/dashboard/quizzes/${i.id}` }));
-      if (fc.data) fc.data.forEach((i: any) => all.push({ id: i.id, type: 'flashcard', title: i.file_name || 'Flashcard', subtitle: 'flashcard', last_visited: i.last_visited || i.created_at, created_at: i.created_at, badges: [], href: `/dashboard/flashcards/${i.id}` }));
-      if (ex.data) ex.data.forEach((i: any) => all.push({ id: i.id, type: 'exam', title: i.source_label || 'Exam', subtitle: 'exam', last_visited: i.last_visited || i.created_at, created_at: i.created_at, badges: [], href: `/dashboard/exam-mode/${i.id}` }));
-      if (ch.data) ch.data.forEach((i: any) => all.push({ id: i.id, type: 'chat', title: i.title || 'Chat Session', subtitle: 'chat', last_visited: i.last_visited || i.created_at, created_at: i.created_at, badges: [], href: `/content/${i.id}?mode=chat&session_id=${i.id}` }));
-      if (fl.data) fl.data.forEach((i: any) => all.push({ id: i.id, type: 'file', title: i.file_name || 'Uploaded File', subtitle: 'file', last_visited: i.last_visited || i.created_at, created_at: i.created_at, badges: [], href: `/content/${i.id}?mode=file&file=${encodeURIComponent(i.file_name || '')}&session_id=${i.id}` }));
+      const all: HistoryItem[] = (data ?? []).map((i: any) => ({
+        id: `${i.type}-${i.session_id}`,
+        type: (i.type as SessionType) || "recording",
+        title: i.title || "Untitled Session",
+        subtitle: i.subtitle || i.type,
+        last_visited: i.last_visited || i.created_at,
+        created_at: i.created_at,
+        badges: [],
+        href: i.href || "#",
+        videoId: i.video_id ?? undefined,
+      }));
 
-      all.sort((a,b) => new Date(b.last_visited).getTime() - new Date(a.last_visited).getTime());
-
+      console.log(`Loaded ${all.length} sessions from unified history.`);
       setItems(all);
-    } catch (e) {
-      console.error("Error loading history:", e);
+    } catch (e: any) {
+      console.error("Primary history load failed, triggering legacy fallback:", e?.message || e);
+      await loadHistoryFallback();
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: string, type: SessionType) {
-    const t: Record<SessionType, string> = {
-      youtube: "youtube_sessions",
-      recording: "recording_sessions",
-      quiz: "quiz_sessions",
-      flashcard: "flashcard_sessions",
-      exam: "exam_sessions",
-      chat: "chat_sessions",
-      file: "file_sessions",
-    };
-    await supabase.from(t[type]).delete().eq("id", id);
-    setItems((prev) => prev.filter((i) => i.id !== id));
+  async function loadHistoryFallback() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      console.log("Loading legacy history fallback (individual tables)...");
+      const [yt, rec, fl, qz, fc, ch, ex] = await Promise.all([
+        supabase.from("youtube_sessions").select("id, video_title, url, created_at, last_visited").eq("user_id", user.id),
+        supabase.from("recording_sessions").select("id, title, created_at, last_visited").eq("user_id", user.id),
+        supabase.from("file_sessions").select("id, file_name, created_at, last_visited, mime_type").eq("user_id", user.id),
+        supabase.from("quiz_sessions").select("id, file_name, created_at, last_visited").eq("user_id", user.id),
+        supabase.from("flashcard_sessions").select("id, file_name, created_at, last_visited").eq("user_id", user.id),
+        supabase.from("chat_sessions").select("id, title, created_at, last_visited").eq("user_id", user.id),
+        supabase.from("exam_sessions").select("id, source_label, created_at, last_visited").eq("user_id", user.id),
+      ]);
+
+      if (yt.error) console.error("YT legacy error:", yt.error.message);
+      if (rec.error) console.error("Rec legacy error:", rec.error.message);
+      if (fl.error) console.error("File legacy error:", fl.error.message);
+      if (qz.error) console.error("Quiz legacy error:", qz.error.message);
+      if (fc.error) console.error("Flash legacy error:", fc.error.message);
+      if (ch.error) console.error("Chat legacy error:", ch.error.message);
+      if (ex.error) console.error("Exam legacy error:", ex.error.message);
+
+      const all: HistoryItem[] = [];
+
+      if (yt.data) yt.data.forEach((i: any) => all.push({
+        id: `youtube-${i.id}`, type: "youtube",
+        title: i.video_title || "YouTube Video", subtitle: "youtube",
+        last_visited: i.last_visited || i.created_at, created_at: i.created_at,
+        badges: [],
+        href: `/content/${i.id}?url=${encodeURIComponent(i.url || "")}&session_id=${i.id}`,
+        videoId: i.video_id,
+      }));
+
+      if (rec.data) rec.data.forEach((i: any) => all.push({
+        id: `recording-${i.id}`, type: "recording",
+        title: i.title || "Audio Recording", subtitle: "recording",
+        last_visited: i.last_visited || i.created_at, created_at: i.created_at,
+        badges: [],
+        href: `/content/${i.id}?mode=microphone&recording_session_id=${i.id}`,
+      }));
+
+      if (fl.data) fl.data.forEach((i: any) => all.push({
+        id: `file-${i.id}`, type: "file",
+        title: i.file_name || "Uploaded File", subtitle: "file",
+        last_visited: i.last_visited || i.created_at, created_at: i.created_at,
+        badges: [],
+        href: `/content/${i.id}?mode=file&file=${encodeURIComponent(i.file_name || "")}&session_id=${i.id}`,
+      }));
+
+      if (qz.data) qz.data.forEach((i: any) => all.push({
+        id: `quiz-${i.id}`, type: "quiz",
+        title: i.file_name || "Interactive Quiz", subtitle: "quiz",
+        last_visited: i.last_visited || i.created_at, created_at: i.created_at,
+        badges: [],
+        href: `/quiz/${i.id}`,
+      }));
+
+      if (fc.data) fc.data.forEach((i: any) => all.push({
+        id: `flashcard-${i.id}`, type: "flashcard",
+        title: i.file_name || "Vocabulary Cards", subtitle: "flashcard",
+        last_visited: i.last_visited || i.created_at, created_at: i.created_at,
+        badges: [],
+        href: `/flashcards/${i.id}`,
+      }));
+
+      if (ch.data) ch.data.forEach((i: any) => all.push({
+        id: `chat-${i.id}`, type: "chat",
+        title: i.title || "AI Chat Session", subtitle: "chat",
+        last_visited: i.last_visited || i.created_at, created_at: i.created_at,
+        badges: [],
+        href: `/content/${i.id}?mode=chat&session_id=${i.id}`,
+      }));
+
+      if (ex.data) ex.data.forEach((i: any) => all.push({
+        id: `exam-${i.id}`, type: "exam",
+        title: i.source_label || "Exam Practice", subtitle: "exam",
+        last_visited: i.last_visited || i.created_at, created_at: i.created_at,
+        badges: [],
+        href: `/exam/${i.id}`,
+      }));
+
+      all.sort((a, b) => {
+        const dateA = a.last_visited ? new Date(a.last_visited).getTime() : 0;
+        const dateB = b.last_visited ? new Date(b.last_visited).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      console.log(`Fallback complete: loaded ${all.length} legacy sessions.`);
+      setItems(all);
+    } catch (e: any) {
+      console.error("Critical failure in history fallback logic:", e?.message || e);
+    }
   }
 
+  async function handleDelete(id: string, type: SessionType) {
+    try {
+      // Strip the type prefix (e.g. "youtube-abc" → "abc")
+      const rawId = id.includes("-") ? id.slice(id.indexOf("-") + 1) : id;
+      const t: Record<SessionType, string> = {
+        youtube: "youtube_sessions",
+        recording: "recording_sessions",
+        quiz: "quiz_sessions",
+        flashcard: "flashcard_sessions",
+        exam: "exam_sessions",
+        chat: "chat_sessions",
+        file: "file_sessions",
+      };
+
+      // 1. Delete from the specific source table
+      const { error: sourceError } = await supabase.from(t[type]).delete().eq("id", rawId);
+      if (sourceError) console.error(`Error deleting from ${t[type]}:`, sourceError.message);
+
+      // 2. Explicitly delete from the unified recent_sessions table
+      const { error: historyError } = await supabase.from("recent_sessions").delete().eq("session_id", rawId);
+      if (historyError) console.warn("Note: session might not have existed in recent_sessions or error occurred:", historyError.message);
+
+      // 3. Update local state
+      setItems((prev) => prev.filter((i) => i.id !== id));
+    } catch (err: any) {
+      console.error("Critical failure during deletion:", err.message);
+    }
+  }
+
+
   async function handleRename(id: string, type: SessionType, newTitle: string) {
+    // Strip the type prefix to get the raw DB UUID
+    const rawId = id.includes("-") ? id.slice(id.indexOf("-") + 1) : id;
     const tableMap: Record<SessionType, string> = {
       youtube: "youtube_sessions",
       recording: "recording_sessions",
@@ -663,11 +795,12 @@ export default function HistoryPage() {
     await supabase
       .from(tableMap[type])
       .update({ [fieldMap[type]]: newTitle })
-      .eq("id", id);
+      .eq("id", rawId);
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, title: newTitle } : i)),
     );
   }
+
 
   const filtered = items.filter((i) => {
     if (filter !== "all" && i.type !== filter) return false;
@@ -798,38 +931,44 @@ export default function HistoryPage() {
               d="M4 12a8 8 0 018-8v8z"
             />
           </svg>
-          <p className="text-sm text-gray-400">Loading history…</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <svg
-            width="40"
-            height="40"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="#D1D5DB"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <p className="text-sm text-gray-400">No sessions found</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((item) => (
-            <SessionCard
-              key={item.id}
-              item={item}
-              onShare={setShareItem}
-              onRename={setRenameItem}
-              onDelete={setDeleteItem}
-            />
-          ))}
-        </div>
+        <>
+          {/* History List */}
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 rounded-[28px] border-2 border-dashed border-gray-100 bg-gray-50/30">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-4 border border-gray-100 shadow-sm">
+                <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-sm font-bold text-gray-900">No matching sessions</p>
+              <p className="text-xs text-gray-400 mt-1">Try a different filter or search term</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-100 rounded-[28px] shadow-sm overflow-hidden">
+              {/* Table Header */}
+              <div className="flex items-center gap-4 px-6 py-4 bg-gray-50/40 border-b border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.1em] flex-[2.5]">Name</span>
+                <span className="hidden md:block text-[10px] font-bold text-gray-400 uppercase tracking-[0.1em] flex-1">Last Visited</span>
+                <span className="hidden sm:block text-[10px] font-bold text-gray-400 uppercase tracking-[0.1em] flex-1">Session Type</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.1em] w-32 text-right">Action</span>
+              </div>
+              
+              <div className="flex flex-col">
+                {filtered.map((item) => (
+                  <SessionRow
+                    key={item.id}
+                    item={item}
+                    onShare={setShareItem}
+                    onRename={setRenameItem}
+                    onDelete={setDeleteItem}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

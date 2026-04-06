@@ -7,6 +7,7 @@ export interface MediaRecord {
   mimeType: string;
   fileName: string;
   thumbnail?: string;
+  geminiUri?: string;
   timestamp?: number;
 }
 

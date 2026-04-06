@@ -27,30 +27,30 @@ export async function POST(req: NextRequest) {
 
     const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-    const prompt = `You are ReviseForge AI — a world-class academic tutor and master educator. Your mission is to analyze this media (video or audio) and extract professional, pedagogical chapters and a high-fidelity, verbatim transcript.
+    const prompt = `You are ReviseForge AI — a world-class academic tutor and master educator. Your mission is to analyze this media (video or audio) and extract professional, pedagogical chapters and an exhaustive, HIGH-FIDELITY, verbatim transcript.
 
-### MISSION A: PEDAGOGICAL CHAPTERING
-Identify 5 to 10 natural topic breaks. Each chapter must:
-- Have a timestamp in MM:SS format.
-- Have an **Elite Title**: Professional and descriptive.
-- Have a **Pedagogical Description**: 3-4 sentences explaining the academic value. Use **LaTeX** ONLY for formulas.
-- Focus on subject matter shifts.
+### MISSION A: PEDAGOGICAL CHAPTERING (EXHAUSTIVE)
+Analyze the semantic structure of the media. Identify EVERY logical topic shift.
+- **Detailed Chapters**: Produce 8-15 distinct chapters.
+- **Elite Titles**: Academic, precise, and professional.
+- **Pedagogical Narratives**: For each chapter, provide a 4-5 sentence summary explaining the core concepts, educational takeaways, and critical analysis. Use **LaTeX** for ALL mathematical/scientific notation.
+- If the media is a YouTube video, use its NATIVE chapters (if visible in metadata/dialogue) as a foundation but expand them with elite pedagogy.
 
-### MISSION B: HIGH-FIDELITY VERBATIM TRANSCRIPT
-Produce a verbatim transcript segment every 15 to 20 seconds.
-- **Accuracy is the Absolute Priority**. Every word must be exactly as spoken.
-- Identify and correctly spell all technical and academic terms.
-- Match MM:SS timestamps.
-- **NO LaTeX in Transcripts**.
+### MISSION B: ABSOLUTE VERBATIM TRANSCRIPT (HIGH-DENSITY)
+Produce a literal, word-for-word transcript segment EVERY 10 seconds.
+- **Verbatim Accuracy**: This is non-negotiable. Every "uh", "um", and repetition should be omitted, but every meaningful word must be captured exactly.
+- **Technical Precision**: Correctly identify and spell complex terminology, proper nouns, and academic jargon.
+- **Frequency**: Ensure segments are dense. Do NOT summarize or skip dialogue.
+- **NO LaTeX** in transcript text.
 
 ### OUTPUT FORMAT (JSON ONLY):
 {
-  "title": "Title of the media",
-  "chapters": [{ "time": "00:00", "title": "...", "text": "..." }],
-  "transcripts": [{ "time": "00:00", "text": "..." }]
+  "title": "A highly descriptive, academic title for this recording",
+  "chapters": [{ "time": "00:00", "title": "Topical Heading", "text": "Deep educational breakdown..." }],
+  "transcripts": [{ "time": "00:00", "text": "The spoken words starting at this timestamp..." }]
 }
 
-Ensure valid JSON only.`;
+You MUST follow this JSON schema exactly. NO conversational filler.`;
 
     const parts: any[] = [{ text: prompt }];
     if (url) {

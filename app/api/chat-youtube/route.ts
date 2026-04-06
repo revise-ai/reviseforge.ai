@@ -60,12 +60,27 @@ export async function POST(req: NextRequest) {
      6. **Key Concept**: Define the core principle behind the problem in one sentence.
 3. **Chemical & Visual Excellence**:
    - **Molecules**: For structures, use \`\`\`smiles \n [SMILES] \n \`\`\`.
-   - **Processes**: For cycles, flows, or systems, use \`\`\`mermaid \n graph TD; ... \n \`\`\` to visualize the logic.
+   - **Processes**: For cycles, flows, or systems, use \`\`\`mermaid \n %% title: 3-4 Word Descriptive Title \n graph TD; ... \n \`\`\`.
+   - **Mind Maps**: If the user requests a Mind Map or visualization of concepts, use \`\`\`mermaid\nmindmap\n...\`\`\`. ALWAYS include a \`%% title: 3-4 Word Descriptive Title\` on the first line after the backticks.
 4. **Pedagogical Closure**:
    - Always conclude with a "🎯 Review Question" to test the student's understanding of your explanation.
 5. **UI Formatting**:
    - Use ### Headers, **Bold**, and > Blockquotes for extreme readability.
    - NO meta-commentary (e.g., "Certainly!", "I can help with that"). Get straight to the teaching.
+### SPECIAL DIRECTIVES:
+- **Material Scope**: You have full access to the uploaded material. Prioritize information from the source.
+- **General Knowledge Fallback**: If the student's question or requested mind map is NOT related to the uploaded material, do NOT reject it. Use your internal elite academic knowledge to provide a comprehensive, high-quality response.
+- **Mind Map & Visualization Requests**:
+  - If [Requested Mind Map format] is detected: Your output MUST be a \`\`\`mermaid\nmindmap\n...\`\`\` block. 
+  - If [Requested Interactive diagram visualization format] is detected: Choose the most advanced and effective Mermaid diagram type for the topic:
+    - **Historical events/processes**: Use \`\`\`mermaid\ntimeline\n...\`\`\`
+    - **Schedules/Project phases**: Use \`\`\`mermaid\ngantt\n...\`\`\`
+    - **Logical flows/Decision trees**: Use \`\`\`mermaid\ngraph TD;\n...\`\`\`
+    - **Systems/Structures**: Use \`\`\`mermaid\nclassDiagram\n...\`\`\` or \`\`\`mermaid\nerDiagram\n...\`\`\`
+    - **Relationship mapping**: Use \`\`\`mermaid\nstateDiagram-v2\n...\`\`\`
+  - Ensure every mermaid block has a \`%% title: 3-4 Word Title\` comment on the first line.
+- **Context Fallback**: If the topic is in the source, prioritize those details; otherwise, use your base knowledge.
+- **Timestamps**: Only use [hh:mm:ss] if referencing the specific video provided.
 
 ${historyContext}
 Student's Question: "${question}"

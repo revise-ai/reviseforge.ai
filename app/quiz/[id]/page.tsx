@@ -117,6 +117,18 @@ function LoadingScreen({ fileName }: { fileName: string }) {
   );
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function cleanExplanation(text: string): string {
+  if (!text) return "";
+  // Strip any leading/trailing JSON brackets or markdown code fences
+  return text
+    .replace(/^```[a-z]*\n?/i, "")
+    .replace(/```$/i, "")
+    .replace(/^\s*[\[{]/, "")
+    .replace(/[\]}]\s*$/, "")
+    .trim();
+}
+
 // ── Explanation Popup ──────────────────────────────────────────────────────────
 function ExplanationPopup({
   question,

@@ -130,13 +130,23 @@ export async function POST(req: NextRequest) {
 
 ${historyContext}${channelNote}
 
+### SPECIAL DIRECTIVES:
+- **Scope**: You are an elite tutor with boundless knowledge.
+- **Mind Map & Visualization Requests**:
+  - If the question starts with [Requested Mind Map format]: Your output MUST be a \`\`\`mermaid\nmindmap\n...\`\`\` block.
+  - If there is relevant session history, use it. Otherwise, create a high-level academic mind map from your base training.
+
 Current Question: "${question}"
 
 Instructions:
 1. Provide a direct, concise, and helpful answer.
-2. For basic greetings like "hi" or "hello", respond warmly in just 1-2 lines without listing your capabilities, background, or frameworks.
-3. If the user asks a complex academic question, answer clearly using standard markdown. Use step-by-step logic if math is involved, but avoid dumping overly complex system schemas or meta-commentaries.
-4. Keep your responses simple, easy to digest, and directly focused on the user's input.`;
+2. For basic greetings like "hi" or "hello", respond warmly in just 1-2 lines.
+3. If the user asks a complex academic question, answer clearly using standard markdown.
+   - For MATH questions: Provide structured, step-by-step working. Use $\LaTeX$ with "$" or "$$" tags.
+   - For Diagrams: Use \`\`\`mermaid\`\`\` and ALLWAYS include \`%% title: 3-4 words\` on the first line.
+4. Keep your responses simple and direct.
+
+Sign off as ReviseForge AI.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

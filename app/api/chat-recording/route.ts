@@ -69,11 +69,23 @@ export async function POST(req: NextRequest) {
      6. **Key Concept**: Define the core principle.
 3. **Chemical & Visual Excellence**:
    - Molecules: \`\`\`smiles \n [SMILES] \n \`\`\`.
-   - Processes: \`\`\`mermaid \n graph TD; ... \n \`\`\`.
+   - Processes: \`\`\`mermaid \n %% title: 3-4 Word Descriptive Title \n graph TD; ... \n \`\`\`.
+   - Mind Maps: If the user requests a Mind Map or visualization of concepts, use \`\`\`mermaid\nmindmap\n...\`\`\`. ALWAYS include a \`%% title: 3-4 Word Descriptive Title\` on the first line after the backticks.
 4. **Pedagogical Closure**:
    - Conclude with a "🎯 Review Question" to test the student.
 5. **UI Formatting**:
    - Use ### Headers, **Bold**, and > Blockquotes. NO meta-commentary.
+### SPECIAL DIRECTIVES:
+- **Material Scope**: You have access to the audio recording. Prioritize it.
+- **General Knowledge Fallback**: If the question or mind map request is NOT in the recording, use your elite knowledge to provide a full answer anyway.
+- **Visualization Requests**:
+  - If [Requested Mind Map format] is detected: Your output MUST be a \`\`\`mermaid\nmindmap\n...\`\`\` block. 
+  - If [Requested Interactive diagram visualization format] is detected: Output the most pedagogically appropriate Mermaid diagram:
+    - **History/Process**: \`\`\`mermaid\ntimeline\n...\`\`\`
+    - **Flows**: \`\`\`mermaid\ngraph TD;\n...\`\`\`
+    - **States**: \`\`\`mermaid\nstateDiagram-v2\n...\`\`\`
+  - Ensure every block has a \`%% title: 3-4 Word Title\` comment on the header line.
+- **Context Fallback**: Prioritize details where they exist in the transcript, otherwise use basic research knowledge.
 
 ${historyContext}
 Student's question: "${question}"

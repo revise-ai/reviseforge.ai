@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import MarkdownRenderer from "./MarkdownRenderer";
+import AddContextPopup, { ContextSelection, ContextChip } from "./AddContextPopup";
 
 type Mode = "youtube" | "web" | "microphone" | "browsertab" | "chat" | "file";
 type ActiveTool = "summary" | "quiz" | "flashcards" | "exams" | "visualizations" | "podcast" | null;
@@ -184,6 +185,17 @@ function Spinner({ label }: { label: string }) {
   );
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function cleanExplanation(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/^```[a-z]*\n?/i, "")
+    .replace(/```$/i, "")
+    .replace(/^\s*[\[{]/, "")
+    .replace(/[\]}]\s*$/, "")
+    .trim();
+}
+
 function SummaryContent({
   summary,
   loading,
@@ -249,9 +261,12 @@ function QuizContent({
           <p className="text-sm font-semibold text-gray-800">{score} / {questions.length} correct</p>
           <button
             onClick={() => { setCurrent(0); setSelected({}); setRevealed({}); setDone(false); }}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer active:scale-95"
+            className="group flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer active:scale-95"
           >
             Retake Quiz
+            <svg className="w-3.5 h-3.5 text-blue-200 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3V17.536L16.232 5.232z" />
+            </svg>
           </button>
         </div>
         <div className="space-y-2">
@@ -343,7 +358,7 @@ function QuizContent({
           <>
             <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 mb-3">
               <p className="text-xs font-semibold text-blue-800 mb-1">Explanation</p>
-              <p className="text-xs text-blue-700 leading-relaxed">{q.explanation}</p>
+              <p className="text-xs text-blue-700 leading-relaxed">{cleanExplanation(q.explanation)}</p>
             </div>
             <button
               onClick={() => { if (current < questions.length - 1) setCurrent((c) => c + 1); else setDone(true); }}
@@ -549,7 +564,6 @@ function MessageActions({
                 { key: "quiz" as const, label: "Generate Quiz", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
                 { key: "flashcards" as const, label: "Generate Flashcards", icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" },
                 { key: "exams" as const, label: "Exam Mode", icon: "M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" },
-                { key: "visualizations" as const, label: "Interactive Visualizations", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
               ].map((item) => (
                 <button
                   key={item.key}
@@ -672,13 +686,18 @@ function RightSidebar({
   onFeedback,
   onMenuAction,
   onFileUpload,
+  contextMenuOpen,
+  setContextMenuOpen,
+  selectedContext,
+  setSelectedContext,
+  videoTitle,
 }: {
   open: boolean;
   onToggle: () => void;
   mode: Mode;
   isChat: boolean;
   activeTool: ActiveTool;
-  onToolClick: (tool: ActiveTool) => void;
+  onToolClick: (tool: ActiveTool, ignoreConfirm?: boolean) => void;
   onBack: () => void;
   summary: string;
   summaryLoading: boolean;
@@ -698,6 +717,11 @@ function RightSidebar({
   onFeedback: (message: string, type: "up" | "down", note: string) => void;
   onMenuAction: (action: "quiz" | "flashcards" | "exams" | "visualizations") => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  contextMenuOpen: boolean;
+  setContextMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  selectedContext: ContextSelection | null;
+  setSelectedContext: React.Dispatch<React.SetStateAction<ContextSelection | null>>;
+  videoTitle?: string;
 }) {
   const isRecording = mode === "microphone" || mode === "browsertab";
   const [isListening, setIsListening] = useState(false);
@@ -710,6 +734,25 @@ function RightSidebar({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+
+  // Derived "Sets" from session data
+  const sessionSets = React.useMemo(() => {
+    const sets = [];
+    if (summary) sets.push({ id: "summary", label: "Detailed Summary", type: "summary" });
+    if (quizQuestions?.length > 0) sets.push({ id: "quiz", label: "Interactive Quiz", type: "quiz" });
+    if (flashcards?.length > 0) sets.push({ id: "flashcards", label: "Vocabulary Flashcards", type: "flashcards" });
+    
+    chatMessages.forEach((msg, idx) => {
+      if (msg.role === "ai" && msg.message.includes("```mermaid")) {
+        const titleMatch = msg.message.match(/title:\s*([^\n]+)/i);
+        const title = titleMatch ? titleMatch[1].trim() : "Session Mind Map";
+        sets.push({ id: `mindmap-${idx}`, label: title, type: "mindmap", msgIndex: idx });
+      }
+    });
+
+    return sets;
+  }, [summary, quizQuestions, flashcards, chatMessages]);
+
 
   useEffect(() => {
     if (isChatMode) chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -788,7 +831,10 @@ function RightSidebar({
     activeTool === "summary" ? "Summary"
       : activeTool === "quiz" ? "Quiz"
         : activeTool === "flashcards" ? "Flashcards"
-          : "";
+          : activeTool === "visualizations" ? "Visualizations"
+            : activeTool === "exams" ? "Exam Mode"
+              : activeTool === "podcast" ? "Podcast Hub"
+                : "";
 
   return (
     <>
@@ -860,7 +906,19 @@ function RightSidebar({
                   {chatMessages.map((msg, i) => (
                     <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                       {msg.role === "user" ? (
-                        <p className="text-sm text-gray-800 leading-relaxed max-w-[90%]">{msg.message}</p>
+                        <div className="text-sm text-gray-800 leading-relaxed max-w-[90%] whitespace-pre-wrap flex flex-wrap gap-x-1.5 gap-y-1">
+                          {msg.message.startsWith("[Requested Mind Map format] ") && (
+                            <span className="inline-flex items-center gap-1 bg-blue-100/80 text-blue-700 px-2.5 rounded-full font-medium text-xs border border-blue-200/50 shadow-sm align-middle h-5 pt-[1px]" style={{ transform: 'translateY(1px)' }}>
+                              @Mind Map
+                            </span>
+                          )}
+                          {msg.message.startsWith("[Requested Interactive diagram visualization format] ") && (
+                            <span className="inline-flex items-center gap-1 bg-green-100/80 text-green-700 px-2.5 rounded-full font-medium text-xs border border-green-200/50 shadow-sm align-middle h-5 pt-[1px]" style={{ transform: 'translateY(1px)' }}>
+                              @Interactive
+                            </span>
+                          )}
+                          <span>{msg.message.replace(/^\[Requested (?:Mind Map|Interactive diagram visualization) format\] /, "")}</span>
+                        </div>
                       ) : (
                         <AIMessage text={msg.message} />
                       )}
@@ -939,8 +997,52 @@ function RightSidebar({
                       </p>
                     </div>
                   )}
+
+                  {/* My Sets Section - User's local history of artifacts */}
+                  {sessionSets.length > 0 && (
+                    <div className="mt-5">
+                      <div className="flex items-center justify-center mb-3">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest shrink-0">My Recents</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        {sessionSets.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              if (item.type === "mindmap") {
+                                setIsChatMode(true);
+                              } else {
+                                onToolClick(item.type as ActiveTool, true);
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-50 bg-gray-50/30 hover:bg-white hover:shadow-sm hover:border-gray-100 transition-all cursor-pointer text-left group"
+                          >
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                              item.type === "summary" ? "bg-blue-50 text-blue-500" :
+                              item.type === "quiz" ? "bg-red-50 text-red-500" :
+                              item.type === "flashcards" ? "bg-orange-50 text-orange-500" : "bg-indigo-50 text-indigo-500"
+                            }`}>
+                              {item.type === "summary" && <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                              {item.type === "quiz" && <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>}
+                              {item.type === "flashcards" && <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>}
+                              {item.type === "mindmap" && <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="3"/><path d="M12 9V4m0 16v-5m-3 .5l-3 3m9-3l3 3M9 9.5l-3-3m9 3l3-3"/></svg>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-semibold text-gray-800 truncate">{item.label}</p>
+                              <p className="text-[10px] text-gray-400 font-medium capitalize">{item.type} · Session Artifact</p>
+                            </div>
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-300 group-hover:text-gray-500 transition-colors shrink-0">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
+
 
               {!isChatMode && activeTool === "summary" && (
                 <SummaryContent summary={summary} loading={summaryLoading} error={summaryError} isRec={isRecording} />
@@ -965,7 +1067,7 @@ function RightSidebar({
                   onChange={onFileUpload}
                 />
                 
-                <div className={`flex flex-col bg-gray-50 border rounded-[32px] px-4 py-2 transition-all duration-300 min-h-[70px] justify-center ${isListening ? "border-black shadow-md ring-2 ring-black/5" : "border-gray-200 focus-within:border-gray-400 focus-within:bg-white"}`}>
+                <div className={`flex flex-col bg-gray-50 border rounded-[32px] px-4 py-2 transition-all duration-300 min-h-[70px] justify-center ${isListening ? "border-blue-500 shadow-md ring-2 ring-blue-50" : "border-gray-200 focus-within:border-blue-400 focus-within:bg-white"}`}>
                   {isProcessingVoice ? (
                     <div className="flex-1 flex items-center justify-center gap-2 text-gray-500 text-sm italic py-2">
                       <svg className="w-4 h-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
@@ -979,7 +1081,7 @@ function RightSidebar({
                       <div className="flex items-center gap-3 flex-1">
                         <div className="flex gap-1 items-center h-4">
                           {[0.1, 0.3, 0.2, 0.4, 0.25, 0.45, 0.2, 0.35].map((d, i) => (
-                            <div key={i} className="w-[3px] bg-black rounded-full animate-[voiceWave_1s_infinite_ease-in-out]" style={{ height: `${20 + Math.random() * 60}%`, animationDelay: `${d}s` }}></div>
+                            <div key={i} className="w-[3px] bg-blue-500 rounded-full animate-[voiceWave_1s_infinite_ease-in-out]" style={{ height: `${20 + Math.random() * 60}%`, animationDelay: `${d}s` }}></div>
                           ))}
                         </div>
                         <span className="text-[13px] font-medium text-gray-500">Recording...</span>
@@ -990,7 +1092,7 @@ function RightSidebar({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
-                        <button onClick={stopRecordingAndTranscribe} className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center hover:scale-110 shadow-sm cursor-pointer" title="Done">
+                        <button onClick={stopRecordingAndTranscribe} className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center hover:scale-110 shadow-sm cursor-pointer" title="Done">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
@@ -999,7 +1101,10 @@ function RightSidebar({
                     </div>
                   ) : (
                     <>
-                      <div className="flex-1 flex flex-col min-h-[36px]">
+                      <div className="flex-1 flex flex-col min-h-[36px] relative">
+                        {selectedContext && (
+                          <ContextChip selection={selectedContext} onRemove={() => setSelectedContext(null)} />
+                        )}
                         <textarea
                           rows={1}
                           value={chatInput}
@@ -1021,17 +1126,19 @@ function RightSidebar({
                         />
                       </div>
 
-                      <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center justify-between mt-2 relative">
                         <div className="flex items-center gap-2">
-                          {/* @ Add Context (Rounded Button) */}
+                          {/* @ Add Source (Rounded Button) */}
                           <button
                             type="button"
+                            onClick={(e) => { e.stopPropagation(); setContextMenuOpen(o => !o); }}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer shrink-0 shadow-sm"
-                            title="Add Context"
+                            title="Add Source"
                           >
                             <span className="text-[13px] font-bold text-gray-400">@</span>
-                            <span className="text-[11px] font-bold uppercase tracking-tight text-gray-400">Add Context</span>
+                            <span className="text-[11px] font-bold uppercase tracking-tight text-gray-400">Add Source</span>
                           </button>
+                          <AddContextPopup open={contextMenuOpen} onClose={() => setContextMenuOpen(false)} onSelect={(item) => setSelectedContext(item)} />
 
                           <div className="flex items-center gap-1 ml-0.5">
                             {/* Upload (Clip) */}
@@ -1129,12 +1236,14 @@ function VideoHub({
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (thumbnail) setThumbnailUrl(thumbnail);
   }, [thumbnail]);
 
   useEffect(() => {
     if (nativeFile) {
       const url = URL.createObjectURL(nativeFile);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVideoUrl(url);
       return () => { URL.revokeObjectURL(url); }
     } else if (base64 && mimeType) {
@@ -1241,7 +1350,7 @@ function VideoHub({
             </div>
             <p className="text-sm font-semibold text-gray-900">Analysis Unavailable</p>
             <p className="text-xs text-gray-500 max-w-[240px] leading-relaxed">
-              We couldn't generate chapters for this video. Use the Chat tool to ask questions about it instead!
+              We couldn&apos;t generate chapters for this video. Use the Chat tool to ask questions about it instead!
             </p>
           </div>
         ) : processing ? (
@@ -1422,7 +1531,7 @@ function AudioHub({
                     key={i} 
                     className={`flex-1 rounded-full transition-all duration-300 ${isActive ? "bg-blue-500/80" : "bg-gray-200"}`}
                     style={{ 
-                      height: `${25 + Math.random() * 55}%`,
+                      height: `${25 + ((i * 7) % 55)}%`,
                       animation: (isPlaying && isActive) ? `bar-bounce 1.2s infinite ${i * 45}ms` : 'none'
                     }}
                   />
@@ -1529,6 +1638,7 @@ function FileView({ file, base64, mimeType }: { file: string, base64?: string, m
         }
         const blob = new Blob([byteNumbers], { type: "application/pdf" });
         const url = URL.createObjectURL(blob);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setPdfUrl(url);
         return () => URL.revokeObjectURL(url);
       } catch (e: any) {
@@ -1677,7 +1787,7 @@ function YoutubeView({
               </div>
               <p className="text-sm font-semibold text-gray-900">Analysis Unavailable</p>
               <p className="text-xs text-gray-500 max-w-[240px] leading-relaxed">
-                We couldn't generate chapters for this video. Use the Chat tool to ask questions about it instead!
+                We couldn&apos;t generate chapters for this video. Use the Chat tool to ask questions about it instead!
               </p>
             </div>
         ) : activeTab === "chapters" ? (
@@ -2036,6 +2146,8 @@ function ChatView({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [selectedContext, setSelectedContext] = useState<ContextSelection | null>(null);
   const [feedbackModal, setFeedbackModal] = useState<{ type: "up" | "down"; message: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2166,8 +2278,14 @@ function ChatView({
   };
 
   const sendMessage = async () => {
-    const text = input.trim();
+    let text = input.trim();
     if (!text || loading) return;
+    
+    if (selectedContext?.id === "mindmap") {
+      text = `[Requested Mind Map format] ${text}`;
+      setSelectedContext(null);
+    }
+    
     setMessages((prev) => [...prev, { role: "user", message: text }]);
     setInput("");
     await sendToAI(text);
@@ -2209,7 +2327,19 @@ function ChatView({
                 /* User bubble — right aligned */
                 <div className="flex justify-end">
                   <div className="max-w-[75%] bg-gray-100 rounded-2xl px-4 py-2.5">
-                    <p className="text-sm text-gray-800 leading-relaxed">{msg.message}</p>
+                    <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap flex flex-wrap gap-x-1.5 gap-y-1">
+                      {msg.message.startsWith("[Requested Mind Map format] ") && (
+                        <span className="inline-flex items-center gap-1 bg-blue-100/80 text-blue-700 px-2.5 rounded-full font-medium text-xs border border-blue-200/50 shadow-sm align-middle h-5 truncate" style={{ transform: 'translateY(1px)' }}>
+                          @Mind Map
+                        </span>
+                      )}
+                      {msg.message.startsWith("[Requested Interactive diagram visualization format] ") && (
+                        <span className="inline-flex items-center gap-1 bg-green-100/80 text-green-700 px-2.5 rounded-full font-medium text-xs border border-green-200/50 shadow-sm align-middle h-5 truncate" style={{ transform: 'translateY(1px)' }}>
+                          @Interactive
+                        </span>
+                      )}
+                      <span>{msg.message.replace(/^\[Requested (?:Mind Map|Interactive diagram visualization) format\] /, "")}</span>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -2290,6 +2420,7 @@ function ChatView({
             ) : (
               <>
                 <div className="flex-1 flex flex-col min-h-[40px]">
+                  {selectedContext && <ContextChip selection={selectedContext} onRemove={() => setSelectedContext(null)} />}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -2319,15 +2450,17 @@ function ChatView({
 
                 <div className="flex items-center justify-between mt-3">
                   <div className="flex items-center gap-3">
-                    {/* @ Add Context (Rounded Button) */}
+                    {/* @ Add Source (Rounded Button) */}
                     <button
                       type="button"
+                      onClick={(e) => { e.stopPropagation(); setContextMenuOpen(o => !o); }}
                       className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer shrink-0 shadow-sm"
-                      title="Add Context"
+                      title="Add Source"
                     >
                       <span className="text-[14px] font-bold text-gray-400">@</span>
-                      <span className="text-[12px] font-bold uppercase tracking-tight text-gray-400">Add Context</span>
+                      <span className="text-[12px] font-bold uppercase tracking-tight text-gray-400">Add Source</span>
                     </button>
+                    <AddContextPopup open={contextMenuOpen} onClose={() => setContextMenuOpen(false)} onSelect={(item) => setSelectedContext(item)} />
 
                     <div className="flex items-center gap-1.5 ml-1">
                       {/* Upload (Clip) */}
@@ -2368,14 +2501,14 @@ function ChatView({
                     ) : input.trim() ? (
                       <button
                         onClick={sendMessage}
-                        className="w-10 h-10 cursor-pointer rounded-full bg-black hover:bg-gray-800 flex items-center justify-center transition-all active:scale-90 shadow-lg"
+                        className="w-10 h-10 cursor-pointer rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center transition-all active:scale-90 shadow-lg"
                       >
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 19V5m-7 7l7-7 7 7" />
                         </svg>
                       </button>
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center opacity-90 shadow-sm" title="Voice mode active">
+                      <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center opacity-90 shadow-sm" title="Voice mode active">
                         <div className="flex gap-[2px] items-center">
                           <div className="w-[2.5px] h-3.5 bg-white rounded-full animate-[pulse_1s_infinite_0s]"></div>
                           <div className="w-[2.5px] h-5 bg-white rounded-full animate-[pulse_1s_infinite_0.2s]"></div>
@@ -2407,10 +2540,18 @@ async function updateRecentSession(params: {
   href: string;
   videoId?: string;
 }) {
+  const { userId, sessionId, type, title, subtitle, href, videoId } = params;
+  
+  // Basic UUID validation to prevent Postgres type errors
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId);
+  if (!isUUID) {
+    console.warn(`[History] Skipping sync for non-database session: ${sessionId}`);
+    return;
+  }
+
   console.log("Updating recent session:", params);
   try {
-    const { userId, sessionId, type, title, subtitle, href, videoId } = params;
-    await supabase.from("recent_sessions").upsert({
+    const { error } = await supabase.from("recent_sessions").upsert({
       user_id: userId,
       session_id: sessionId,
       type,
@@ -2422,9 +2563,10 @@ async function updateRecentSession(params: {
     }, {
       onConflict: 'user_id,session_id'
     });
+    if (error) throw error;
     console.log("Recent session updated successfully");
   } catch (err) {
-    console.error("Failed to update recent session (Table might be missing, please run fix_history_schema.sql):", err);
+    console.error("Failed to update recent session:", (err as any).message || err);
   }
 }
 
@@ -2439,6 +2581,8 @@ export default function Contentpage() {
   const uploadedFile = params.get("file") ?? "";
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [selectedContext, setSelectedContext] = useState<ContextSelection | null>(null);
   const isRecording = mode === "microphone" || mode === "browsertab";
   const isChat = mode === "chat";
 
@@ -2472,6 +2616,12 @@ export default function Contentpage() {
   const [fileThumbnail, setFileThumbnail] = useState<string>("");
   const [generationError, setGenerationError] = useState<string>("");
   const [nativeFile, setNativeFile] = useState<File | null>(null);
+  const [fileUri, setFileUri] = useState<string>("");
+
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [pendingTool, setPendingTool] = useState<ActiveTool>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && (window as any).__capturedFile) {
@@ -2484,6 +2634,7 @@ export default function Contentpage() {
           setFileBase64(stored.base64 || "");
           setFileMimeType(stored.mimeType || "");
           setFileThumbnail(stored.thumbnail || "");
+          setFileUri(stored.geminiUri || "");
         }
       })();
     }
@@ -2547,7 +2698,7 @@ export default function Contentpage() {
 
   // Trigger Pedagogical Generation for Files
   useEffect(() => {
-    const shouldTrigger = mode === "file" && fileBase64 && fileMimeType && chapters.length === 0 && !chaptersLoading && !generationError;
+    const shouldTrigger = isHydrated && mode === "file" && fileBase64 && fileMimeType && chapters.length === 0 && !chaptersLoading && !generationError;
     if (!shouldTrigger) return;
 
     (async () => {
@@ -2579,13 +2730,21 @@ export default function Contentpage() {
           return;
         }
 
-        const { fileUri, mimeType: uploadedMime } = await uploadRes.json();
+        const { fileUri: freshUri, mimeType: uploadedMime } = await uploadRes.json();
+        setFileUri(freshUri);
+        await saveMediaToDB({ 
+          base64: fileBase64, 
+          mimeType: fileMimeType, 
+          fileName: uploadedFile || "file", 
+          thumbnail: fileThumbnail, 
+          geminiUri: freshUri 
+        });
 
         // Step 2: Generate chapters using the Gemini file URI
         const chapRes = await fetch("/api/generate-chapters", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: fileUri, mimeType: uploadedMime || fileMimeType }),
+          body: JSON.stringify({ url: freshUri, mimeType: uploadedMime || fileMimeType }),
         });
 
         if (chapRes.ok) {
@@ -2662,13 +2821,18 @@ export default function Contentpage() {
             href: `/content/${sessionId}?mode=file&file=${encodeURIComponent(uploadedFile || '')}&session_id=${sessionId}`,
           });
           
-          const [chatHistory, cachedChapters] = await Promise.all([
+          const [chatHistory, cachedChapters, cachedStudyData] = await Promise.all([
             loadChatMessages(sessionId, false),
             loadCachedChaptersAndTranscripts(sessionId, false),
+            loadCachedData(sessionId, false),
           ]);
           if (chatHistory.length) setChatMessages(chatHistory);
           if (cachedChapters.chapters.length) setChapters(cachedChapters.chapters);
           if (cachedChapters.transcripts.length) setTranscripts(cachedChapters.transcripts);
+          if (cachedStudyData.summary) setSummary(cachedStudyData.summary);
+          if (cachedStudyData.quizQuestions.length) setQuizQuestions(cachedStudyData.quizQuestions);
+          if (cachedStudyData.flashcards.length) setFlashcards(cachedStudyData.flashcards);
+
           
         } else if (sessionId && !recSidParam) {
           await supabase.from("youtube_sessions").update({ last_visited: new Date().toISOString() }).eq("id", sessionId);
@@ -2729,6 +2893,9 @@ export default function Contentpage() {
           const chatHistory = await loadChatMessages(sessionId, false);
           if (chatHistory.length) setChatMessages(chatHistory);
         }
+        setIsHydrated(true);
+      } else {
+        setIsHydrated(true);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2748,7 +2915,7 @@ export default function Contentpage() {
   }, [videoTitle, sessionId]);
 
   useEffect(() => {
-    if (!url || isRecording || isChat || (chapters.length > 0 && !chaptersLoading)) return;
+    if (!isHydrated || !url || isRecording || isChat || (chapters.length > 0 && !chaptersLoading)) return;
     (async () => {
       setChaptersLoading(true);
       try {
@@ -2763,9 +2930,25 @@ export default function Contentpage() {
         const fetchedTranscripts = data.transcripts ?? [];
         setChapters(fetchedChapters);
         setTranscripts(fetchedTranscripts);
-        setVideoTitle(data.title ?? "");
+        const aiTitle = data.title || "";
+        if (aiTitle) setVideoTitle(aiTitle);
+
         if (sessionId && userIdRef.current) {
           await persistChaptersAndTranscripts(sessionId, userIdRef.current, fetchedChapters, fetchedTranscripts, false);
+          
+          // Sync AI-generated title back to DB if it's currently generic
+          if (aiTitle) {
+            await supabase.from("youtube_sessions").update({ video_title: aiTitle }).eq("id", sessionId);
+            updateRecentSession({
+              userId: userIdRef.current,
+              sessionId: sessionId,
+              type: 'youtube',
+              title: aiTitle,
+              subtitle: 'youtube',
+              href: `/content/${sessionId}?url=${encodeURIComponent(url)}&session_id=${sessionId}`,
+              videoId: extractVideoId(url) ?? undefined,
+            });
+          }
         }
       } catch {
       } finally {
@@ -2775,8 +2958,22 @@ export default function Contentpage() {
   }, [url]);
 
   const handleToolClick = useCallback(
-    async (tool: ActiveTool, forceRedirect = false) => {
-      if (tool === "exams" || (forceRedirect && (tool === "quiz" || tool === "flashcards"))) {
+    async (tool: ActiveTool, ignoreConfirm = false) => {
+      // ── Confirmation Logic ───────────────────────────────────────────────────
+      if (!ignoreConfirm && tool && ["summary", "quiz", "flashcards"].includes(tool)) {
+        let exists = false;
+        if (tool === "summary" && summary) exists = true;
+        if (tool === "quiz" && quizQuestions.length > 0) exists = true;
+        if (tool === "flashcards" && flashcards.length > 0) exists = true;
+
+        if (exists) {
+          setPendingTool(tool);
+          setShowConfirmModal(true);
+          return;
+        }
+      }
+
+      if (tool === "exams" || (ignoreConfirm && (tool === "quiz" || tool === "flashcards"))) {
         const userId = userIdRef.current;
         if (isRecording) {
           if (!recordingAudioRef.current?.base64 && !transcripts.length) return;
@@ -3098,9 +3295,23 @@ export default function Contentpage() {
     [url, mode, fileBase64, fileMimeType, uploadedFile, isRecording, transcripts, recordingSessionId, summary, summaryLoading, quizQuestions.length, quizLoading, flashcards.length, flashcardsLoading, sessionId, router],
   );
 
+  const confirmRegeneration = () => {
+    if (pendingTool) {
+      handleToolClick(pendingTool, true);
+    }
+    setShowConfirmModal(false);
+    setPendingTool(null);
+  };
+
   const handleChatSend = useCallback(async () => {
-    const q = chatInput.trim();
+    let q = chatInput.trim();
     if (!q || chatLoading) return;
+    
+    if (selectedContext?.id === "mindmap") {
+      q = `[Requested Mind Map format] ${q}`;
+      setSelectedContext(null); // consume the context
+    }
+    
     const userId = userIdRef.current;
     const activeSid = isRec ? recordingSessionId : sessionId;
 
@@ -3130,11 +3341,12 @@ export default function Contentpage() {
         const data = await res.json();
         answer = data.answer;
       } else {
-        if (!url) throw new Error("No video URL available.");
+        const chatUrl = (mode === "file" && fileUri) ? fileUri : url;
+        if (!chatUrl) throw new Error(mode === "file" ? "File analysis is still processing. Please wait." : "No source URL available.");
         const res = await fetch("/api/chat-youtube", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, question: q, history: chatMessages.slice(-6) }),
+          body: JSON.stringify({ url: chatUrl, question: q, history: chatMessages.slice(-6) }),
         });
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
         const data = await res.json();
@@ -3182,6 +3394,39 @@ export default function Contentpage() {
           ? uploadedFile
           : "Content";
 
+  const handleTitleEdit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      setIsEditingTitle(false);
+      const activeSid = isRec ? recordingSessionId : sessionId;
+      const userId = userIdRef.current;
+      if (!activeSid || !userId || !videoTitle) return;
+
+      const tableMap: Record<string, string> = {
+        youtube: "youtube_sessions",
+        recording: "recording_sessions",
+        file: "file_sessions",
+        chat: "chat_sessions",
+      };
+      const fieldMap: Record<string, string> = {
+        youtube: "video_title",
+        recording: "title",
+        file: "file_name",
+        chat: "title",
+      };
+      
+      const sessionType = isRec ? 'recording' : mode;
+      const table = tableMap[sessionType] || "youtube_sessions";
+      const field = fieldMap[sessionType] || "video_title";
+
+      try {
+        await supabase.from(table).update({ [field]: videoTitle }).eq("id", activeSid);
+        await supabase.from("recent_sessions").update({ title: videoTitle }).eq("session_id", activeSid);
+      } catch (err) {
+        console.error("Failed to update title:", err);
+      }
+    }
+  };
+
   if (isChat) {
     return (
       <div className="flex h-screen bg-white overflow-hidden">
@@ -3196,8 +3441,30 @@ export default function Contentpage() {
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       <header className="h-12 flex items-center justify-between px-4 border-b border-gray-200 bg-white shrink-0">
-        <div className="flex items-center gap-3 min-w-0 pl-1">
-          <span className="text-sm font-medium text-gray-700 truncate">{videoTitle || title}</span>
+        <div className="flex items-center gap-3 min-w-0 pl-1 group">
+          {isEditingTitle ? (
+            <input
+              autoFocus
+              className="text-sm font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-500 w-full max-w-xs"
+              value={videoTitle || title}
+              onChange={(e) => setVideoTitle(e.target.value)}
+              onKeyDown={handleTitleEdit}
+              onBlur={() => setIsEditingTitle(false)}
+            />
+          ) : (
+            <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditingTitle(true)}>
+              <span className="text-sm font-medium text-gray-700 truncate">{videoTitle || title}</span>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsEditingTitle(true); }}
+                className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                title="Edit title"
+              >
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link href="/dashboard">
@@ -3309,9 +3576,59 @@ export default function Contentpage() {
             onMenuAction={(action) => {
               handleToolClick(action as any, true);
             }}
+            contextMenuOpen={contextMenuOpen}
+            setContextMenuOpen={setContextMenuOpen}
+            selectedContext={selectedContext}
+            setSelectedContext={setSelectedContext}
+            videoTitle={videoTitle}
           />
         )}
       </div>
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-8 pt-6 pb-2">
+              <h3 className="text-xl font-bold text-gray-900 leading-tight">
+                Regenerate {pendingTool === 'summary' ? 'Summary' : pendingTool === 'quiz' ? 'Quiz' : 'Flashcards'}
+              </h3>
+              <button 
+                onClick={() => { setShowConfirmModal(false); setPendingTool(null); }}
+                className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors cursor-pointer"
+              >
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-8">
+              <p className="text-gray-600 text-[15px] leading-relaxed">
+                {pendingTool === 'summary' && "A summary already exists for this session. Generating a new one will replace your current version—would you like to proceed?"}
+                {pendingTool === 'quiz' && "A quiz has already been created. Would you like to generate a fresh set of questions based on your latest study materials?"}
+                {pendingTool === 'flashcards' && "A flashcard deck already exists. Generating a new one will create a fresh set of cards for you. Do you want to proceed?"}
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-8 pb-8 pt-2">
+              <button
+                onClick={() => { setShowConfirmModal(false); setPendingTool(null); }}
+                className="px-6 py-3 text-sm font-bold text-gray-600 bg-gray-50 border border-transparent rounded-2xl hover:bg-gray-100 transition-all active:scale-95 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRegeneration}
+                className="px-8 py-3 text-sm font-bold text-white bg-blue-600 rounded-2xl hover:bg-blue-700 transition-all active:scale-95 cursor-pointer shadow-lg shadow-blue-200"
+              >
+                Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

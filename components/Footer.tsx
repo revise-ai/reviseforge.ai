@@ -13,212 +13,72 @@ const Footer = () => {
         <footer className="bg-[#131314] w-full max-w-337.5 mx-auto text-white pt-8 lg:pt-12 px-4 sm:px-8 md:px-16 lg:px-28 rounded-tl-3xl rounded-tr-3xl overflow-hidden">
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-6 gap-8 md:gap-12">
             <div className="lg:col-span-3 space-y-6">
-              <a href="" className="block">
-                <svg
-                  width="157"
-                  height="40"
-                  viewBox="0 0 157 40"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="m8.75 11.3 6.75 3.884 6.75-3.885M8.75 34.58v-7.755L2 22.939m27 0-6.75 3.885v7.754M2.405 15.408 15.5 22.954l13.095-7.546M15.5 38V22.939M29 28.915V16.962a2.98 2.98 0 0 0-1.5-2.585L17 8.4a3.01 3.01 0 0 0-3 0L3.5 14.377A3 3 0 0 0 2 16.962v11.953A2.98 2.98 0 0 0 3.5 31.5L14 37.477a3.01 3.01 0 0 0 3 0L27.5 31.5a3 3 0 0 0 1.5-2.585"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+              <a href="/" className="block">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-900/20 flex items-center justify-center bg-[#131314] border border-neutral-800">
+                    <img 
+                      src="/assets/reviseforge-icon-only.png" 
+                      alt="ReviseForge Logo" 
+                      className="w-full h-full object-contain p-1"
+                    />
+                  </div>
+                  <span className="text-xl font-bold tracking-tight text-white">ReviseForge</span>
+                </div>
               </a>
-              <p className="text-sm/6 text-neutral-300 max-w-96">
-                PrebuiltUI helps you build faster by transforming your design
-                vision into fully functional, production-ready UI components.
+              <p className="text-sm/6 text-neutral-400 max-w-96">
+                ReviseForge is the all-in-one learning operating system. We transform messy lectures and long videos into structured academic assets to help you master any subject.
               </p>
               <div className="flex gap-5 md:gap-6 order-1 md:order-2">
-                {/* X (Twitter) */}
-                <a href="#" className="text-white hover:text-gray-300">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
-                  </svg>
+                <a href="#" className="text-neutral-400 hover:text-white transition-colors">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" /></svg>
                 </a>
-                {/* Github */}
-                <a href="#" className="text-white hover:text-gray-300">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-                    <path d="M9 18c-4.51 2-5-2-7-2" />
-                  </svg>
-                </a>
-                {/* Linkedin */}
-                <a href="#" className="text-white hover:text-gray-300">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-                    <rect width="4" height="12" x="2" y="9" />
-                    <circle cx="4" cy="4" r="2" />
-                  </svg>
-                </a>
-                {/* Youtube */}
-                <a href="#" className="text-white hover:text-gray-300">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
-                    <path d="m10 15 5-3-5-3z" />
-                  </svg>
-                </a>
-                {/* Instagram */}
-                <a href="#" className="text-white hover:text-gray-300">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-                  </svg>
+                <a href="#" className="text-neutral-400 hover:text-white transition-colors">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" /><path d="M9 18c-4.51 2-5-2-7-2" /></svg>
                 </a>
               </div>
             </div>
 
             <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 lg:gap-28 items-start">
-              {/* Products */}
               <div>
-                <h3 className="font-medium text-sm mb-4">Products</h3>
-                <ul className="space-y-3 text-sm text-neutral-300">
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Components
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Templates
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Icons
-                    </a>
-                  </li>
+                <h3 className="font-bold text-xs uppercase tracking-widest text-neutral-500 mb-6">Products</h3>
+                <ul className="space-y-4 text-sm text-neutral-300">
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">YouTube Analysis</a></li>
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">Voice Recording</a></li>
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">Exam Simulation</a></li>
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">AI Note-Taking</a></li>
                 </ul>
               </div>
-
-              {/* Resources */}
               <div>
-                <h3 className="font-medium text-sm mb-4">Resources</h3>
-                <ul className="space-y-3 text-sm text-neutral-300">
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      PrebuiltUI
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Templates
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Components
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Blogs
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Store
-                    </a>
-                  </li>
+                <h3 className="font-bold text-xs uppercase tracking-widest text-neutral-500 mb-6">Resources</h3>
+                <ul className="space-y-4 text-sm text-neutral-300">
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">Documentation</a></li>
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">Study Guides</a></li>
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">API Access</a></li>
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">Support</a></li>
                 </ul>
               </div>
-
-              {/* Company */}
               <div className="col-span-2 md:col-span-1">
-                <h3 className="font-medium text-sm mb-4">Company</h3>
-                <ul className="space-y-3 text-sm text-neutral-300">
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      About
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Vision
-                    </a>
-                  </li>
+                <h3 className="font-bold text-xs uppercase tracking-widest text-neutral-500 mb-6">Company</h3>
+                <ul className="space-y-4 text-sm text-neutral-300">
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">About Us</a></li>
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">Vision</a></li>
                   <li className="flex items-center gap-2">
-                    <a href="#" className="hover:text-neutral-400">
-                      Careers
-                    </a>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-950 border border-blue-300 text-blue-300">
-                      HIRING
-                    </span>
+                    <a href="#" className="hover:text-blue-400 transition-colors">Careers</a>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">HIRING</span>
                   </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Privacy policy
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="hover:text-neutral-400">
-                      Contact Us
-                    </a>
-                  </li>
+                  <li><a href="#" className="hover:text-blue-400 transition-colors">Privacy</a></li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <div className="max-w-7xl mx-auto mt-12 pt-4 border-t border-neutral-700 flex justify-between items-center">
-            <p className="text-neutral-400 text-sm">© 2026 PrebuiltUI Design</p>
-            <p className="text-sm text-neutral-400">All right reserved.</p>
+          <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-neutral-800/50 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-neutral-500 text-xs">© 2026 ReviseForge Inc. Built for top performers.</p>
+            <p className="text-xs text-neutral-500">All rights reserved.</p>
           </div>
-          <div className="relative">
-            <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl h-full max-h-64 bg-blue-500 rounded-full blur-[170px] pointer-events-none" />
-            <h3 className="text-center font-extrabold leading-[0.7] text-transparent text-[clamp(3rem,14vw,15rem)] [-webkit-text-stroke:1px_#0D3B54] mt-6">
+          <div className="relative pb-4 flex justify-center px-12 overflow-visible">
+            <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl h-full max-h-64 bg-blue-500 rounded-full blur-[170px] pointer-events-none opacity-40" />
+            <h3 className="text-center font-extrabold leading-[0.9] text-transparent text-[clamp(2rem,13vw,12rem)] [-webkit-text-stroke:1px_#0D3B54] mt-10 select-none whitespace-nowrap">
               ReviseForge
             </h3>
           </div>

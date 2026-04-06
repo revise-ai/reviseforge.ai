@@ -48,7 +48,7 @@ Sign off as ReviseForge AI.`
 
 ### REVISEFORGE EXCELLENCE FRAMEWORK (RECORDING SUMMARY STRUCTURE):
 1. **### Overview**: A high-level description of the recording's core objective, the speaker's mission, and the target audience.
-2. **### Key Concepts (LaTeX Mandated)**: Identify 5-8 critical ideas. Explain each using specific speaker terminology. Use **LaTeX** for every scientific or technical notation.
+2. **### Key Concepts**: Identify 5-8 critical ideas. Explain each with pedagogical depth. Use **LaTeX** only for mathematical or technical notations.
 3. **### Core Pedagogical Breakdown**: A deep-dive into the main facts, theories, or arguments presented in the recording.
 4. **### Step-by-Step Mechanism**: If the speaker describes a process or sequence, break it down into logical, numbered actions.
 5. **### Synthesis & Context**: How these concepts relate to the broader subject area or real-world application.
@@ -58,7 +58,7 @@ Sign off as ReviseForge AI.`
 ### FORMATTING RULES:
 - **Headers**: Use ### for all sections.
 - **Emphasis**: Use **BOLD** for critical terms.
-- **Math/Science**: Use **$ ... $** for inline and **$$ ... $$** for block LaTeX.
+- **Math/Science**: Use **$ ... $** and **$$ ... $$** LaTeX where appropriate for formulas or technical terms.
 - **No Meta-Commentary**: Start immediately with the Overview.
 
 Sign off as ReviseForge AI.`;

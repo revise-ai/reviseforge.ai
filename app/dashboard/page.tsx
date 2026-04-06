@@ -78,14 +78,14 @@ async function getOrCreateYoutubeSession(url: string): Promise<string> {
     if (error || !created) throw error;
     return created.id;
   } catch {
-    return Math.random().toString(36).slice(2, 18);
+    return crypto.randomUUID();
   }
 }
 
 async function createChatSession(title: string): Promise<string> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return Math.random().toString(36).slice(2, 18);
+    if (!user) return crypto.randomUUID();
 
     const { data: created, error } = await supabase
       .from("chat_sessions")
@@ -96,14 +96,14 @@ async function createChatSession(title: string): Promise<string> {
     if (error || !created) throw error;
     return created.id;
   } catch {
-    return Math.random().toString(36).slice(2, 18);
+    return crypto.randomUUID();
   }
 }
 
 async function createWebSession(url: string, title: string): Promise<string> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return Math.random().toString(36).slice(2, 18);
+    if (!user) return crypto.randomUUID();
 
     const { data: created, error } = await supabase
       .from("chat_sessions")
@@ -469,8 +469,8 @@ export default function DashboardPage() {
     const firstUrl = urls?.[0];
     const remainingText = text.replace(urlRegex, "").trim();
 
+    const restricted = ["wa.me", "t.me", "web.whatsapp.com", "telegram.org", "facebook.com", "instagram.com"];
     if (firstUrl) {
-      const restricted = ["wa.me", "t.me", "web.whatsapp.com", "telegram.org", "facebook.com", "instagram.com"];
       if (restricted.some(domain => firstUrl.includes(domain))) {
         alert("Sorry, we don't support social media links yet.");
         return;
@@ -480,11 +480,19 @@ export default function DashboardPage() {
         : await createWebSession(firstUrl, remainingText || "Website Content");
       const mode = (firstUrl.includes("youtube.com") || firstUrl.includes("youtu.be")) ? "youtube" : "web";
       let targetPath = `/content/${id}?mode=${mode}&url=${encodeURIComponent(firstUrl)}&session_id=${id}`;
-      if (remainingText) targetPath += `&q=${encodeURIComponent(remainingText)}`;
+      let finalQuery = remainingText;
+      if (selectedContext?.id === "mindmap") finalQuery = `[Requested Mind Map format] ${finalQuery}`;
+      if (selectedContext?.id === "interactive") finalQuery = `[Requested Interactive diagram visualization format] ${finalQuery}`;
+      
+      if (finalQuery) targetPath += `&q=${encodeURIComponent(finalQuery)}`;
       router.push(targetPath);
     } else {
       const id = await createChatSession(text.slice(0, 50));
-      router.push(`/content/${id}?mode=chat&q=${encodeURIComponent(text)}&session_id=${id}`);
+      let finalQuery = text;
+      if (selectedContext?.id === "mindmap") finalQuery = `[Requested Mind Map format] ${finalQuery}`;
+      if (selectedContext?.id === "interactive") finalQuery = `[Requested Interactive diagram visualization format] ${finalQuery}`;
+      
+      router.push(`/content/${id}?mode=chat&q=${encodeURIComponent(finalQuery)}&session_id=${id}`);
     }
   };
 
@@ -813,7 +821,7 @@ export default function DashboardPage() {
                   <div className="relative">
                     <button type="button" onClick={() => setContextMenuOpen(o => !o)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer shrink-0 shadow-sm ${contextMenuOpen ? "border-blue-300 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"}`}>
                       <span className={`text-[13px] font-bold ${contextMenuOpen ? "text-blue-600" : "text-gray-400"}`}>@</span>
-                      <span className={`text-[10px] font-bold uppercase tracking-tight ${contextMenuOpen ? "text-blue-600" : "text-gray-400"}`}>Add Context</span>
+                      <span className={`text-[10px] font-bold uppercase tracking-tight ${contextMenuOpen ? "text-blue-600" : "text-gray-400"}`}>Add Source</span>
                     </button>
                     <AddContextPopup open={contextMenuOpen} onClose={() => setContextMenuOpen(false)} onSelect={(item) => setSelectedContext(item)} />
                   </div>

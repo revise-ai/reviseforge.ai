@@ -728,11 +728,12 @@ function ExamModeContent() {
   const reviewSessionId = searchParams.get("session_id") ?? "";
   const isYoutubeSource = source === "youtube" && !!youtubeUrl;
   const isRecordingSource = source === "recording";
+  const isFileSource = source === "file";
   const isReview = !!reviewSessionId;
 
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(
-    isYoutubeSource || isRecordingSource || isReview ? "loading" : "modal",
+    isYoutubeSource || isRecordingSource || isFileSource || isReview ? "loading" : "modal",
   );
   const [exam, setExam] = useState<ExamData | null>(null);
   const [label, setLabel] = useState(
@@ -740,7 +741,9 @@ function ExamModeContent() {
       ? youtubeUrl.replace("https://", "").replace("www.", "").slice(0, 60)
       : isRecordingSource
         ? "Your recording"
-        : "",
+        : isFileSource
+          ? (sessionStorage.getItem("file_study_name") || "Uploaded document")
+          : "",
   );
   const [error, setError] = useState("");
   const examSessionIdRef = useRef<string>("");
@@ -943,6 +946,78 @@ function ExamModeContent() {
               source: "recording",
               source_label: "Your recording",
               recording_session_id: recSid || null,
+              exam_data: data.exam,
+            })
+            .select("id")
+            .single();
+          if (sess?.id) examSessionIdRef.current = sess.id;
+        }
+      } catch (err: any) {
+        setError(err.message || "Something went wrong.");
+        setPhase("modal");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Generate from uploaded file (stored in sessionStorage) ─────────────────
+  useEffect(() => {
+    if (!isFileSource) return;
+    (async () => {
+      setPhase("loading");
+      try {
+        const fileBase64 = sessionStorage.getItem("file_study_base64") ?? "";
+        const mimeType = sessionStorage.getItem("file_study_mimeType") ?? "";
+        const fileName = sessionStorage.getItem("file_study_name") ?? "document";
+
+        if (!fileBase64 || !mimeType)
+          throw new Error(
+            "No file data found. Please go back and upload a file first.",
+          );
+
+        // Convert base64 back to binary blob
+        const base64Data = fileBase64.includes(",") ? fileBase64.split(",")[1] : fileBase64;
+        const cleaned = base64Data.replace(/\s/g, "");
+        const byteChars = atob(cleaned);
+        const byteArr = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteArr[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([byteArr], { type: mimeType });
+
+        const fd = new FormData();
+        fd.append("file", blob, fileName);
+        
+        const res = await fetch("/api/generate-exam", {
+          method: "POST",
+          body: fd,
+        });
+        
+        if (!res.ok) {
+          const e = await res.json();
+          throw new Error(e.error || "Failed to generate exam from file");
+        }
+        
+        const data = await res.json();
+        setExam(data.exam);
+        setPhase("ready");
+        
+        // Clean up sessionStorage
+        sessionStorage.removeItem("file_study_base64");
+        sessionStorage.removeItem("file_study_mimeType");
+        sessionStorage.removeItem("file_study_name");
+        
+        // Create exam session row for history
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { data: sess } = await supabase
+            .from("exam_sessions")
+            .insert({
+              user_id: user.id,
+              source: "file",
+              source_label: fileName,
               exam_data: data.exam,
             })
             .select("id")

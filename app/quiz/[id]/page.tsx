@@ -213,7 +213,7 @@ function ExplanationPopup({
             Explanation
           </h3>
           <p className="text-sm text-gray-600 leading-relaxed">
-            {question.explanation}
+            {cleanExplanation(question.explanation)}
           </p>
         </div>
 
@@ -474,7 +474,7 @@ function ResultsScreen({
                           Explanation
                         </p>
                         <p className="text-xs text-blue-700 leading-relaxed">
-                          {q.explanation}
+                          {cleanExplanation(q.explanation)}
                         </p>
                       </div>
                     </div>
@@ -816,6 +816,8 @@ export default function QuizPage() {
         generateYouTubeQuiz(urlParam, urlSessionId, authUser?.id);
       } else if (sourceParam === "recording") {
         generateRecordingQuiz(urlSessionId, authUser?.id);
+      } else if (sourceParam === "file") {
+        generateFileQuiz(urlSessionId, authUser?.id);
       } else if (b64File && name) {
         generateAndPersist(b64File, name, urlSessionId, authUser?.id);
       } else {
@@ -967,11 +969,70 @@ export default function QuizPage() {
       const jsonStart = text.indexOf("{");
       const jsonEnd = text.lastIndexOf("}") + 1;
       const jsonStr = text.substring(jsonStart, jsonEnd);
-      const parsed = JSON.parse(jsonStr);
+      const questions = JSON.parse(jsonStr).questions;
       
-      await persistGeneratedQuiz(parsed.questions, sid, uid);
+      await persistGeneratedQuiz(questions, sid, uid);
     } catch (err: any) {
       setError(err.message || "Failed to generate quiz from recording.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateFileQuiz = async (sid: string, uid?: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data: existing } = await supabase
+        .from("quiz_sessions")
+        .select("status")
+        .eq("id", sid)
+        .single();
+      if (existing?.status === "ready" || existing?.status === "finished") {
+        await loadQuestionsFromDB(sid, uid);
+        return;
+      }
+
+      const fileBase64 = sessionStorage.getItem("file_study_base64") ?? "";
+      const mimeType = sessionStorage.getItem("file_study_mimeType") ?? "";
+      const fileName = sessionStorage.getItem("file_study_name") ?? "document";
+
+      if (!fileBase64 || !mimeType) {
+        throw new Error("No file data found. Please go back and upload a file first.");
+      }
+
+      // Convert base64 back to binary blob
+      const base64Data = fileBase64.includes(",") ? fileBase64.split(",")[1] : fileBase64;
+      const cleaned = base64Data.replace(/\s/g, "");
+      const byteChars = atob(cleaned);
+      const byteArr = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteArr[i] = byteChars.charCodeAt(i);
+      }
+      const blob = new Blob([byteArr], { type: mimeType });
+
+      const formData = new FormData();
+      formData.append("file", blob, fileName);
+
+      const res = await fetch("/api/generate-quiz", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.error || "Failed to generate quiz from file");
+      }
+
+      const data = await res.json();
+      await persistGeneratedQuiz(data.questions, sid, uid);
+      
+      // Clean up sessionStorage
+      sessionStorage.removeItem("file_study_base64");
+      sessionStorage.removeItem("file_study_mimeType");
+      sessionStorage.removeItem("file_study_name");
+    } catch (err: any) {
+      setError(err.message || "Failed to generate quiz from file.");
     } finally {
       setLoading(false);
     }
@@ -1096,6 +1157,14 @@ export default function QuizPage() {
     sessionStorage.removeItem("quiz_file");
     sessionStorage.removeItem("quiz_filename");
     sessionStorage.removeItem("quiz_session_id");
+  };
+
+  // Clean up explanation text by removing unwanted symbols
+  const cleanExplanation = (text: string): string => {
+    return text
+      .replace(/[#@*]/g, '') // Remove #, @, * symbols
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .trim();
   };
 
   const mapRows = (data: any[]): QuizQuestion[] =>

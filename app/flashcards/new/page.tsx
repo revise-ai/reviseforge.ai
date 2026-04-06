@@ -20,7 +20,7 @@ function NewFlashcardLoader() {
         .insert({
           user_id: user?.id,
           status: "generating",
-          file_name: source === "youtube" ? "YouTube Video" : source === "recording" ? "Recording" : "New Flashcards"
+          file_name: source === "youtube" ? "YouTube Video" : source === "recording" ? "Recording" : source === "file" ? (sessionStorage.getItem("file_study_name") || "Uploaded File") : "New Flashcards"
         })
         .select("id")
         .single();

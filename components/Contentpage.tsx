@@ -691,12 +691,12 @@ function RightSidebar({
   flashcardsError: string;
   chatMessages: { role: "user" | "ai"; message: string }[];
   chatInput: string;
-  setChatInput: (v: string) => void;
+  setChatInput: React.Dispatch<React.SetStateAction<string>>;
   onChatSend: () => void;
   chatLoading: boolean;
   recordingReady?: boolean;
   onFeedback: (message: string, type: "up" | "down", note: string) => void;
-  onMenuAction: (action: "quiz" | "flashcards" | "exams") => void;
+  onMenuAction: (action: "quiz" | "flashcards" | "exams" | "visualizations") => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const isRecording = mode === "microphone" || mode === "browsertab";
@@ -1592,11 +1592,13 @@ function YoutubeView({
   chapters,
   transcripts,
   chaptersLoading,
+  error,
 }: {
   url: string;
   chapters: ChapterItem[];
   transcripts: TranscriptItem[];
   chaptersLoading: boolean;
+  error?: string;
 }) {
   const [activeTab, setActiveTab] = useState<"chapters" | "transcripts">("chapters");
   const videoId = extractVideoId(url) ?? "";
@@ -1666,6 +1668,18 @@ function YoutubeView({
             </svg>
             <p className="text-xs text-gray-400">Loading chapters &amp; transcript…</p>
           </div>
+        ) : error ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 py-12 px-8 text-center">
+              <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-500 mb-2">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-gray-900">Analysis Unavailable</p>
+              <p className="text-xs text-gray-500 max-w-[240px] leading-relaxed">
+                We couldn't generate chapters for this video. Use the Chat tool to ask questions about it instead!
+              </p>
+            </div>
         ) : activeTab === "chapters" ? (
           chapters.length > 0 ? (
             <div className="divide-y divide-gray-50">
@@ -2006,16 +2020,16 @@ function ChatView({
   sessionId: string;
 }) {
   const router = useRouter();
-  const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>(() => {
-    const msgs: { role: "user" | "ai"; text: string }[] = [];
+  const [messages, setMessages] = useState<{ role: "user" | "ai"; message: string }[]>(() => {
+    const msgs: { role: "user" | "ai"; message: string }[] = [];
     if (uploadedFile) {
-      msgs.push({ role: "user", text: `Uploaded: ${uploadedFile}` });
+      msgs.push({ role: "user", message: `Uploaded: ${uploadedFile}` });
       msgs.push({
         role: "ai",
-        text: `I've received your file ${uploadedFile}. What would you like to do with it? I can help summarise, explain, or quiz you on the content.`,
+        message: `I've received your file ${uploadedFile}. What would you like to do with it? I can help summarise, explain, or quiz you on the content.`,
       });
     } else if (initialQuery) {
-      msgs.push({ role: "user", text: initialQuery });
+      msgs.push({ role: "user", message: initialQuery });
     }
     return msgs;
   });
@@ -2122,7 +2136,7 @@ function ChatView({
   const sendToAI = async (question: string) => {
     setLoading(true);
     try {
-      const history = messages.slice(-8).map((m) => ({ role: m.role, message: m.text }));
+      const history = messages.slice(-8).map((m) => ({ role: m.role, message: m.message }));
       const res = await fetch("/api/chat-general", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2130,7 +2144,7 @@ function ChatView({
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: "ai", text: data.answer }]);
+      setMessages((prev) => [...prev, { role: "ai", message: data.answer }]);
       
       if (sessionId) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -2144,7 +2158,7 @@ function ChatView({
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "ai", text: "Sorry, something went wrong. Please try again." },
+        { role: "ai", message: "Sorry, something went wrong. Please try again." },
       ]);
     } finally {
       setLoading(false);
@@ -2154,7 +2168,7 @@ function ChatView({
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || loading) return;
-    setMessages((prev) => [...prev, { role: "user", text }]);
+    setMessages((prev) => [...prev, { role: "user", message: text }]);
     setInput("");
     await sendToAI(text);
   };
@@ -2164,8 +2178,8 @@ function ChatView({
     if (!file) return;
     setMessages((prev) => [
       ...prev,
-      { role: "user", text: `Uploaded: ${file.name}` },
-      { role: "ai", text: `I've received ${file.name}. What would you like to do with it?` },
+      { role: "user", message: `Uploaded: ${file.name}` },
+      { role: "ai", message: `I've received ${file.name}. What would you like to do with it?` },
     ]);
     e.target.value = "";
   };
@@ -2179,7 +2193,10 @@ function ChatView({
         <FeedbackModal
           type={feedbackModal.type}
           onClose={() => setFeedbackModal(null)}
-          onSubmit={() => setShowToast(true)}
+          onSubmit={(note) => {
+            setShowToast(true);
+            // Optionally persist here if needed
+          }}
         />
       )}
 
@@ -2192,18 +2209,18 @@ function ChatView({
                 /* User bubble — right aligned */
                 <div className="flex justify-end">
                   <div className="max-w-[75%] bg-gray-100 rounded-2xl px-4 py-2.5">
-                    <p className="text-sm text-gray-800 leading-relaxed">{msg.text}</p>
+                    <p className="text-sm text-gray-800 leading-relaxed">{msg.message}</p>
                   </div>
                 </div>
               ) : (
                 /* AI response — structured renderer */
                 <div className="flex flex-col items-start w-full">
                   {/* ↓ THE ONLY CHANGED LINE — was <p>{msg.text}</p> */}
-                  <AIMessage text={msg.text} />
+                  <AIMessage text={msg.message} />
                   <MessageActions
-                    message={msg.text}
-                    onThumbUp={() => setFeedbackModal({ type: "up", message: msg.text })}
-                    onThumbDown={() => setFeedbackModal({ type: "down", message: msg.text })}
+                    message={msg.message}
+                    onThumbUp={() => setFeedbackModal({ type: "up", message: msg.message })}
+                    onThumbDown={() => setFeedbackModal({ type: "down", message: msg.message })}
                     onMenuAction={(action) => {
                       if (action === "exams") {
                         router.push("/dashboard/exam-mode");
@@ -2212,7 +2229,7 @@ function ChatView({
                           ...prev,
                           {
                             role: "ai",
-                            text: `To generate ${action === "quiz" ? "a quiz" : "flashcards"}, please start from the dashboard by pasting a YouTube link or recording a lecture. That gives me the source material to work from.`,
+                            message: `To generate ${action === "quiz" ? "a quiz" : "flashcards"}, please start from the dashboard by pasting a YouTube link or recording a lecture. That gives me the source material to work from.`,
                           },
                         ]);
                       }
@@ -2772,6 +2789,17 @@ export default function Contentpage() {
           if (tool === "exams") router.push("/dashboard/exam-mode?source=recording");
           else if (tool === "quiz") router.push("/quiz/new?source=recording");
           else if (tool === "flashcards") router.push("/flashcards/new?source=recording");
+        } else if (mode === "file" && fileBase64 && fileMimeType) {
+          // Store file data in sessionStorage for file-based generation
+          try {
+            sessionStorage.setItem("file_study_base64", fileBase64);
+            sessionStorage.setItem("file_study_mimeType", fileMimeType);
+            sessionStorage.setItem("file_study_name", uploadedFile || "document");
+          } catch { /* sessionStorage might be full */ }
+          
+          if (tool === "exams") router.push("/dashboard/exam-mode?source=file");
+          else if (tool === "quiz") router.push("/quiz/new?source=file");
+          else if (tool === "flashcards") router.push("/flashcards/new?source=file");
         } else {
           const baseUrl = tool === "exams" ? "/dashboard/exam-mode" : tool === "quiz" ? "/quiz/new" : "/flashcards/new";
           const destination = url
@@ -2881,6 +2909,128 @@ export default function Contentpage() {
         return;
       }
 
+      // Handle file mode
+      if (mode === "file") {
+        if (!fileBase64 || !fileMimeType) {
+          if (tool === "summary") setSummaryError("No file available for summary generation.");
+          if (tool === "quiz") setQuizError("No file available for quiz generation.");
+          if (tool === "flashcards") setFlashcardsError("No file available for flashcard generation.");
+          return;
+        }
+
+        // Convert base64 back to binary blob for FormData
+        const base64Data = fileBase64.includes(",") ? fileBase64.split(",")[1] : fileBase64;
+        const cleaned = base64Data.replace(/\s/g, "");
+        const byteChars = atob(cleaned);
+        const byteArr = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteArr[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([byteArr], { type: fileMimeType });
+        const fileName = uploadedFile || "document.pdf";
+
+        if (tool === "summary" && !summary && !summaryLoading) {
+          setSummaryLoading(true);
+          setSummaryError("");
+          try {
+            // For summary, we need to upload to Gemini first and then generate
+            const form = new FormData();
+            form.append("file", blob, fileName);
+            
+            const uploadRes = await fetch("/api/upload-to-gemini", {
+              method: "POST",
+              body: form,
+            });
+
+            if (!uploadRes.ok) {
+              const err = await uploadRes.json();
+              throw new Error(err.error || "File upload to AI failed.");
+            }
+
+            const { fileUri, mimeType: uploadedMime } = await uploadRes.json();
+
+            // Now generate summary using the file URI
+            const summaryRes = await fetch("/api/generate-summary", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: fileUri }),
+            });
+
+            if (!summaryRes.ok) {
+              const e = await summaryRes.json();
+              throw new Error(e.error || "Failed to generate summary");
+            }
+
+            const data = await summaryRes.json();
+            setSummary(data.summary);
+            if (sessionId && userId) await persistSummary(sessionId, userId, data.summary, false);
+          } catch (e: any) {
+            setSummaryError(e.message || "Failed to generate summary");
+          } finally {
+            setSummaryLoading(false);
+          }
+        }
+
+        if (tool === "quiz" && !quizQuestions.length && !quizLoading) {
+          setQuizLoading(true);
+          setQuizError("");
+          try {
+            const form = new FormData();
+            form.append("file", blob, fileName);
+            
+            const res = await fetch("/api/generate-quiz", {
+              method: "POST",
+              body: form,
+            });
+
+            if (!res.ok) {
+              const e = await res.json();
+              throw new Error(e.error || "Failed to generate quiz");
+            }
+
+            const data = await res.json();
+            const questions: QuizQuestion[] = (data.questions ?? []).map((q: any, i: number) => ({ ...q, id: i + 1 }));
+            setQuizQuestions(questions);
+            if (sessionId && userId) await persistQuiz(sessionId, userId, questions, false);
+          } catch (e: any) {
+            setQuizError(e.message || "Failed to generate quiz");
+          } finally {
+            setQuizLoading(false);
+          }
+        }
+
+        if (tool === "flashcards" && !flashcards.length && !flashcardsLoading) {
+          setFlashcardsLoading(true);
+          setFlashcardsError("");
+          try {
+            const form = new FormData();
+            form.append("file", blob, fileName);
+            
+            const res = await fetch("/api/generate-flashcards", {
+              method: "POST",
+              body: form,
+            });
+
+            if (!res.ok) {
+              const e = await res.json();
+              throw new Error(e.error || "Failed to generate flashcards");
+            }
+
+            const data = await res.json();
+            const cards: Flashcard[] = (data.flashcards ?? []).map((c: any, i: number) => ({ ...c, id: i + 1 }));
+            setFlashcards(cards);
+            if (sessionId && userId) await persistFlashcards(sessionId, userId, cards, false);
+          } catch (e: any) {
+            setFlashcardsError(e.message || "Failed to generate flashcards");
+          } finally {
+            setFlashcardsLoading(false);
+          }
+        }
+
+        return;
+      }
+
+      // Handle YouTube mode (existing logic)
       if (!url) return;
 
       if (tool === "summary" && !summary && !summaryLoading) {
@@ -2945,7 +3095,7 @@ export default function Contentpage() {
         }
       }
     },
-    [url, isRecording, transcripts, recordingSessionId, summary, summaryLoading, quizQuestions.length, quizLoading, flashcards.length, flashcardsLoading, sessionId, router],
+    [url, mode, fileBase64, fileMimeType, uploadedFile, isRecording, transcripts, recordingSessionId, summary, summaryLoading, quizQuestions.length, quizLoading, flashcards.length, flashcardsLoading, sessionId, router],
   );
 
   const handleChatSend = useCallback(async () => {
@@ -3025,7 +3175,7 @@ export default function Contentpage() {
   const title = isRecording
     ? `Recording at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
     : isChat
-      ? initialQuery || uploadedFile || "Chat"
+      ? initialQuery && initialQuery.length < 50 ? initialQuery : (uploadedFile || "Chat")
       : url
         ? url.replace("https://", "").replace("www.", "").slice(0, 70)
         : uploadedFile

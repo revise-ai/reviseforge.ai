@@ -76,12 +76,9 @@ const Footer = () => {
             <p className="text-neutral-500 text-xs">© 2026 ReviseForge Inc. Built for top performers.</p>
             <p className="text-xs text-neutral-500">All rights reserved.</p>
           </div>
-          <div className="relative pb-4 flex justify-center px-12 overflow-visible">
-            <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl h-full max-h-64 bg-blue-500 rounded-full blur-[170px] pointer-events-none opacity-40" />
-            <h3 className="text-center font-extrabold leading-[0.9] text-transparent text-[clamp(2rem,13vw,12rem)] [-webkit-text-stroke:1px_#0D3B54] mt-10 select-none whitespace-nowrap">
-              ReviseForge
-            </h3>
-          </div>
+          <h3 className="text-center font-extrabold leading-[0.9] text-transparent text-[clamp(2rem,12vw,16rem)] [-webkit-text-stroke:1px_#0D3B54] mt-6 select-none">
+            ReviseForge
+          </h3>
         </footer>
       </div>
     </>

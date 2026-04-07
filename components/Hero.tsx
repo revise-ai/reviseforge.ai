@@ -33,13 +33,13 @@ const Hero = () => {
           fill="none"
           preserveAspectRatio="none"
         >
-          <path d="M-100 150 Q350 20 700 120 Q1050 220 1500 80"  stroke="white" strokeWidth="1.2" strokeOpacity="0.45" fill="none" />
-          <path d="M-100 230 Q300 90 700 190 Q1100 290 1500 150" stroke="white" strokeWidth="1"   strokeOpacity="0.35" fill="none" />
-          <path d="M-100 310 Q400 150 700 260 Q1000 370 1500 230" stroke="white" strokeWidth="0.8" strokeOpacity="0.25" fill="none" />
-          <path d="M0 390 Q350 250 700 340 Q1050 430 1400 320"   stroke="white" strokeWidth="1"   strokeOpacity="0.38" fill="none" />
-          <path d="M0 450 Q350 330 700 410 Q1050 490 1400 390"   stroke="white" strokeWidth="0.7" strokeOpacity="0.28" fill="none" />
-          <path d="M300 490 Q480 420 630 478"                    stroke="white" strokeWidth="0.6" strokeOpacity="0.2"  fill="none" />
-          <path d="M720 490 Q900 420 1020 475"                   stroke="white" strokeWidth="0.6" strokeOpacity="0.2"  fill="none" />
+          <path d="M-100 150 Q350 20 700 120 Q1050 220 1500 80"  stroke="white" strokeWidth="0.8" strokeOpacity="0.25" fill="none" />
+          <path d="M-100 230 Q300 90 700 190 Q1100 290 1500 150" stroke="white" strokeWidth="0.6" strokeOpacity="0.18" fill="none" />
+          <path d="M-100 310 Q400 150 700 260 Q1000 370 1500 230" stroke="white" strokeWidth="0.5" strokeOpacity="0.12" fill="none" />
+          <path d="M0 390 Q350 250 700 340 Q1050 430 1400 320"   stroke="white" strokeWidth="0.7" strokeOpacity="0.2"  fill="none" />
+          <path d="M0 450 Q350 330 700 410 Q1050 490 1400 390"   stroke="white" strokeWidth="0.5" strokeOpacity="0.15" fill="none" />
+          <path d="M300 490 Q480 420 630 478"                    stroke="white" strokeWidth="0.4" strokeOpacity="0.1"  fill="none" />
+          <path d="M720 490 Q900 420 1020 475"                   stroke="white" strokeWidth="0.4" strokeOpacity="0.1"  fill="none" />
         </svg>
       </div>
 

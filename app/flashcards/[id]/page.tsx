@@ -676,12 +676,6 @@ export default function FlashcardsPage() {
         if (user) setUserId(user.id);
         generateRecordingFlashcards(urlSessionId, user?.id);
       })();
-    } else if (sourceParam === "file") {
-      (async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) setUserId(user.id);
-        generateFileFlashcards(urlSessionId, user?.id);
-      })();
     } else if (shouldGenerate) {
       // ✅ Set the mutex SYNCHRONOUSLY before going async
       sessionStorage.setItem("flashcard_generating_for", urlSessionId);

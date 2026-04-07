@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import MarkdownRenderer from "./MarkdownRenderer";
 import AddContextPopup, { ContextSelection, ContextChip } from "./AddContextPopup";
+import UploadPopup from "./UploadPopup";
 
 type Mode = "youtube" | "web" | "microphone" | "browsertab" | "chat" | "file";
 type ActiveTool = "summary" | "quiz" | "flashcards" | "exams" | "visualizations" | "podcast" | null;
@@ -690,6 +691,8 @@ function RightSidebar({
   setContextMenuOpen,
   selectedContext,
   setSelectedContext,
+  uploadMenuOpen,
+  setUploadMenuOpen,
   videoTitle,
 }: {
   open: boolean;
@@ -721,6 +724,8 @@ function RightSidebar({
   setContextMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   selectedContext: ContextSelection | null;
   setSelectedContext: React.Dispatch<React.SetStateAction<ContextSelection | null>>;
+  uploadMenuOpen: boolean;
+  setUploadMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   videoTitle?: string;
 }) {
   const isRecording = mode === "microphone" || mode === "browsertab";
@@ -1142,17 +1147,25 @@ function RightSidebar({
 
                           <div className="flex items-center gap-1 ml-0.5">
                             {/* Upload (Clip) */}
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1"
-                              title="Upload Document"
-                            >
-                              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                              </svg>
-                            </button>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setUploadMenuOpen(o => !o)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer shrink-0 shadow-sm"
+                                title="Upload Document"
+                              >
+                                <svg className="w-[13px] h-[13px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                </svg>
+                                <span className="text-[11px] font-medium tracking-wide">Upload</span>
+                              </button>
+                              <UploadPopup
+                                open={uploadMenuOpen}
+                                onClose={() => setUploadMenuOpen(false)}
+                                onAddFile={() => fileInputRef.current?.click()}
+                              />
+                            </div>
 
                             {/* Dictate (Mic) */}
                             <button
@@ -2148,6 +2161,7 @@ function ChatView({
   const [showToast, setShowToast] = useState(false);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [selectedContext, setSelectedContext] = useState<ContextSelection | null>(null);
+  const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
   const [feedbackModal, setFeedbackModal] = useState<{ type: "up" | "down"; message: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2464,17 +2478,25 @@ function ChatView({
 
                     <div className="flex items-center gap-1.5 ml-1">
                       {/* Upload (Clip) */}
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1"
-                        title="Upload Document"
-                      >
-                        <svg className="w-[20px] h-[20px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setUploadMenuOpen(o => !o)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer shrink-0 shadow-sm"
+                          title="Upload Document"
+                        >
+                          <svg className="w-[13px] h-[13px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                          <span className="text-[11px] font-medium tracking-wide">Upload</span>
+                        </button>
+                        <UploadPopup
+                          open={uploadMenuOpen}
+                          onClose={() => setUploadMenuOpen(false)}
+                          onAddFile={() => fileInputRef.current?.click()}
+                        />
+                      </div>
 
                       {/* Dictate (Mic) */}
                       <button
@@ -2583,6 +2605,7 @@ export default function Contentpage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [selectedContext, setSelectedContext] = useState<ContextSelection | null>(null);
+  const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
   const isRecording = mode === "microphone" || mode === "browsertab";
   const isChat = mode === "chat";
 
@@ -3580,6 +3603,8 @@ export default function Contentpage() {
             setContextMenuOpen={setContextMenuOpen}
             selectedContext={selectedContext}
             setSelectedContext={setSelectedContext}
+            uploadMenuOpen={uploadMenuOpen}
+            setUploadMenuOpen={setUploadMenuOpen}
             videoTitle={videoTitle}
           />
         )}

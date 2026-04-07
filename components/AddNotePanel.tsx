@@ -74,9 +74,9 @@ export default function AddNotePanel({
                 <Image
                   src="/assets/reviseforge-logo-full.png"
                   alt="ReviseForge Logo"
-                  width={200}
-                  height={42}
-                  className="object-contain"
+                  width={180}
+                  height={40}
+                  className="h-10 w-auto object-contain"
                 />
               </Link>
             </div>
@@ -112,19 +112,7 @@ export default function AddNotePanel({
                 key={note.id}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
               >
-                <svg
-                  className="w-4 h-4 text-gray-300 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
+                <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0"/>
                 <button
                   onClick={() => onNoteSelected && onNoteSelected(note)}
                   className="cursor-pointer flex-1 text-sm text-gray-700 truncate text-left"

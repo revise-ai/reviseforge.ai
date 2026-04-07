@@ -355,9 +355,9 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                 <Image 
                   src="/assets/reviseforge-logo-full.png" 
                   alt="ReviseForge Logo" 
-                  width={140} 
-                  height={32}
-                  className="h-8 w-auto object-contain"
+                  width={180} 
+                  height={40}
+                  className="h-10 w-auto object-contain"
                 />
               </div>
               <button onClick={() => setShowChannelsPanel(false)} className="cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
@@ -379,7 +379,7 @@ function SidebarInner({ userName: propName, userEmail: propEmail }: SidebarProps
                     const isActive = pathname === `/dashboard/channel/${slug}`;
                     return (
                       <div key={channel.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group cursor-pointer ${isActive?"bg-blue-50 text-blue-700":"hover:bg-gray-100 text-gray-700"}`}>
-                        <div className="w-2 h-2 rounded-full bg-green-500 shrink-0"/>
+                        <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0"/>
                         <Link href={`/dashboard/channel/${slug}`} onClick={() => setShowChannelsPanel(false)} className="flex-1 text-sm font-medium truncate">{channel.name}</Link>
                         <span className="text-xs text-gray-400 shrink-0">{channel.members}</span>
                         <button onClick={() => deleteChannel(channel.id)} className="cursor-pointer opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded-lg transition-all" title="Leave channel">

@@ -14,6 +14,7 @@ import OnboardingModal from "@/components/OnboardingModal";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/context/LanguageContext";
 import AddContextPopup, { ContextChip, type ContextSelection } from "@/components/AddContextPopup";
+import UploadPopup from "@/components/UploadPopup";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -425,6 +426,7 @@ export default function DashboardPage() {
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [selectedContext, setSelectedContext] = useState<ContextSelection | null>(null);
+  const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
   
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -827,12 +829,19 @@ export default function DashboardPage() {
                   </div>
                   
                   {/* The unified Upload Button */}
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer shrink-0 shadow-sm">
-                    <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                    <span className="text-[11px] font-medium tracking-wide">Upload</span>
-                  </button>
+                  <div className="relative">
+                    <button type="button" onClick={() => setUploadMenuOpen(o => !o)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer shrink-0 shadow-sm">
+                      <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      <span className="text-[11px] font-medium tracking-wide">Upload</span>
+                    </button>
+                    <UploadPopup
+                      open={uploadMenuOpen}
+                      onClose={() => setUploadMenuOpen(false)}
+                      onAddFile={() => fileInputRef.current?.click()}
+                    />
+                  </div>
 
                   <button type="button" onClick={toggleVoice} className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1.5 ml-1">
                     <svg className="w-[20px] h-[20px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -273,3 +273,7 @@ const Hero = () => {
 };
 
 export default Hero; -->
+
+<!-- Claude can now build custom charts, diagrams, and interactive visuals right in the conversation when showing beats telling. -->
+
+nice , it should be like this after the user clicks to it intergrate and th euser say the popup the first one then if te user select any one she or he is okay with then the user should see the next popup for them to see what it about then they can finally connect click on th econnect button

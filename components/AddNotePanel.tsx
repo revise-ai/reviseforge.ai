@@ -71,10 +71,10 @@ export default function AddNotePanel({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
-                <Image 
-                  src="/assets/reviseforge-logo-full.png" 
-                  alt="ReviseForge Logo" 
-                  width={200} 
+                <Image
+                  src="/assets/reviseforge-logo-full.png"
+                  alt="ReviseForge Logo"
+                  width={200}
                   height={42}
                   className="object-contain"
                 />

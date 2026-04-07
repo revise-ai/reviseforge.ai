@@ -58,10 +58,10 @@ export async function middleware(request: NextRequest) {
 
   // ── Auth Protection ──────────────────────────────────────────────────────────
   const { pathname } = request.nextUrl;
-  const isProtectedPath = pathname.startsWith("/dashboard") || 
-                          pathname.startsWith("/admin") || 
-                          pathname.startsWith("/quiz") || 
-                          pathname.startsWith("/notes");
+  const isProtectedPath = pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/quiz") ||
+    pathname.startsWith("/notes");
 
   if (isProtectedPath && !user) {
     const url = request.nextUrl.clone();
@@ -75,7 +75,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none");
-  
+
   // Content Security Policy
   const csp = `
     default-src 'self';
@@ -88,7 +88,7 @@ export async function middleware(request: NextRequest) {
     child-src 'self' blob: data: https://www.youtube.com https://youtube.com;
     frame-ancestors 'self';
   `.replace(/\s+/g, " ").trim();
-  
+
   response.headers.set("Content-Security-Policy", csp);
 
   return response;

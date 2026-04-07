@@ -11,7 +11,7 @@ const Hero = () => {
   return (
     <section className="flex flex-col items-center bg-white relative overflow-hidden">
 
-      {/* ── Exact patientdesk.ai — floats with margin on left, right and bottom, fades in from top ── */}
+      {/* floats with margin on left, right and bottom, fades in from top ── */}
       <div
         aria-hidden="true"
         style={{
@@ -19,7 +19,7 @@ const Hero = () => {
           bottom: "16px",
           left: "16px",
           right: "16px",
-          height: "45%",
+          height: "55%",
           background: "linear-gradient(to bottom, transparent 0%, #eff6ff 30%, #dbeafe 65%, #bfdbfe 100%)",
           borderRadius: "24px",
           pointerEvents: "none",

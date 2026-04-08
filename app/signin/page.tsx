@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase-browser";
 
 function Toast({
@@ -137,15 +136,11 @@ function SigninInner() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
 
       <div className="px-8 py-8 flex justify-start">
-        <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
-          <Image
-            src="/assets/reviseforge-logo-full.png"
-            alt="ReviseForge Logo"
-            width={180}
-            height={48}
-            className="object-contain"
-            priority
-          />
+        <Link href="/" className="group flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span className="text-sm font-medium">Back</span>
         </Link>
       </div>
 

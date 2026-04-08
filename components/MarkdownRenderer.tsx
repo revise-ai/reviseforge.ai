@@ -22,17 +22,18 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className 
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          h1: ({ ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
-          h2: ({ ...props }) => <h2 className="text-lg font-bold mt-3 mb-2" {...props} />,
-          h3: ({ ...props }) => <h3 className="text-md font-semibold mt-2 mb-1" {...props} />,
-          p: ({ ...props }) => <p className="mb-2 leading-relaxed" {...props} />,
-          ul: ({ ...props }) => <ul className="list-disc ml-6 mb-6 space-y-3" {...props} />,
-          ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-6 space-y-3" {...props} />,
-          li: ({ ...props }) => <li className="mb-1 leading-relaxed pl-1" {...props} />,
-          blockquote: ({ ...props }) => (
+          h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+          h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold mt-3 mb-2" {...props} />,
+          h3: ({ node, ...props }: any) => <h3 className="text-md font-semibold mt-2 mb-1" {...props} />,
+          p: ({ node, ...props }: any) => <div className="mb-2 leading-relaxed" {...props} />,
+          ul: ({ node, ...props }: any) => <ul className="list-disc ml-6 mb-6 space-y-3" {...props} />,
+          ol: ({ node, ...props }: any) => <ol className="list-decimal ml-6 mb-6 space-y-3" {...props} />,
+          li: ({ node, ...props }: any) => <li className="mb-1 leading-relaxed pl-1" {...props} />,
+          blockquote: ({ node, ...props }: any) => (
             <blockquote className="border-l-4 border-gray-200 pl-4 italic my-2" {...props} />
           ),
-          code: ({ inline, className, children, ...props }: any) => {
+          pre: ({ node, ...props }: any) => <div {...props} />,
+          code: ({ node, inline, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || "");
             const lang = match ? match[1] : "";
 

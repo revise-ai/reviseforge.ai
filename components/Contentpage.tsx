@@ -2137,10 +2137,12 @@ function ChatView({
   initialQuery,
   uploadedFile,
   sessionId,
+  setIsHydrated,
 }: {
   initialQuery: string;
   uploadedFile: string;
   sessionId: string;
+  setIsHydrated: (v: boolean) => void;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<{ role: "user" | "ai"; message: string }[]>(() => {
@@ -2238,27 +2240,6 @@ function ChatView({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    (async () => {
-      if (sessionId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const past = await loadChatMessages(sessionId, false);
-          if (past.length > 0) {
-            setMessages(past);
-            return;
-          }
-        }
-      }
-      
-      // Only fire initial query if there was no past history found
-      if (initialQuery && messages.length <= 1) {
-        sendToAI(initialQuery);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, initialQuery]);
-
   const sendToAI = async (question: string) => {
     setLoading(true);
     try {
@@ -2273,23 +2254,58 @@ function ChatView({
       setMessages((prev) => [...prev, { role: "ai", message: data.answer }]);
       
       if (sessionId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await persistChatMessage(sessionId, user.id, "user", question, false);
-          await persistChatMessage(sessionId, user.id, "ai", data.answer, false);
-          // Also update last visited
-          await supabase.from("chat_sessions").update({ last_visited: new Date().toISOString() }).eq("id", sessionId);
-        }
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            // Save messages to DB in background
+            persistChatMessage(sessionId, user.id, "user", question, false).catch(console.error);
+            persistChatMessage(sessionId, user.id, "ai", data.answer, false).catch(console.error);
+            supabase.from("chat_sessions").update({ last_visited: new Date().toISOString() }).eq("id", sessionId).catch(console.error);
+          }
+        })();
       }
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "ai", message: "Sorry, something went wrong. Please try again." },
+        { role: "ai", message: "Sorry, I'm having trouble connecting to AI. Please check your connection and try again." },
       ]);
     } finally {
       setLoading(false);
     }
   };
+
+  const historyFetchedRef = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      if (historyFetchedRef.current) return;
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsHydrated(true);
+        return;
+      }
+
+      if (sessionId) {
+        const past = await loadChatMessages(sessionId, false);
+        historyFetchedRef.current = true;
+        if (past.length > 0) {
+          setMessages(past);
+          setIsHydrated(true);
+          return;
+        }
+      }
+      
+      setIsHydrated(true); // Set true immediately if we've checked history
+      
+      // If we got here, no history was found. 
+      // Only fire initial query if this is the first time and we have a query.
+      if (initialQuery && messages.length <= 2) { 
+        sendToAI(initialQuery); // Don't await here, let it run
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, initialQuery]);
 
   const sendMessage = async () => {
     let text = input.trim();
@@ -2614,6 +2630,16 @@ export default function Contentpage() {
   const [recordingSessionId, setRecordingSessionId] = useState<string>("");
   const isRec = isRecording && !!recordingSessionId;
 
+  const title = isRecording
+    ? `Recording at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+    : isChat
+      ? initialQuery && initialQuery.length < 50 ? initialQuery : (uploadedFile || "Chat")
+      : url
+        ? url.replace("https://", "").replace("www.", "").slice(0, 70)
+        : uploadedFile
+          ? uploadedFile
+          : "Content";
+
   const [activeTool, setActiveTool] = useState<ActiveTool>(null);
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -2849,6 +2875,13 @@ export default function Contentpage() {
             loadCachedChaptersAndTranscripts(sessionId, false),
             loadCachedData(sessionId, false),
           ]);
+          
+          console.log("[Hydration] Loaded from cache:", { 
+            chat: chatHistory.length, 
+            chapters: cachedChapters.chapters.length, 
+            summary: !!cachedStudyData.summary 
+          });
+
           if (chatHistory.length) setChatMessages(chatHistory);
           if (cachedChapters.chapters.length) setChapters(cachedChapters.chapters);
           if (cachedChapters.transcripts.length) setTranscripts(cachedChapters.transcripts);
@@ -2938,8 +2971,20 @@ export default function Contentpage() {
   }, [videoTitle, sessionId]);
 
   useEffect(() => {
-    if (!isHydrated || !url || isRecording || isChat || (chapters.length > 0 && !chaptersLoading)) return;
+    // PREVENT AUTO-GENERATION IF HYDRATION IS STILL PENDING OR IF CHAPTERS ALREADY EXIST
+    if (!isHydrated || !url || isRecording || isChat || (chapters && chapters.length > 0) || chaptersLoading) return;
+    
+    // Check if we already have chapters in DB just to be absolutely sure
     (async () => {
+      if (sessionId) {
+        const cached = await loadCachedChaptersAndTranscripts(sessionId, false);
+        if (cached.chapters.length > 0) {
+          setChapters(cached.chapters);
+          setTranscripts(cached.transcripts);
+          return;
+        }
+      }
+
       setChaptersLoading(true);
       try {
         const res = await fetch("/api/generate-chapters", {
@@ -3056,6 +3101,16 @@ export default function Contentpage() {
           setSummaryLoading(true);
           setSummaryError("");
           try {
+            // Check cache first
+            if (recordingSessionId) {
+              const cached = await supabase.from("content_summaries").select("summary").eq("recording_session_id", recordingSessionId).maybeSingle();
+              if (cached.data?.summary) {
+                setSummary(cached.data.summary);
+                setSummaryLoading(false);
+                return;
+              }
+            }
+
             const res = await fetch("/api/generate-summary-recording", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -3080,6 +3135,14 @@ export default function Contentpage() {
           setQuizLoading(true);
           setQuizError("");
           try {
+            if (recordingSessionId) {
+              const cached = await loadCachedData(recordingSessionId, true);
+              if (cached.quizQuestions.length > 0) {
+                setQuizQuestions(cached.quizQuestions);
+                setQuizLoading(false);
+                return;
+              }
+            }
             const res = await fetch("/api/generate-quiz-recording", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -3105,6 +3168,14 @@ export default function Contentpage() {
           setFlashcardsLoading(true);
           setFlashcardsError("");
           try {
+            if (recordingSessionId) {
+              const cached = await loadCachedData(recordingSessionId, true);
+              if (cached.flashcards.length > 0) {
+                setFlashcards(cached.flashcards);
+                setFlashcardsLoading(false);
+                return;
+              }
+            }
             const res = await fetch("/api/generate-flashcards-recording", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -3153,6 +3224,16 @@ export default function Contentpage() {
           setSummaryLoading(true);
           setSummaryError("");
           try {
+            // Check cache first
+            if (sessionId) {
+              const cached = await supabase.from("content_summaries").select("summary").eq("session_id", sessionId).maybeSingle();
+              if (cached.data?.summary) {
+                setSummary(cached.data.summary);
+                setSummaryLoading(false);
+                return;
+              }
+            }
+
             // For summary, we need to upload to Gemini first and then generate
             const form = new FormData();
             form.append("file", blob, fileName);
@@ -3195,6 +3276,14 @@ export default function Contentpage() {
           setQuizLoading(true);
           setQuizError("");
           try {
+            if (sessionId) {
+              const cached = await loadCachedData(sessionId, false);
+              if (cached.quizQuestions.length > 0) {
+                setQuizQuestions(cached.quizQuestions);
+                setQuizLoading(false);
+                return;
+              }
+            }
             const form = new FormData();
             form.append("file", blob, fileName);
             
@@ -3223,6 +3312,14 @@ export default function Contentpage() {
           setFlashcardsLoading(true);
           setFlashcardsError("");
           try {
+            if (sessionId) {
+              const cached = await loadCachedData(sessionId, false);
+              if (cached.flashcards.length > 0) {
+                setFlashcards(cached.flashcards);
+                setFlashcardsLoading(false);
+                return;
+              }
+            }
             const form = new FormData();
             form.append("file", blob, fileName);
             
@@ -3257,6 +3354,17 @@ export default function Contentpage() {
         setSummaryLoading(true);
         setSummaryError("");
         try {
+          // Double check database first
+          const activeSid = isRec ? recordingSessionId : sessionId;
+          if (activeSid) {
+            const cached = await supabase.from("content_summaries").select("summary").eq(isRec ? "recording_session_id" : "session_id", activeSid).maybeSingle();
+            if (cached.data?.summary) {
+              setSummary(cached.data.summary);
+              setSummaryLoading(false);
+              return;
+            }
+          }
+
           const res = await fetch("/api/generate-summary", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -3277,6 +3385,14 @@ export default function Contentpage() {
         setQuizLoading(true);
         setQuizError("");
         try {
+          if (sessionId) {
+            const cached = await loadCachedData(sessionId, false);
+            if (cached.quizQuestions.length > 0) {
+              setQuizQuestions(cached.quizQuestions);
+              setQuizLoading(false);
+              return;
+            }
+          }
           const res = await fetch("/api/generate-quiz-youtube", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -3298,6 +3414,14 @@ export default function Contentpage() {
         setFlashcardsLoading(true);
         setFlashcardsError("");
         try {
+          if (sessionId) {
+            const cached = await loadCachedData(sessionId, false);
+            if (cached.flashcards.length > 0) {
+              setFlashcards(cached.flashcards);
+              setFlashcardsLoading(false);
+              return;
+            }
+          }
           const res = await fetch("/api/generate-flashcards-youtube", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -3342,8 +3466,9 @@ export default function Contentpage() {
     setChatInput("");
     setChatLoading(true);
 
+    // PERSIST USER MESSAGE IMMEDIATELY
     if (activeSid && userId) {
-      await persistChatMessage(activeSid, userId, "user", q, isRec);
+      persistChatMessage(activeSid, userId, "user", q, isRec).catch(console.error);
     }
 
     try {
@@ -3379,18 +3504,19 @@ export default function Contentpage() {
       setChatMessages((prev) => [...prev, { role: "ai", message: answer }]);
 
       if (activeSid && userId) {
+        // PERSIST AI RESPONSE
         await persistChatMessage(activeSid, userId, "ai", answer, isRec);
         
         // Update recent session entry
-        await updateRecentSession({
+        updateRecentSession({
           userId,
           sessionId: activeSid,
-          type: isRec ? 'recording' : 'youtube',
+          type: isRec ? 'recording' : (mode === 'file' ? 'file' : 'youtube'),
           title: videoTitle || title,
-          subtitle: isRec ? 'recording' : 'youtube',
+          subtitle: isRec ? 'recording' : (mode === 'file' ? 'file' : 'youtube'),
           href: window.location.pathname + window.location.search,
-          videoId: isRec ? undefined : extractVideoId(url) ?? undefined,
-        });
+          videoId: (isRec || mode === 'file') ? undefined : extractVideoId(url) ?? undefined,
+        }).catch(console.error);
       }
     } catch (e: any) {
       setChatMessages((prev) => [
@@ -3405,17 +3531,8 @@ export default function Contentpage() {
     } finally {
       setChatLoading(false);
     }
-  }, [chatInput, url, isRecording, isRec, recordingSessionId, chatMessages, chatLoading, sessionId, transcripts]);
+  }, [chatInput, url, isRecording, isRec, recordingSessionId, chatMessages, chatLoading, sessionId, transcripts, mode, fileUri, videoTitle]);
 
-  const title = isRecording
-    ? `Recording at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
-    : isChat
-      ? initialQuery && initialQuery.length < 50 ? initialQuery : (uploadedFile || "Chat")
-      : url
-        ? url.replace("https://", "").replace("www.", "").slice(0, 70)
-        : uploadedFile
-          ? uploadedFile
-          : "Content";
 
   const handleTitleEdit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -3455,7 +3572,7 @@ export default function Contentpage() {
       <div className="flex h-screen bg-white overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden ml-[90px] min-w-0">
-          <ChatView initialQuery={initialQuery} uploadedFile={uploadedFile} sessionId={sessionId} />
+          <ChatView initialQuery={initialQuery} uploadedFile={uploadedFile} sessionId={sessionId} setIsHydrated={setIsHydrated} />
         </div>
       </div>
     );

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 
 export default function IntegrationPage() {
-  const [activeIntegration, setActiveIntegration] = useState<"gdrive" | "zoom" | "notion" | "canvas" | null>(null);
+  const [activeIntegration, setActiveIntegration] = useState<"gdrive" | "zoom" | "notion" | "canvas" | "dropbox" | "gmail" | "meet" | "docs" | "slides" | "teams" | "word" | "sheets" | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [rating, setRating] = useState(0);
 
@@ -114,6 +114,198 @@ export default function IntegrationPage() {
         <div className="w-7 h-7 rounded-full bg-[#E72429] flex items-center justify-center pt-0.5">
           <span className="text-[12px] font-black text-white leading-none">CV</span>
         </div>
+      )
+    },
+    {
+      id: "dropbox" as const,
+      name: "Dropbox",
+      slug: "Dropbox",
+      provider: "ReviseForge",
+      description: "Securely sync study documents and research papers from your Dropbox folders.",
+      headerSubtitle: "Sync your research and document library.",
+      overview: "Integrate your Dropbox folders with ReviseForge to automatically analyze synchronized research papers and academic drafts.",
+      features: [
+        "Direct folder-to-session synchronization",
+        "Auto-upload research PDF documents",
+        "Maintain document versioning for study notes"
+      ],
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-[52px] h-[52px]" fill="#0061FF" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 2L12 6L6 10L0 6L6 2ZM18 2L24 6L18 10L12 6L18 2ZM6 10L12 14L6 18L0 14L6 10ZM18 10L24 14L18 18L12 14L18 10ZM12 15L18 19L12 23L6 19L12 15Z"/>
+        </svg>
+      ),
+      cardIcon: (
+        <svg viewBox="0 0 24 24" className="w-7 h-7" fill="#0061FF" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 2L12 6L6 10L0 6L6 2ZM18 2L24 6L18 10L12 6L18 2ZM6 10L12 14L6 18L0 14L6 10ZM18 10L24 14L18 18L12 14L18 10ZM12 15L18 19L12 23L6 19L12 15Z"/>
+        </svg>
+      )
+    },
+    {
+      id: "gmail" as const,
+      name: "Gmail",
+      slug: "Gmail",
+      provider: "ReviseForge",
+      description: "Import academic newsletters, feedback, and course updates from your inbox.",
+      headerSubtitle: "Digest course updates from your inbox.",
+      overview: "Sync your academic Gmail account to extract important lecture summaries, professor emails, and course notifications directly into study guides.",
+      features: [
+        "Extract course material from attachments",
+        "Summarize academic newsletters",
+        "Auto-organize professor feedback"
+      ],
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-[52px] h-[52px]" xmlns="http://www.w3.org/2000/svg">
+          <path d="M24 4.5v15c0 .85-.65 1.5-1.5 1.5H21V7.38l-9 5.62-9-5.62V21H1.5c-.85 0-1.5-.65-1.5-1.5v-15c0-.85.65-1.5 1.5-1.5H3l9 5.62L21 3h1.5c.85 0 1.5.65 1.5 1.5z" fill="#EA4335"/>
+        </svg>
+      ),
+      cardIcon: (
+        <svg viewBox="0 0 24 24" className="w-7 h-7" xmlns="http://www.w3.org/2000/svg">
+          <path d="M24 4.5v15c0 .85-.65 1.5-1.5 1.5H21V7.38l-9 5.62-9-5.62V21H1.5c-.85 0-1.5-.65-1.5-1.5v-15c0-.85.65-1.5 1.5-1.5H3l9 5.62L21 3h1.5c.85 0 1.5.65 1.5 1.5z" fill="#EA4335"/>
+        </svg>
+      )
+    },
+    {
+      id: "meet" as const,
+      name: "Google Meet",
+      slug: "Google-Meet",
+      provider: "ReviseForge",
+      description: "Automatically capture meeting transcripts and generate context-aware notes.",
+      headerSubtitle: "Capture discussion-based learning.",
+      overview: "Connect Google Meet to record and analyze seminars, study groups, and office hours. Never miss a detail from verbal academic discussions.",
+      features: [
+        "Real-time transcription for active sessions",
+        "Participant-based highlights and notes",
+        "Integration with Google Calendar for scheduled classes"
+      ],
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-[52px] h-[52px]" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 12.5V9c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h10c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" fill="#00AC47"/>
+        </svg>
+      ),
+      cardIcon: (
+        <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 12.5V9c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h10c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" fill="#00AC47"/>
+        </svg>
+      )
+    },
+    {
+      id: "docs" as const,
+      name: "Google Docs",
+      slug: "Google-Docs",
+      provider: "ReviseForge",
+      description: "Live sync your collaborative study documents and convert them into flashcards.",
+      headerSubtitle: "Seamlessly analyze collaborative notes.",
+      overview: "Link your Google Docs to pull collaborative writing, essay drafts, and group notes into the ReviseForge AI engine for structure analysis.",
+      features: [
+        "Live sync between Doc and Study Session",
+        "Import revision history for deep learning",
+        "Convert doc headers into quiz sections"
+      ],
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-[52px] h-[52px]" fill="#4285F4" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>
+      ),
+      cardIcon: (
+        <svg viewBox="0 0 24 24" className="w-7 h-7" fill="#4285F4" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>
+      )
+    },
+    {
+      id: "slides" as const,
+      name: "Google Slides",
+      slug: "Google-Slides",
+      provider: "ReviseForge",
+      description: "Import lecture presentations and generate slide-by-slide summaries.",
+      headerSubtitle: "Master presentation content instantly.",
+      overview: "Fetch slide decks from your professor and generate concise explanations for every slide, complete with visual context markers.",
+      features: [
+        "Slide-by-slide content extraction",
+        "Automatic diagram-to-text conversion",
+        "Flashcard generation from key bullet points"
+      ],
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-[52px] h-[52px]" fill="#FBBC04" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>
+      ),
+      cardIcon: (
+        <svg viewBox="0 0 24 24" className="w-7 h-7" fill="#FBBC04" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>
+      )
+    },
+    {
+      id: "teams" as const,
+      name: "Microsoft Teams",
+      slug: "Teams",
+      provider: "ReviseForge",
+      description: "Sync study group chats and meeting recordings for instant analysis.",
+      headerSubtitle: "Connect your academic collaboration hub.",
+      overview: "Import conversations and lecture recordings from your institutional Microsoft Teams account to keep all collaborative learning in one place.",
+      features: [
+        "Message-to-Note transformation",
+        "Recording transcription and summary",
+        "Shared channel document extraction"
+      ],
+      icon: (
+        <div className="w-[52px] h-[52px] bg-[#6264A7] rounded-[10px] flex items-center justify-center pt-0.5">
+          <span className="text-white font-black text-2xl">T</span>
+        </div>
+      ),
+      cardIcon: (
+        <div className="w-7 h-7 bg-[#6264A7] rounded-[6px] flex items-center justify-center pt-0.5">
+          <span className="text-white font-black text-[14px]">T</span>
+        </div>
+      )
+    },
+    {
+      id: "word" as const,
+      name: "Microsoft Word",
+      slug: "Word",
+      provider: "ReviseForge",
+      description: "Analyze your thesis drafts and research papers with AI-powered insights.",
+      headerSubtitle: "Deep analysis for your written work.",
+      overview: "Import .docx files to check for academic consistency, generate references, and create comprehensive study summaries for your long-form writing.",
+      features: [
+        "Academic tone and structure analysis",
+        "Bibliography and citation extraction",
+        "Structural outlining based on content"
+      ],
+      icon: (
+        <div className="w-[52px] h-[52px] bg-[#2B579A] rounded-[10px] flex items-center justify-center pt-0.5">
+          <span className="text-white font-black text-2xl">W</span>
+        </div>
+      ),
+      cardIcon: (
+        <div className="w-7 h-7 bg-[#2B579A] rounded-[6px] flex items-center justify-center pt-0.5">
+          <span className="text-white font-black text-[14px]">W</span>
+        </div>
+      )
+    },
+    {
+      id: "sheets" as const,
+      name: "Google Sheets",
+      slug: "Google-Sheets",
+      provider: "ReviseForge",
+      description: "Transform data-heavy spreadsheets into clear academic explanations.",
+      headerSubtitle: "Analyze data-based study material.",
+      overview: "Sync your Google Sheets to explain complex datasets, generate study questions from rows, and understand academic data tables.",
+      features: [
+        "Table-to-Text explanation logic",
+        "Data-driven quiz generation",
+        "Sync updates for research spreadsheets"
+      ],
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-[52px] h-[52px]" fill="#0F9D58" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>
+      ),
+      cardIcon: (
+        <svg viewBox="0 0 24 24" className="w-7 h-7" fill="#0F9D58" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>
       )
     }
   ];

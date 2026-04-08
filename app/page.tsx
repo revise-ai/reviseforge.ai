@@ -12,10 +12,10 @@ const page = () => {
     <div>
       <Hero/>
       <Demo/>
-      <Integrations/>
+      {/* <Integrations/> */}
       <FeaturesSection/>
       <Testimonials/>
-      <CallToAction/>
+      {/* <CallToAction/> */}
       <Footer/>
     </div>
   )
